@@ -1,10 +1,20 @@
 <script>
   import { enhance } from '$app/forms';
+  import SubmitButton from '$lib/components/SubmitButton.svelte';
 
   let { data, form } = $props();
 
   let usarNovoEmpreendimento = $state(data.empreendimentos.length === 0);
   let investidores = $state([{ nome: '', cpf: '', email: '' }]);
+  let cadastrando = $state(false);
+
+  function aoSubmeter() {
+    cadastrando = true;
+    return async ({ update }) => {
+      await update();
+      cadastrando = false;
+    };
+  }
 
   function adicionarInvestidor() {
     if (investidores.length < 3) investidores.push({ nome: '', cpf: '', email: '' });
@@ -44,7 +54,7 @@
   {:else}
     <h1 class="text-xl font-bold text-calper-dark mt-4 mb-6">Nova unidade</h1>
 
-    <form method="POST" use:enhance class="card p-7 flex flex-col gap-5">
+    <form method="POST" use:enhance={aoSubmeter} class="card p-7 flex flex-col gap-5">
       {#if form?.erro}
         <div class="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3.5 py-3">
           {form.erro}
@@ -143,7 +153,7 @@
         </div>
       </div>
 
-      <button type="submit" class="btn-primary mt-1">Cadastrar unidade</button>
+      <SubmitButton loading={cadastrando} class="mt-1">Cadastrar unidade</SubmitButton>
     </form>
   {/if}
 </div>

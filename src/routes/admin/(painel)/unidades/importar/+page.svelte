@@ -2,8 +2,18 @@
   import { enhance } from '$app/forms';
   import Papa from 'papaparse';
   import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
+  import SubmitButton from '$lib/components/SubmitButton.svelte';
 
   let { form } = $props();
+  let importando = $state(false);
+
+  function aoSubmeter() {
+    importando = true;
+    return async ({ update }) => {
+      await update();
+      importando = false;
+    };
+  }
 
   // etapa: 'upload' | 'mapear' | 'confirmar'
   let etapa = $state('upload');
@@ -229,16 +239,18 @@
         {/if}
       </div>
 
-      <form method="POST" action="?/confirmar" use:enhance>
+      <form method="POST" action="?/confirmar" use:enhance={aoSubmeter}>
         <input type="hidden" name="nomeArquivo" value={nomeArquivo} />
         <input type="hidden" name="linhas" value={JSON.stringify(linhasMapeadas)} />
         <div class="flex gap-3">
           <button type="button" class="btn-outline text-sm" onclick={() => (etapa = 'upload')}>
             Voltar
           </button>
-          <button type="submit" class="btn-primary text-sm" disabled={totalValidas === 0}>
-            Confirmar e importar {totalValidas} linha(s) válida(s)
-          </button>
+          <div class="flex-1">
+            <SubmitButton loading={importando} disabled={totalValidas === 0}>
+              Confirmar e importar {totalValidas} linha(s) válida(s)
+            </SubmitButton>
+          </div>
         </div>
         {#if totalInvalidas > 0}
           <p class="text-xs text-gray-500 mt-2">

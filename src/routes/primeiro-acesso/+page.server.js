@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { definirUnidadeNaSessao, hashSenha } from '$lib/server/auth.js';
+import { senhaAceitavel } from '$lib/password.js';
 
 export function load({ locals }) {
   if (!locals.investidor) throw redirect(303, '/login');
@@ -15,8 +16,10 @@ export const actions = {
     const novaSenha = String(form.get('novaSenha') ?? '');
     const confirmarSenha = String(form.get('confirmarSenha') ?? '');
 
-    if (novaSenha.length < 8) {
-      return fail(400, { erro: 'A senha precisa ter pelo menos 8 caracteres.' });
+    if (!senhaAceitavel(novaSenha)) {
+      return fail(400, {
+        erro: 'Sua senha precisa atingir pelo menos o nível "forte": 8+ caracteres, maiúscula, minúscula, número e caractere especial (ao menos 4 desses 5 requisitos).'
+      });
     }
     if (novaSenha !== confirmarSenha) {
       return fail(400, { erro: 'As senhas não coincidem.' });

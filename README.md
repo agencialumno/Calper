@@ -74,6 +74,21 @@ Depois do `db:seed`, use:
 A importação em massa aceita apenas **CSV** por enquanto (exporte do Excel/Google
 Sheets como CSV antes de subir).
 
+## Botão com spinner embutido + força de senha
+
+- `src/lib/components/SubmitButton.svelte` — botão reutilizável: ao carregar, o texto
+  some (fade) e a logo circular gira no centro, com o fundo do botão passando a branco
+  com sombra suave. Em uso nos logins (investidor e funcionário), primeiro acesso,
+  cadastro/importação de unidades e apontamento do dossiê.
+- `src/lib/password.js` — avaliação de força de senha (isomórfico): 5 requisitos
+  (8+ caracteres, maiúscula, minúscula, número, especial). Nível mínimo aceito pelo
+  sistema é **forte** (4 de 5 requisitos) — reforçado tanto no client (tempo real)
+  quanto no servidor (`/primeiro-acesso`), então não dá pra burlar desligando o JS.
+- `src/lib/components/PasswordStrength.svelte` — barra de força + checklist com check
+  verde em tempo real por requisito cumprido.
+- `src/lib/components/AvisoSutil.svelte` — aviso inline (não é `alert()`), usado quando
+  a senha não atinge o nível mínimo ou as senhas não coincidem.
+
 ## Loading spinner
 
 Overlay global (`src/lib/components/LoadingOverlay.svelte`) com a logo circular

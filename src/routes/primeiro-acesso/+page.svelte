@@ -1,8 +1,35 @@
 <script>
   import { enhance } from '$app/forms';
+  import SubmitButton from '$lib/components/SubmitButton.svelte';
+  import PasswordStrength from '$lib/components/PasswordStrength.svelte';
+  import AvisoSutil from '$lib/components/AvisoSutil.svelte';
+  import { senhaAceitavel } from '$lib/password.js';
 
   /** @type {import('./$types').ActionData} */
   export let form;
+
+  let novaSenha = '';
+  let confirmarSenha = '';
+  let enviando = false;
+  let tentouEnviar = false;
+
+  $: senhaForteOk = senhaAceitavel(novaSenha);
+  $: senhasConferem = novaSenha.length > 0 && novaSenha === confirmarSenha;
+  $: mostrarAvisoForca = tentouEnviar && !senhaForteOk;
+  $: mostrarAvisoConfirmacao = tentouEnviar && senhaForteOk && !senhasConferem;
+
+  function aoSubmeter({ cancel }) {
+    tentouEnviar = true;
+    if (!senhaForteOk || !senhasConferem) {
+      cancel();
+      return;
+    }
+    enviando = true;
+    return async ({ update }) => {
+      await update();
+      enviando = false;
+    };
+  }
 </script>
 
 <svelte:head>
@@ -16,42 +43,54 @@
       Este é o seu primeiro acesso — crie uma senha nova para continuar
     </p>
 
-    <form method="POST" use:enhance class="flex flex-col gap-4">
+    <form method="POST" use:enhance={aoSubmeter} class="flex flex-col gap-4">
       {#if form?.erro}
-        <div class="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3.5 py-3">
-          {form.erro}
-        </div>
+        <AvisoSutil>{form.erro}</AvisoSutil>
       {/if}
 
       <div>
-        <label for="novaSenha" class="block text-sm font-semibold text-calper-dark mb-1.5"
-          >Nova senha</label
-        >
+        <label for="novaSenha" class="block text-sm font-semibold text-calper-dark mb-1.5">
+          Nova senha
+        </label>
         <input
           id="novaSenha"
           name="novaSenha"
           class="input"
           type="password"
-          placeholder="Mínimo de 8 caracteres"
+          placeholder="Crie uma senha forte"
+          bind:value={novaSenha}
           required
-          minlength="8"
         />
+        <PasswordStrength senha={novaSenha} />
       </div>
+
+      {#if mostrarAvisoForca}
+        <AvisoSutil>
+          Sua senha ainda não atingiu o nível mínimo exigido (forte). Complete os requisitos
+          acima destacados em verde para continuar.
+        </AvisoSutil>
+      {/if}
+
       <div>
-        <label for="confirmarSenha" class="block text-sm font-semibold text-calper-dark mb-1.5"
-          >Confirmar senha</label
-        >
+        <label for="confirmarSenha" class="block text-sm font-semibold text-calper-dark mb-1.5">
+          Confirmar senha
+        </label>
         <input
           id="confirmarSenha"
           name="confirmarSenha"
           class="input"
           type="password"
           placeholder="Repita a senha"
+          bind:value={confirmarSenha}
           required
-          minlength="8"
         />
       </div>
-      <button type="submit" class="btn-primary mt-2">Salvar e continuar</button>
+
+      {#if mostrarAvisoConfirmacao}
+        <AvisoSutil>As senhas digitadas não coincidem.</AvisoSutil>
+      {/if}
+
+      <SubmitButton loading={enviando}>Salvar e continuar</SubmitButton>
     </form>
   </div>
 </div>

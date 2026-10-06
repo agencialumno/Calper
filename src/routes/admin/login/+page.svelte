@@ -1,8 +1,17 @@
 <script>
   import { enhance } from '$app/forms';
-  import { comLoading } from '$lib/stores/loading.js';
+  import SubmitButton from '$lib/components/SubmitButton.svelte';
 
   let { form } = $props();
+  let entrando = $state(false);
+
+  function aoSubmeter() {
+    entrando = true;
+    return async ({ update }) => {
+      await update();
+      entrando = false;
+    };
+  }
 </script>
 
 <svelte:head>
@@ -15,7 +24,7 @@
     <h1 class="text-xl font-bold text-calper-dark mb-1">Painel da equipe</h1>
     <p class="text-sm text-gray-500 mb-7">Acesso restrito ao time Calper</p>
 
-    <form method="POST" use:enhance={comLoading} class="flex flex-col gap-4">
+    <form method="POST" use:enhance={aoSubmeter} class="flex flex-col gap-4">
       {#if form?.erro}
         <div class="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3.5 py-3">
           {form.erro}
@@ -38,7 +47,9 @@
         <label for="senha" class="block text-sm font-semibold text-calper-dark mb-1.5">Senha</label>
         <input id="senha" name="senha" class="input" type="password" placeholder="••••••••" required />
       </div>
-      <button type="submit" class="btn-primary mt-2">Entrar</button>
+      <div class="mt-2">
+        <SubmitButton loading={entrando}>Entrar</SubmitButton>
+      </div>
     </form>
   </div>
 </div>

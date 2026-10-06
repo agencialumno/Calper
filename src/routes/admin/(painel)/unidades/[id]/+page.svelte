@@ -1,8 +1,18 @@
 <script>
   import { enhance } from '$app/forms';
+  import SubmitButton from '$lib/components/SubmitButton.svelte';
 
   let { data } = $props();
   const u = data.unidade;
+  let adicionando = $state(false);
+
+  function aoSubmeterApontamento() {
+    adicionando = true;
+    return async ({ update }) => {
+      await update();
+      adicionando = false;
+    };
+  }
 
   const statusLabel = {
     regularizado: 'Regularizado',
@@ -74,10 +84,14 @@
     <div class="card p-6">
       <div class="text-sm font-bold text-calper-dark mb-4">Histórico</div>
 
-      <form method="POST" action="?/adicionarApontamento" use:enhance class="flex gap-2 mb-5">
+      <form method="POST" action="?/adicionarApontamento" use:enhance={aoSubmeterApontamento} class="flex gap-2 mb-5">
         <input type="hidden" name="tipo" value="apontamento" />
         <input name="descricao" class="input text-sm" placeholder="Adicionar apontamento..." required />
-        <button type="submit" class="btn-outline text-sm !py-2.5 whitespace-nowrap">Adicionar</button>
+        <div class="w-32 shrink-0">
+          <SubmitButton loading={adicionando} variant="outline" class="!py-2.5 text-sm whitespace-nowrap">
+            Adicionar
+          </SubmitButton>
+        </div>
       </form>
 
       <div class="flex flex-col">
