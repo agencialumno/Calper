@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { db } from './db.js';
-import { cpfValido, formatarCpf } from '$lib/cpf.js';
+import { cpfValido, formatarCpf } from '../cpf.js';
 
 export { cpfValido, formatarCpf };
 
