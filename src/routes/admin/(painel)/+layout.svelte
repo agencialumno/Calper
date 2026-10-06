@@ -4,11 +4,11 @@
   let { data, children } = $props();
 
   const nav = [
-    { href: '/admin/unidades', label: 'Unidades' },
-    { href: '/admin/checkin', label: 'Check-in' }
-    // Dashboard, Agenda e Atualizações da obra entram nos próximos módulos.
-  ];
-
+  { href: '/admin/unidades', label: 'Unidades' },
+  { href: '/admin/checkin', label: 'Check-in' },
+  { href: '/admin/atualizacoes', label: 'Atualizações' }
+  // Dashboard e Agenda entram nos próximos módulos.
+];
   const rotuloPerfil = { admin: 'Admin', gestao: 'Gestão', atendimento: 'Atendimento' };
 </script>
 

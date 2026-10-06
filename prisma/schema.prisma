@@ -16,6 +16,7 @@ model Empreendimento {
   nome        String
   estagioAtual String   @default("Início da Jornada")
   unidades    Unidade[]
+  atualizacoes AtualizacaoEstagio[]
   createdAt   DateTime  @default(now())
 }
 
@@ -135,6 +136,7 @@ model Funcionario {
   ativo     Boolean           @default(true)
   sessoes   SessaoFuncionario[]
   lotes     ImportacaoLote[]
+  atualizacoesPublicadas AtualizacaoEstagio[]
   createdAt DateTime          @default(now())
 }
 
@@ -158,4 +160,31 @@ model ImportacaoLote {
   criadoPorId   String
   criadoPor     Funcionario @relation(fields: [criadoPorId], references: [id])
   createdAt     DateTime    @default(now())
+}
+
+// --- Atualizações da obra (engajamento) ---
+
+model AtualizacaoEstagio {
+  id               String         @id @default(cuid())
+  empreendimentoId String
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id])
+  titulo           String
+  descricao        String
+  midiaBase64      String?        // foto do marco (opcional) — mesma limitação do documento: base64 até trocar por S3/R2
+  publicadoPorId   String
+  publicadoPor     Funcionario    @relation(fields: [publicadoPorId], references: [id])
+  emails           EmailEnviado[]
+  createdAt        DateTime       @default(now())
+}
+
+// Log de disparo — auditoria de quem recebeu cada atualização.
+model EmailEnviado {
+  id            String             @id @default(cuid())
+  atualizacaoId String
+  atualizacao   AtualizacaoEstagio @relation(fields: [atualizacaoId], references: [id])
+  investidorId  String
+  email         String
+  enviado       Boolean            @default(true)
+  erro          String?
+  createdAt     DateTime           @default(now())
 }

@@ -22,6 +22,21 @@
 </svelte:head>
 
 <div class="p-5 max-w-2xl mx-auto flex flex-col gap-6">
+
+    <!-- estágio da obra -->
+  <a
+    href="/jornada"
+    class="rounded-2xl p-5 text-white flex items-center justify-between"
+    style="background: linear-gradient(135deg, #2c333b, #20252b)"
+  >
+    <div>
+      <div class="text-[11px] font-bold text-red-300 tracking-wide mb-1">ESTÁGIO ATUAL DA OBRA</div>
+      <div class="text-lg font-bold">{data.estagioAtual}</div>
+      <div class="text-xs text-gray-400 mt-0.5">{data.empreendimento}</div>
+    </div>
+    <span class="text-xs font-semibold text-white shrink-0">ver jornada →</span>
+  </a>
+
   <!-- agendamentos existentes -->
   <div>
     <h2 class="text-sm font-bold text-calper-dark mb-3">Meus agendamentos</h2>
