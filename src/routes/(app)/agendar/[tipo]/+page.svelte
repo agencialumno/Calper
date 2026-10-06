@@ -7,7 +7,9 @@
 
   let acompanhantes = $state([]);
   let enviando = $state(false);
-  let arquivoNome = $state('');
+  let arquivo = $state(null); // File selecionado
+  let previewUrl = $state('');
+  let tentouEnviar = $state(false);
 
   const maxAcompanhantes = data.tipoEvento.limitePessoas - 1;
 
@@ -18,13 +20,35 @@
     acompanhantes.splice(i, 1);
   }
 
-  function aoSubmeter() {
+  function formatarTamanho(bytes) {
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function aoEscolherArquivo(e) {
+    const f = e.target.files?.[0] ?? null;
+    arquivo = f;
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = f && f.type.startsWith('image/') ? URL.createObjectURL(f) : '';
+  }
+
+  function aoSubmeter({ cancel }) {
+    tentouEnviar = true;
+
+    if (data.tipoEvento.exigeDocumento && !arquivo) {
+      cancel();
+      return;
+    }
+
     enviando = true;
     return async ({ update }) => {
       await update();
       enviando = false;
     };
   }
+
+  const faltaDocumento = $derived(tentouEnviar && data.tipoEvento.exigeDocumento && !arquivo);
 </script>
 
 <svelte:head>
@@ -76,22 +100,58 @@
     {#if data.tipoEvento.exigeDocumento}
       <div>
         <div class="block text-sm font-semibold text-calper-dark mb-1.5">Documento de identificação</div>
-        <label
-          class="card border-dashed p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-calper-red"
-        >
-          <span class="text-sm font-semibold text-calper-dark mb-0.5">
-            {arquivoNome || 'Clique para enviar (JPG, PNG ou PDF)'}
-          </span>
-          <span class="text-xs text-gray-400">máximo 4 MB</span>
-          <input
-            type="file"
-            name="documento"
-            accept="image/jpeg,image/png,application/pdf"
-            class="hidden"
-            required
-            onchange={(e) => (arquivoNome = e.target.files?.[0]?.name ?? '')}
-          />
-        </label>
+
+        {#if arquivo}
+          <label
+            class="card p-3 flex items-center gap-3 cursor-pointer hover:border-calper-red {faltaDocumento ? 'border-calper-red' : ''}"
+          >
+            {#if previewUrl}
+              <img src={previewUrl} alt="Pré-visualização do documento" class="w-14 h-14 rounded-lg object-cover shrink-0" />
+            {:else}
+              <div class="w-14 h-14 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2">
+                  <path d="M4 21V5a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2z" />
+                  <path d="M14 3v6h6" />
+                </svg>
+              </div>
+            {/if}
+            <div class="min-w-0">
+              <div class="text-sm font-semibold text-calper-dark truncate">{arquivo.name}</div>
+              <div class="text-xs text-gray-400">{formatarTamanho(arquivo.size)} · trocar arquivo</div>
+            </div>
+            <input
+              type="file"
+              name="documento"
+              accept="image/jpeg,image/png,application/pdf"
+              class="hidden"
+              onchange={aoEscolherArquivo}
+            />
+          </label>
+        {:else}
+          <label
+            class="card border-dashed p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-calper-red {faltaDocumento ? 'border-calper-red' : ''}"
+          >
+            <span class="text-sm font-semibold text-calper-dark mb-0.5">
+              Clique para enviar (JPG, PNG ou PDF)
+            </span>
+            <span class="text-xs text-gray-400">máximo 4 MB</span>
+            <input
+              type="file"
+              name="documento"
+              accept="image/jpeg,image/png,application/pdf"
+              class="hidden"
+              onchange={aoEscolherArquivo}
+            />
+          </label>
+        {/if}
+
+        {#if faltaDocumento}
+          <div class="mt-2.5">
+            <AvisoSutil>
+              Envie o documento de identificação — ele é obrigatório para este tipo de evento.
+            </AvisoSutil>
+          </div>
+        {/if}
       </div>
     {/if}
 
