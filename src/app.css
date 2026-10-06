@@ -5,6 +5,13 @@
 @layer base {
   html {
     @apply text-calper-dark;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* iPhone com notch/Dynamic Island — evita conteúdo colado nas bordas seguras */
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
@@ -19,6 +26,7 @@
     @apply bg-white border border-gray-100 rounded-2xl;
   }
   .input {
-    @apply w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[15px] text-calper-dark outline-none focus:border-calper-red;
+    /* 16px é o mínimo pra iOS Safari não dar zoom automático ao focar o campo */
+    @apply w-full rounded-xl border border-gray-200 px-3.5 py-3 text-base text-calper-dark outline-none focus:border-calper-red;
   }
 }

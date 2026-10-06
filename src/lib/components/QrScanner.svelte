@@ -1,47 +1,60 @@
 <script>
   import { onDestroy } from 'svelte';
+  import jsQR from 'jsqr';
 
   let { onDetected } = $props();
 
   let video;
+  let canvas;
   let streamAtivo = $state(false);
-  let suportado = $state(typeof window !== 'undefined' && 'BarcodeDetector' in window);
   let erro = $state('');
-  let intervalo;
+  let frameId;
   let mediaStream;
 
   async function iniciar() {
     erro = '';
-    if (!suportado) {
-      erro = 'Seu navegador não suporta leitura de QR Code pela câmera. Use a busca manual abaixo.';
-      return;
-    }
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
       video.srcObject = mediaStream;
+      // iOS Safari exige que o play() aconteça dentro do gesto do usuário — este
+      // método já é chamado a partir do onclick do botão, então está ok aqui.
       await video.play();
       streamAtivo = true;
-
-      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
-      intervalo = setInterval(async () => {
-        if (!video || video.readyState < 2) return;
-        try {
-          const codigos = await detector.detect(video);
-          if (codigos.length > 0) {
-            parar();
-            onDetected?.(codigos[0].rawValue);
-          }
-        } catch {
-          // frame inválido ocasional — ignora e tenta no próximo intervalo
-        }
-      }, 350);
+      frameId = requestAnimationFrame(lerFrame);
     } catch {
       erro = 'Não foi possível acessar a câmera. Confira a permissão do navegador.';
     }
   }
 
+  function lerFrame() {
+    if (!streamAtivo) return;
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imagem = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const resultado = jsQR(imagem.data, imagem.width, imagem.height, {
+        inversionAttempts: 'dontInvert'
+      });
+
+      if (resultado?.data) {
+        const valor = resultado.data;
+        parar();
+        onDetected?.(valor);
+        return;
+      }
+    }
+
+    frameId = requestAnimationFrame(lerFrame);
+  }
+
   function parar() {
-    clearInterval(intervalo);
+    cancelAnimationFrame(frameId);
     mediaStream?.getTracks().forEach((t) => t.stop());
     streamAtivo = false;
   }
@@ -51,8 +64,14 @@
 
 <div class="rounded-2xl overflow-hidden bg-calper-dark relative" style="aspect-ratio: 1 / 1;">
   <!-- svelte-ignore a11y_media_has_caption -->
-  <video bind:this={video} class="w-full h-full object-cover {streamAtivo ? '' : 'hidden'}" muted playsinline
+  <video
+    bind:this={video}
+    class="w-full h-full object-cover {streamAtivo ? '' : 'hidden'}"
+    muted
+    playsinline
+    autoplay
   ></video>
+  <canvas bind:this={canvas} class="hidden"></canvas>
 
   {#if !streamAtivo}
     <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
