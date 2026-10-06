@@ -3,11 +3,12 @@
 
   let { data, children } = $props();
 
-  const nav = [
+const nav = [
+  { href: '/admin/dashboard', label: 'Dashboard' },
   { href: '/admin/unidades', label: 'Unidades' },
   { href: '/admin/checkin', label: 'Check-in' },
   { href: '/admin/atualizacoes', label: 'Atualizações' }
-  // Dashboard e Agenda entram nos próximos módulos.
+  // Agenda entra em um próximo módulo.
 ];
   const rotuloPerfil = { admin: 'Admin', gestao: 'Gestão', atendimento: 'Atendimento' };
 </script>

@@ -94,19 +94,22 @@
   <title>Agendar {data.tipoEvento.nome} — Calper</title>
 </svelte:head>
 
-<div class="p-5 max-w-lg mx-auto">
+<div class="max-w-4xl mx-auto p-5 md:p-10">
   <a href="/painel" class="text-sm text-gray-500 hover:text-calper-dark">← Painel</a>
 
-  <h1 class="text-xl font-bold text-calper-dark mt-3 mb-1">{data.tipoEvento.nome}</h1>
-  <p class="text-sm text-gray-500 mb-6">
-    Até {data.tipoEvento.limitePessoas} pessoa(s) no total, incluindo você.
-  </p>
+  <div class="mt-3 mb-6 md:mb-8">
+    <h1 class="text-xl md:text-2xl font-bold text-calper-dark mb-1">{data.tipoEvento.nome}</h1>
+    <p class="text-sm text-gray-500">
+      Até {data.tipoEvento.limitePessoas} pessoa(s) no total, incluindo você.
+    </p>
+  </div>
 
+  <div class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-6 md:gap-8 items-start">
   <form
     method="POST"
     enctype="multipart/form-data"
     use:enhance={aoSubmeter}
-    class="card p-6 flex flex-col gap-5"
+    class="card p-6 md:p-8 flex flex-col gap-5"
   >
     {#if form?.erro}
       <AvisoSutil>{form.erro}</AvisoSutil>
@@ -269,4 +272,38 @@
 
     <SubmitButton loading={enviando}>Confirmar agendamento</SubmitButton>
   </form>
+
+  <!-- resumo (visível já no mobile embaixo do form, e fixo ao lado no desktop) -->
+  <aside class="card p-6 md:sticky md:top-24 flex flex-col gap-4">
+    <div>
+      <div class="text-xs font-bold text-gray-400 tracking-wide mb-1">EVENTO</div>
+      <div class="text-base font-bold text-calper-dark">{data.tipoEvento.nome}</div>
+    </div>
+    <div class="h-px bg-gray-100"></div>
+    <div class="flex flex-col gap-3 text-sm">
+      <div class="flex items-center gap-2.5 text-gray-600">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2" class="shrink-0"><path d="M16 2v4M8 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg>
+        Janela de agendamento: amanhã até 90 dias à frente
+      </div>
+      <div class="flex items-center gap-2.5 text-gray-600">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2" class="shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Horários fixos, das {data.horarios[0]} às {data.horarios[data.horarios.length - 1]}
+      </div>
+      <div class="flex items-center gap-2.5 text-gray-600">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2" class="shrink-0"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Até {data.tipoEvento.limitePessoas} pessoa(s) no total
+      </div>
+      {#if data.tipoEvento.exigeDocumento}
+        <div class="flex items-center gap-2.5 text-gray-600">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2" class="shrink-0"><path d="M4 21V5a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M14 3v6h6"/></svg>
+          Documento de identificação obrigatório
+        </div>
+      {/if}
+    </div>
+    <div class="h-px bg-gray-100"></div>
+    <p class="text-xs text-gray-400 leading-relaxed">
+      Depois de confirmado, você poderá cancelar a qualquer momento pela tela do agendamento.
+    </p>
+  </aside>
+  </div>
 </div>
