@@ -1,5 +1,6 @@
 <script>
   import { enhance } from '$app/forms';
+  import { comLoading } from '$lib/stores/loading.js';
 
   /** @type {import('./$types').ActionData} */
   export let form;
@@ -43,7 +44,7 @@
       <h1 class="text-2xl font-bold text-calper-dark mb-1">Entrar</h1>
       <p class="text-sm text-gray-500 mb-9">Acesse com seu CPF para ver sua unidade</p>
 
-      <form method="POST" use:enhance class="flex flex-col gap-4">
+      <form method="POST" use:enhance={comLoading} class="flex flex-col gap-4">
         {#if form?.erro}
           <div class="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3.5 py-3">
             {form.erro}

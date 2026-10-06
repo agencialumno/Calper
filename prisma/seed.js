@@ -17,11 +17,12 @@ async function main() {
     data: { empreendimentoId: empreendimento.id, bloco: 'A', numero: '302' }
   });
 
+  // CPF de teste válido (passa na validação de dígito verificador: 111.444.777-35)
   // senha temporária de teste: Calper@123 (troque no primeiro acesso real)
   const investidor = await db.investidor.create({
     data: {
       nome: 'Mariana Souza',
-      cpf: '12345678900',
+      cpf: '11144477735',
       senhaHash: hashSenha('Calper@123'),
       primeiroAcesso: true
     }

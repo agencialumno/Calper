@@ -28,7 +28,7 @@ Stack: SvelteKit + Tailwind CSS + Prisma (PostgreSQL) + Vercel. Runtime/gerencia
    bun run dev
    ```
 4. Acesse `/login` e entre com o usuário de teste do seed:
-   - CPF: `123.456.789-00`
+   - CPF: `111.444.777-35`
    - Senha: `Calper@123` (primeiro acesso — vai pedir troca de senha)
 
 ## Módulo implementado: Autenticação
@@ -73,6 +73,16 @@ Depois do `db:seed`, use:
 
 A importação em massa aceita apenas **CSV** por enquanto (exporte do Excel/Google
 Sheets como CSV antes de subir).
+
+## Loading spinner
+
+Overlay global (`src/lib/components/LoadingOverlay.svelte`) com a logo circular
+(`favicon.png`) girando — aparece automaticamente durante qualquer navegação
+(ex: depois de um redirect de login) e também pode ser ligado manualmente em
+formulários com `use:enhance={comLoading}` (de `$lib/stores/loading.js`), pra
+cobrir o intervalo entre o clique e a resposta do servidor mesmo quando não
+há navegação (ex: erro de senha). Já aplicado nos logins do investidor e do
+funcionário.
 
 ### Próximo módulo
 Agendamento (os 5 tipos de evento, regras de bloqueio, upload de documento, QR Code).
