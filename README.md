@@ -41,5 +41,38 @@ Stack: SvelteKit + Tailwind CSS + Prisma (PostgreSQL) + Vercel. Runtime/gerencia
 - Cabeçalho do painel mostra só "Unidade X — Bloco Y" (sem saudação pessoal, já que a conta é da unidade)
 - Logout: `POST /logout`
 
+## Módulo implementado: Cadastro de unidades + importação em massa
+
+Acesso em `/admin` — login separado do investidor, só pra equipe Calper.
+
+- Login do time: `/admin/login` (usuário de teste do seed abaixo)
+- Perfis: `admin` e `gestao` têm acesso a este módulo; `atendimento` ainda não (entra no
+  módulo de check-in)
+- `/admin/unidades` — listagem com busca por unidade/bloco/empreendimento
+- `/admin/unidades/nova` — cadastro manual (até 3 investidores por unidade; gera senha
+  temporária só para CPF novo; se o CPF já existe, apenas vincula à unidade)
+- `/admin/unidades/importar` — importação em massa via CSV:
+  1. upload do arquivo
+  2. mapeamento de colunas (não exige nomes de coluna específicos)
+  3. prévia com validação linha a linha (CPF, e-mail, campos obrigatórios)
+  4. confirmação — linhas com problema são ignoradas e listadas no resultado, sem travar
+     o restante
+  5. ao final, baixa um CSV com nome/CPF/e-mail/senha temporária de cada investidor novo
+     (para disparo em lotes — o envio automático por e-mail entra no módulo de
+     atualizações/engajamento)
+- `/admin/unidades/[id]` — dossiê da unidade: investidores vinculados, histórico
+  (timeline) e campo pra adicionar apontamentos; status da unidade editável
+  (regularizado / troca de titularidade / distrato)
+- Toda unidade carrega um `HistoricoUnidade` — criada automaticamente no cadastro
+  (manual ou importação) e por qualquer apontamento adicionado depois
+
+### Testando
+
+Depois do `db:seed`, use:
+- Funcionário: `admin@calper.com.br` / `Calper@123`
+
+A importação em massa aceita apenas **CSV** por enquanto (exporte do Excel/Google
+Sheets como CSV antes de subir).
+
 ### Próximo módulo
-Cadastro de unidades (dossiê completo) + importação em massa via planilha.
+Agendamento (os 5 tipos de evento, regras de bloqueio, upload de documento, QR Code).

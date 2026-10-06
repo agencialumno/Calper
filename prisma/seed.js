@@ -34,7 +34,18 @@ async function main() {
     ]
   });
 
-  console.log('Seed concluído. CPF de teste: 123.456.789-00 / senha: Calper@123');
+  await db.funcionario.create({
+    data: {
+      nome: 'Admin Calper',
+      email: 'admin@calper.com.br',
+      senhaHash: hashSenha('Calper@123'),
+      perfil: 'admin'
+    }
+  });
+
+  console.log('Seed concluído.');
+  console.log('Investidor de teste — CPF: 123.456.789-00 / senha: Calper@123');
+  console.log('Funcionário de teste — e-mail: admin@calper.com.br / senha: Calper@123');
 }
 
 main().finally(() => db.$disconnect());

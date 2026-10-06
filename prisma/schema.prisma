@@ -20,16 +20,31 @@ model Empreendimento {
 }
 
 model Unidade {
-  id               String             @id @default(cuid())
+  id               String               @id @default(cuid())
   empreendimentoId String
-  empreendimento   Empreendimento     @relation(fields: [empreendimentoId], references: [id])
+  empreendimento   Empreendimento       @relation(fields: [empreendimentoId], references: [id])
   bloco            String
   numero           String
-  status           String             @default("regularizado") // regularizado | troca_titularidade | distrato
+  status           String               @default("regularizado") // regularizado | troca_titularidade | distrato
+  observacoes      String?              // anotações livres do dossiê
   investidores     UnidadeInvestidor[]
-  createdAt        DateTime           @default(now())
+  historico        HistoricoUnidade[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   @@unique([empreendimentoId, bloco, numero])
+}
+
+// Linha do tempo da unidade — "a unidade não é só o CPF": todo evento relevante
+// fica registrado aqui, independente de quem é o investidor no momento.
+model HistoricoUnidade {
+  id          String   @id @default(cuid())
+  unidadeId   String
+  unidade     Unidade  @relation(fields: [unidadeId], references: [id])
+  tipo        String   // cadastro | vistoria | avaliacao | apontamento | evento_realizado | documento | outro
+  descricao   String
+  criadoPorId String?  // Funcionario.id, quando aplicável
+  createdAt   DateTime @default(now())
 }
 
 model Investidor {
@@ -62,4 +77,40 @@ model Sessao {
   unidadeId    String?    // unidade selecionada nesta sessão (quando há mais de uma)
   expiresAt    DateTime
   createdAt    DateTime   @default(now())
+}
+
+// --- Time Calper (painel admin) ---
+
+model Funcionario {
+  id        String            @id @default(cuid())
+  nome      String
+  email     String            @unique
+  senhaHash String
+  perfil    String            @default("atendimento") // admin | gestao | atendimento
+  ativo     Boolean           @default(true)
+  sessoes   SessaoFuncionario[]
+  lotes     ImportacaoLote[]
+  createdAt DateTime          @default(now())
+}
+
+model SessaoFuncionario {
+  id            String      @id // token da sessão
+  funcionarioId String
+  funcionario   Funcionario @relation(fields: [funcionarioId], references: [id])
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+}
+
+// Registro de cada rodada de importação em massa (auditoria + senhas temporárias geradas).
+model ImportacaoLote {
+  id            String      @id @default(cuid())
+  nomeArquivo   String
+  totalLinhas   Int
+  unidadesCriadas Int
+  investidoresCriados Int
+  erros         Json?       // linhas que não puderam ser importadas, com o motivo
+  credenciais   Json?       // [{ nome, cpf, email, senhaTemporaria }] geradas nesse lote
+  criadoPorId   String
+  criadoPor     Funcionario @relation(fields: [criadoPorId], references: [id])
+  createdAt     DateTime    @default(now())
 }
