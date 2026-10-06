@@ -10,11 +10,13 @@ Stack: SvelteKit + Tailwind CSS + Prisma (PostgreSQL) + Vercel. Runtime/gerencia
 
 ## Rodando localmente
 
-1. Configure o banco (Supabase → Project Settings → Database → Connection string):
+1. Configure o banco (Vercel → projeto → aba Storage → Create Database → Postgres):
    ```
-   cp .env.example .env
-   # edite DATABASE_URL (pooler, porta 6543) e DIRECT_URL (direta, porta 5432)
+   bun install -g vercel
+   vercel link
+   vercel env pull .env
    ```
+   Isso já baixa o `.env` com `DATABASE_URL` preenchido. Se preferir configurar manualmente, use `.env.example` como base.
 2. Instale dependências e gere o schema:
    ```
    bun install
