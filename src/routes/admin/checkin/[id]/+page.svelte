@@ -96,12 +96,27 @@
         </div>
       </div>
 
-      {#if a.acompanhantes.length}
-        <ul class="text-sm text-calper-dark flex flex-col gap-1 mb-5">
-          {#each a.acompanhantes as nome}
-            <li>· {nome}</li>
+            {#if a.acompanhantes.length}
+        <div class="flex flex-col gap-2 mb-5">
+          {#each a.acompanhantes as ac}
+            <div class="flex items-center gap-2.5 text-sm">
+              {#if ac.documentoBase64}
+                {#if ac.documentoBase64.startsWith('data:application/pdf')}
+                  <a href={ac.documentoBase64} target="_blank" class="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dd0417" stroke-width="2"><path d="M4 21V5a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M14 3v6h6"/></svg>
+                  </a>
+                {:else}
+                  <img src={ac.documentoBase64} alt="Documento de {ac.nome}" class="w-9 h-9 rounded-lg object-cover shrink-0" />
+                {/if}
+              {:else}
+                <div class="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center shrink-0 text-[9px] text-gray-400 text-center leading-tight">
+                  sem doc.
+                </div>
+              {/if}
+              <span class="text-calper-dark">{ac.nome}</span>
+            </div>
           {/each}
-        </ul>
+        </div>
       {/if}
 
       {#if status === 'confirmado'}

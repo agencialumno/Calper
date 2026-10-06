@@ -44,10 +44,13 @@ export const actions = {
     const form = await request.formData();
     const data = String(form.get('data') ?? '');
     const horario = String(form.get('horario') ?? '');
-    const acompanhantes = form
-      .getAll('acompanhante')
-      .map((n) => String(n).trim())
-      .filter(Boolean);
+
+    const nomesAcompanhantes = form.getAll('acompanhanteNome').map((n) => String(n).trim());
+    const documentosAcompanhantes = form.getAll('acompanhanteDocumento');
+
+    const acompanhantesValidos = nomesAcompanhantes
+      .map((nome, i) => ({ nome, documento: documentosAcompanhantes[i] }))
+      .filter((a) => a.nome);
 
     const { minimo, maximo } = faixaDeDatasPermitida();
     const dataEscolhida = new Date(`${data}T00:00:00`);
@@ -59,7 +62,7 @@ export const actions = {
       return fail(400, { erro: 'Escolha um horário válido.' });
     }
 
-    const totalPessoas = 1 + acompanhantes.length;
+    const totalPessoas = 1 + acompanhantesValidos.length;
     if (totalPessoas > tipoEvento.limitePessoas) {
       return fail(400, {
         erro: `Este evento aceita no máximo ${tipoEvento.limitePessoas} pessoa(s), incluindo você.`
@@ -79,6 +82,18 @@ export const actions = {
       }
     }
 
+    let acompanhantesParaCriar;
+    try {
+      acompanhantesParaCriar = await Promise.all(
+        acompanhantesValidos.map(async (a) => ({
+          nome: a.nome,
+          documentoBase64: await arquivoParaBase64(a.documento)
+        }))
+      );
+    } catch (err) {
+      return fail(400, { erro: `Documento de acompanhante inválido: ${err.message}` });
+    }
+
     const [hora, minuto] = horario.split(':').map(Number);
     const dataHora = new Date(`${data}T00:00:00`);
     dataHora.setHours(hora, minuto, 0, 0);
@@ -91,7 +106,7 @@ export const actions = {
         dataHora,
         qrToken: gerarQrToken(),
         documentoBase64,
-        acompanhantes: { create: acompanhantes.map((nome) => ({ nome })) }
+        acompanhantes: { create: acompanhantesParaCriar }
       }
     });
 

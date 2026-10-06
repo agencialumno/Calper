@@ -110,10 +110,11 @@ model Agendamento {
 }
 
 model Acompanhante {
-  id            String      @id @default(cuid())
-  agendamentoId String
-  agendamento   Agendamento @relation(fields: [agendamentoId], references: [id])
-  nome          String
+  id              String      @id @default(cuid())
+  agendamentoId   String
+  agendamento     Agendamento @relation(fields: [agendamentoId], references: [id])
+  nome            String
+  documentoBase64 String?     // opcional — documento de identificação do acompanhante
 }
 
 model Sessao {

@@ -7,16 +7,23 @@
 
   let acompanhantes = $state([]);
   let enviando = $state(false);
-  let arquivo = $state(null); // File selecionado
-  let previewUrl = $state('');
   let tentouEnviar = $state(false);
+
+  // documento principal
+  let inputPrincipal;
+  let arquivoPrincipal = $state(null);
+  let previewPrincipal = $state('');
+  let arrastandoPrincipal = $state(false);
 
   const maxAcompanhantes = data.tipoEvento.limitePessoas - 1;
 
   function adicionarAcompanhante() {
-    if (acompanhantes.length < maxAcompanhantes) acompanhantes.push({ nome: '' });
+    if (acompanhantes.length < maxAcompanhantes) {
+      acompanhantes.push({ nome: '', arquivo: null, previewUrl: '', arrastando: false });
+    }
   }
   function removerAcompanhante(i) {
+    if (acompanhantes[i].previewUrl) URL.revokeObjectURL(acompanhantes[i].previewUrl);
     acompanhantes.splice(i, 1);
   }
 
@@ -25,18 +32,48 @@
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  function aoEscolherArquivo(e) {
-    const f = e.target.files?.[0] ?? null;
-    arquivo = f;
+  function aplicarArquivoPrincipal(f) {
+    arquivoPrincipal = f;
+    if (previewPrincipal) URL.revokeObjectURL(previewPrincipal);
+    previewPrincipal = f && f.type.startsWith('image/') ? URL.createObjectURL(f) : '';
+  }
 
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = f && f.type.startsWith('image/') ? URL.createObjectURL(f) : '';
+  function aoEscolherPrincipal(e) {
+    aplicarArquivoPrincipal(e.target.files?.[0] ?? null);
+  }
+
+  function aoSoltarPrincipal(e) {
+    e.preventDefault();
+    arrastandoPrincipal = false;
+    const f = e.dataTransfer.files?.[0];
+    if (!f) return;
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    inputPrincipal.files = dt.files;
+    aplicarArquivoPrincipal(f);
+  }
+
+  function aplicarArquivoAcompanhante(i, f) {
+    if (acompanhantes[i].previewUrl) URL.revokeObjectURL(acompanhantes[i].previewUrl);
+    acompanhantes[i].arquivo = f;
+    acompanhantes[i].previewUrl = f && f.type.startsWith('image/') ? URL.createObjectURL(f) : '';
+  }
+
+  function aoSoltarAcompanhante(e, i, inputEl) {
+    e.preventDefault();
+    acompanhantes[i].arrastando = false;
+    const f = e.dataTransfer.files?.[0];
+    if (!f) return;
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    inputEl.files = dt.files;
+    aplicarArquivoAcompanhante(i, f);
   }
 
   function aoSubmeter({ cancel }) {
     tentouEnviar = true;
 
-    if (data.tipoEvento.exigeDocumento && !arquivo) {
+    if (data.tipoEvento.exigeDocumento && !arquivoPrincipal) {
       cancel();
       return;
     }
@@ -48,7 +85,9 @@
     };
   }
 
-  const faltaDocumento = $derived(tentouEnviar && data.tipoEvento.exigeDocumento && !arquivo);
+  const faltaDocumentoPrincipal = $derived(
+    tentouEnviar && data.tipoEvento.exigeDocumento && !arquivoPrincipal
+  );
 </script>
 
 <svelte:head>
@@ -99,14 +138,38 @@
 
     {#if data.tipoEvento.exigeDocumento}
       <div>
-        <div class="block text-sm font-semibold text-calper-dark mb-1.5">Documento de identificação</div>
+        <label for="documento-principal" class="block text-sm font-semibold text-calper-dark mb-1.5">
+          Documento de identificação
+        </label>
 
-        {#if arquivo}
-          <label
-            class="card p-3 flex items-center gap-3 cursor-pointer hover:border-calper-red {faltaDocumento ? 'border-calper-red' : ''}"
-          >
-            {#if previewUrl}
-              <img src={previewUrl} alt="Pré-visualização do documento" class="w-14 h-14 rounded-lg object-cover shrink-0" />
+        <!-- input único e persistente — nunca é recriado, por isso o arquivo não se perde -->
+        <input
+          bind:this={inputPrincipal}
+          id="documento-principal"
+          type="file"
+          name="documento"
+          accept="image/jpeg,image/png,application/pdf"
+          class="hidden"
+          onchange={aoEscolherPrincipal}
+        />
+
+        <label
+          for="documento-principal"
+          class="card p-3 flex items-center gap-3 cursor-pointer transition-colors {faltaDocumentoPrincipal
+            ? 'border-calper-red'
+            : arrastandoPrincipal
+              ? 'border-calper-red bg-[#fdeceb]'
+              : 'hover:border-calper-red'} {arquivoPrincipal ? '' : 'border-dashed'}"
+          ondragover={(e) => {
+            e.preventDefault();
+            arrastandoPrincipal = true;
+          }}
+          ondragleave={() => (arrastandoPrincipal = false)}
+          ondrop={aoSoltarPrincipal}
+        >
+          {#if arquivoPrincipal}
+            {#if previewPrincipal}
+              <img src={previewPrincipal} alt="Pré-visualização do documento" class="w-14 h-14 rounded-lg object-cover shrink-0" />
             {:else}
               <div class="w-14 h-14 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2">
@@ -116,36 +179,20 @@
               </div>
             {/if}
             <div class="min-w-0">
-              <div class="text-sm font-semibold text-calper-dark truncate">{arquivo.name}</div>
-              <div class="text-xs text-gray-400">{formatarTamanho(arquivo.size)} · trocar arquivo</div>
+              <div class="text-sm font-semibold text-calper-dark truncate">{arquivoPrincipal.name}</div>
+              <div class="text-xs text-gray-400">{formatarTamanho(arquivoPrincipal.size)} · trocar arquivo</div>
             </div>
-            <input
-              type="file"
-              name="documento"
-              accept="image/jpeg,image/png,application/pdf"
-              class="hidden"
-              onchange={aoEscolherArquivo}
-            />
-          </label>
-        {:else}
-          <label
-            class="card border-dashed p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-calper-red {faltaDocumento ? 'border-calper-red' : ''}"
-          >
-            <span class="text-sm font-semibold text-calper-dark mb-0.5">
-              Clique para enviar (JPG, PNG ou PDF)
-            </span>
-            <span class="text-xs text-gray-400">máximo 4 MB</span>
-            <input
-              type="file"
-              name="documento"
-              accept="image/jpeg,image/png,application/pdf"
-              class="hidden"
-              onchange={aoEscolherArquivo}
-            />
-          </label>
-        {/if}
+          {:else}
+            <div class="flex-1 flex flex-col items-center justify-center text-center py-2.5">
+              <span class="text-sm font-semibold text-calper-dark mb-0.5">
+                {arrastandoPrincipal ? 'Solte o arquivo aqui' : 'Clique ou arraste (JPG, PNG ou PDF)'}
+              </span>
+              <span class="text-xs text-gray-400">máximo 4 MB</span>
+            </div>
+          {/if}
+        </label>
 
-        {#if faltaDocumento}
+        {#if faltaDocumentoPrincipal}
           <div class="mt-2.5">
             <AvisoSutil>
               Envie o documento de identificação — ele é obrigatório para este tipo de evento.
@@ -165,17 +212,55 @@
             </button>
           {/if}
         </div>
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-3">
           {#each acompanhantes as ac, i (i)}
-            <div class="flex gap-2">
-              <input name="acompanhante" bind:value={ac.nome} class="input" placeholder="Nome completo" />
-              <button
-                type="button"
-                class="text-xs text-gray-400 hover:text-calper-red shrink-0 px-2"
-                onclick={() => removerAcompanhante(i)}
+            {@const inputId = `doc-acompanhante-${i}`}
+            <div class="border border-gray-200 rounded-xl p-3 flex flex-col gap-2.5">
+              <div class="flex gap-2">
+                <input name="acompanhanteNome" bind:value={ac.nome} class="input" placeholder="Nome completo" />
+                <button
+                  type="button"
+                  class="text-xs text-gray-400 hover:text-calper-red shrink-0 px-2"
+                  onclick={() => removerAcompanhante(i)}
+                >
+                  remover
+                </button>
+              </div>
+
+              <input
+                id={inputId}
+                type="file"
+                name="acompanhanteDocumento"
+                accept="image/jpeg,image/png,application/pdf"
+                class="hidden"
+                onchange={(e) => aplicarArquivoAcompanhante(i, e.target.files?.[0] ?? null)}
+              />
+              <label
+                for={inputId}
+                class="rounded-lg border border-dashed border-gray-200 p-2.5 flex items-center gap-2.5 cursor-pointer text-xs {ac.arrastando
+                  ? 'border-calper-red bg-[#fdeceb]'
+                  : 'hover:border-calper-red'}"
+                ondragover={(e) => {
+                  e.preventDefault();
+                  ac.arrastando = true;
+                }}
+                ondragleave={() => (ac.arrastando = false)}
+                ondrop={(e) => aoSoltarAcompanhante(e, i, e.currentTarget.previousElementSibling)}
               >
-                remover
-              </button>
+                {#if ac.arquivo}
+                  {#if ac.previewUrl}
+                    <img src={ac.previewUrl} alt="" class="w-9 h-9 rounded object-cover shrink-0" />
+                  {:else}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2" class="shrink-0">
+                      <path d="M4 21V5a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2z" />
+                      <path d="M14 3v6h6" />
+                    </svg>
+                  {/if}
+                  <span class="text-gray-600 truncate">{ac.arquivo.name} · {formatarTamanho(ac.arquivo.size)}</span>
+                {:else}
+                  <span class="text-gray-400">Documento do acompanhante (opcional)</span>
+                {/if}
+              </label>
             </div>
           {/each}
         </div>

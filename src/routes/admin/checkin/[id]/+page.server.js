@@ -28,7 +28,11 @@ export async function load({ params }) {
       documentoBase64: agendamento.documentoBase64,
       investidorNome: agendamento.investidor.nome,
       investidorCpf: agendamento.investidor.cpf,
-      acompanhantes: agendamento.acompanhantes.map((a) => a.nome)
+            acompanhantes: agendamento.acompanhantes.map((a) => ({
+        nome: a.nome,
+        documentoBase64: a.documentoBase64
+      }))
+      
     },
     unidade: {
       id: agendamento.unidade.id,
