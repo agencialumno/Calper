@@ -1,0 +1,31 @@
+{
+  "name": "calper-app",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "node prisma/seed.js"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-vercel": "^5.4.0",
+    "@sveltejs/kit": "^2.9.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "svelte": "^5.2.0",
+    "svelte-check": "^4.0.0",
+    "tailwindcss": "^3.4.14",
+    "vite": "^5.4.11"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0",
+    "qrcode": "^1.5.4"
+  }
+}

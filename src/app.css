@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply text-calper-dark;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gradient-to-br from-[#ef2334] to-[#b80311] text-white font-semibold rounded-xl px-5 py-3.5 transition-opacity hover:opacity-90;
+  }
+  .btn-outline {
+    @apply bg-white border border-gray-200 text-calper-dark font-semibold rounded-xl px-5 py-3.5 hover:bg-gray-50;
+  }
+  .card {
+    @apply bg-white border border-gray-100 rounded-2xl;
+  }
+  .input {
+    @apply w-full rounded-xl border border-gray-200 px-3.5 py-3 text-[15px] text-calper-dark outline-none focus:border-calper-red;
+  }
+}

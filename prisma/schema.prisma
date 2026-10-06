@@ -1,0 +1,65 @@
+// Schema inicial — cobre o necessário para o módulo de autenticação.
+// Os demais campos do dossiê da unidade (vistorias, avaliações, apontamentos,
+// histórico) entram no próximo módulo (Cadastro de Unidades).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Empreendimento {
+  id          String    @id @default(cuid())
+  nome        String
+  estagioAtual String   @default("Início da Jornada")
+  unidades    Unidade[]
+  createdAt   DateTime  @default(now())
+}
+
+model Unidade {
+  id               String             @id @default(cuid())
+  empreendimentoId String
+  empreendimento   Empreendimento     @relation(fields: [empreendimentoId], references: [id])
+  bloco            String
+  numero           String
+  status           String             @default("regularizado") // regularizado | troca_titularidade | distrato
+  investidores     UnidadeInvestidor[]
+  createdAt        DateTime           @default(now())
+
+  @@unique([empreendimentoId, bloco, numero])
+}
+
+model Investidor {
+  id              String              @id @default(cuid())
+  nome            String
+  cpf             String              @unique
+  senhaHash       String
+  primeiroAcesso  Boolean             @default(true)
+  unidades        UnidadeInvestidor[]
+  sessoes         Sessao[]
+  createdAt       DateTime            @default(now())
+}
+
+// Até 3 investidores por unidade; cada um com seu próprio e-mail de contato.
+model UnidadeInvestidor {
+  id           String     @id @default(cuid())
+  unidadeId    String
+  investidorId String
+  email        String
+  unidade      Unidade    @relation(fields: [unidadeId], references: [id])
+  investidor   Investidor @relation(fields: [investidorId], references: [id])
+
+  @@unique([unidadeId, investidorId])
+}
+
+model Sessao {
+  id           String     @id // token da sessão
+  investidorId String
+  investidor   Investidor @relation(fields: [investidorId], references: [id])
+  unidadeId    String?    // unidade selecionada nesta sessão (quando há mais de uma)
+  expiresAt    DateTime
+  createdAt    DateTime   @default(now())
+}
