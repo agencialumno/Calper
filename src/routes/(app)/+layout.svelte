@@ -1,7 +1,6 @@
 <script>
-  /** @type {import('./$types').LayoutData} */
-  export let data;
-  let { children } = $props();
+  /** @type {{ data: import('./$types').LayoutData, children: import('svelte').Snippet }} */
+  let { data, children } = $props();
 </script>
 
 <header class="border-b border-gray-100 px-5 py-4 flex items-center justify-between">

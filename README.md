@@ -1,6 +1,6 @@
 # Calper — Plataforma do Investidor
 
-Stack: SvelteKit + Tailwind CSS + Prisma (PostgreSQL) + Vercel.
+Stack: SvelteKit + Tailwind CSS + Prisma (PostgreSQL) + Vercel. Runtime/gerenciador de pacotes: **Bun**.
 
 ## Assets
 - `static/logo.png` — logo colorida (fundos claros)
@@ -10,20 +10,20 @@ Stack: SvelteKit + Tailwind CSS + Prisma (PostgreSQL) + Vercel.
 
 ## Rodando localmente
 
-1. Configure o banco:
+1. Configure o banco (Supabase → Project Settings → Database → Connection string):
    ```
    cp .env.example .env
-   # edite DATABASE_URL com os dados do seu Postgres
+   # edite DATABASE_URL (pooler, porta 6543) e DIRECT_URL (direta, porta 5432)
    ```
 2. Instale dependências e gere o schema:
    ```
-   npm install
-   npm run db:migrate
-   npm run db:seed
+   bun install
+   bun run db:migrate
+   bun run db:seed
    ```
 3. Suba o servidor:
    ```
-   npm run dev
+   bun run dev
    ```
 4. Acesse `/login` e entre com o usuário de teste do seed:
    - CPF: `123.456.789-00`
