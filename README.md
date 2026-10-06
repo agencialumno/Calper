@@ -69,6 +69,9 @@ Acesso em `/admin` — login separado do investidor, só pra equipe Calper.
 ### Testando
 
 Depois do `db:seed`, use:
+- Investidor 1 (primeiro acesso, 2 unidades vinculadas): CPF `111.444.777-35` / senha `Calper@123`
+- Investidor 2 (acesso direto, 1 unidade só — pula troca de senha e seleção de unidade):
+  CPF `123.456.789-09` / senha `Calper@123`
 - Funcionário: `admin@calper.com.br` / `Calper@123`
 
 A importação em massa aceita apenas **CSV** por enquanto (exporte do Excel/Google
