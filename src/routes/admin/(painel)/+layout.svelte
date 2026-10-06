@@ -16,7 +16,7 @@ const nav = [
 <div class="min-h-screen flex flex-col md:flex-row bg-[#f6f6f7]">
   <!-- sidebar (desktop) / barra superior (mobile) -->
   <aside
-    class="md:basis-[240px] md:min-w-[240px] md:min-h-screen md:flex-col bg-calper-dark flex items-center md:items-stretch gap-1 px-3 md:px-4 py-2.5 md:py-6"
+    class="md:basis-[240px] md:min-w-[240px] md:h-screen md:sticky md:top-0 md:flex-col md:overflow-y-auto bg-calper-dark flex items-center md:items-stretch gap-1 px-3 md:px-4 py-2.5 md:py-6"
   >
     <div class="px-2 md:px-3 md:pb-7 shrink-0">
       <img src="/logo-branca.png" alt="Calper" class="h-5 md:h-6" />
