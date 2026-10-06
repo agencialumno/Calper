@@ -80,6 +80,28 @@
       </div>
     </div>
 
+    <!-- agendamentos -->
+    <div class="card p-6">
+      <div class="text-sm font-bold text-calper-dark mb-4">Agendamentos</div>
+      {#if u.agendamentos.length === 0}
+        <p class="text-sm text-gray-400">Nenhum agendamento ainda.</p>
+      {:else}
+        <div class="flex flex-col gap-2.5">
+          {#each u.agendamentos as a (a.id)}
+            <div class="border border-gray-100 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <div class="text-sm font-bold text-calper-dark">{a.tipoNome}</div>
+                <div class="text-xs text-gray-500 mt-0.5">{formatarData(a.dataHora)}</div>
+              </div>
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full {tipoCor[a.status] ?? tipoCor.outro}">
+                {a.status}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+
     <!-- histórico -->
     <div class="card p-6">
       <div class="text-sm font-bold text-calper-dark mb-4">Histórico</div>

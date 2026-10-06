@@ -29,6 +29,7 @@ model Unidade {
   observacoes      String?              // anotações livres do dossiê
   investidores     UnidadeInvestidor[]
   historico        HistoricoUnidade[]
+  agendamentos     Agendamento[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -55,6 +56,7 @@ model Investidor {
   primeiroAcesso  Boolean             @default(true)
   unidades        UnidadeInvestidor[]
   sessoes         Sessao[]
+  agendamentos    Agendamento[]
   createdAt       DateTime            @default(now())
 }
 
@@ -68,6 +70,49 @@ model UnidadeInvestidor {
   investidor   Investidor @relation(fields: [investidorId], references: [id])
 
   @@unique([unidadeId, investidorId])
+}
+
+// --- Agendamento ---
+
+// Módulo configurável de tipos de evento (não hardcoded) — hoje cobre os 5
+// tipos definidos no escopo, mas permite adicionar outros no futuro.
+model TipoEvento {
+  id              String        @id @default(cuid())
+  slug            String        @unique // visita-obra | vistoria | escritura | entrega-chaves | atendimento
+  nome            String
+  exigeDocumento  Boolean       @default(false)
+  limitePessoas   Int           @default(4) // total de pessoas (investidor + acompanhantes)
+  ativo           Boolean       @default(true)
+  ordem           Int           @default(0)
+  agendamentos    Agendamento[]
+}
+
+model Agendamento {
+  id              String         @id @default(cuid())
+  unidadeId       String
+  unidade         Unidade        @relation(fields: [unidadeId], references: [id])
+  tipoEventoId    String
+  tipoEvento      TipoEvento     @relation(fields: [tipoEventoId], references: [id])
+  investidorId    String         // quem fez o agendamento
+  investidor      Investidor     @relation(fields: [investidorId], references: [id])
+  dataHora        DateTime
+  status          String         @default("confirmado") // confirmado | cancelado | realizado
+  qrToken         String         @unique
+  // Documento de identificação do investidor (base64) — enquanto não há
+  // armazenamento de arquivos (S3/R2) configurado; trocar por upload real
+  // quando a infraestrutura de storage entrar.
+  documentoBase64 String?
+  acompanhantes   Acompanhante[]
+  createdAt       DateTime       @default(now())
+
+  @@index([unidadeId, tipoEventoId, status])
+}
+
+model Acompanhante {
+  id            String      @id @default(cuid())
+  agendamentoId String
+  agendamento   Agendamento @relation(fields: [agendamentoId], references: [id])
+  nome          String
 }
 
 model Sessao {

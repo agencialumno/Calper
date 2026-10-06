@@ -6,7 +6,19 @@ import { hashSenha } from '../src/lib/server/auth.js';
 
 const db = new PrismaClient();
 
+const TIPOS_EVENTO = [
+  { slug: 'visita-obra', nome: 'Visitação à obra', exigeDocumento: true, limitePessoas: 4, ordem: 1 },
+  { slug: 'vistoria', nome: 'Vistoria de unidade', exigeDocumento: false, limitePessoas: 2, ordem: 2 },
+  { slug: 'escritura', nome: 'Assinatura da Escritura', exigeDocumento: true, limitePessoas: 3, ordem: 3 },
+  { slug: 'entrega-chaves', nome: 'Entrega de chaves', exigeDocumento: false, limitePessoas: 2, ordem: 4 },
+  { slug: 'atendimento', nome: 'Atendimento presencial', exigeDocumento: false, limitePessoas: 2, ordem: 5 }
+];
+
 async function main() {
+  for (const tipo of TIPOS_EVENTO) {
+    await db.tipoEvento.upsert({ where: { slug: tipo.slug }, update: tipo, create: tipo });
+  }
+
   let empreendimento = await db.empreendimento.findFirst({ where: { nome: 'Arte Botânica' } });
   if (!empreendimento) {
     empreendimento = await db.empreendimento.create({

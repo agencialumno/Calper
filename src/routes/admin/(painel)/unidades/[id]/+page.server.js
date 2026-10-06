@@ -7,7 +7,8 @@ export async function load({ params }) {
     include: {
       empreendimento: true,
       investidores: { include: { investidor: true } },
-      historico: { orderBy: { createdAt: 'desc' } }
+      historico: { orderBy: { createdAt: 'desc' } },
+      agendamentos: { include: { tipoEvento: true }, orderBy: { dataHora: 'desc' } }
     }
   });
 
@@ -33,6 +34,12 @@ export async function load({ params }) {
         tipo: h.tipo,
         descricao: h.descricao,
         createdAt: h.createdAt
+      })),
+      agendamentos: unidade.agendamentos.map((a) => ({
+        id: a.id,
+        tipoNome: a.tipoEvento.nome,
+        dataHora: a.dataHora,
+        status: a.status
       }))
     }
   };

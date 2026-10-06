@@ -102,5 +102,31 @@ cobrir o intervalo entre o clique e a resposta do servidor mesmo quando não
 há navegação (ex: erro de senha). Já aplicado nos logins do investidor e do
 funcionário.
 
+## Módulo implementado: Agendamento
+
+- `TipoEvento` configurável — seedado com os 5 tipos do escopo: Visitação à obra
+  (exige documento, até 4 pessoas), Vistoria de unidade, Assinatura da Escritura
+  (exige documento), Entrega de chaves, Atendimento presencial
+- Investidor: `/painel` lista agendamentos existentes e os tipos disponíveis pra
+  agendar; tipos já agendados pra essa unidade ficam marcados como indisponíveis
+  (regra "1 unidade = 1 agendamento ativo por tipo de evento", revalidada no
+  servidor contra corrida/duplo clique)
+- `/agendar/[tipo]` — formulário: data (janela de amanhã até 90 dias),
+  horário (slots fixos), upload de documento quando exigido (aceita JPG/PNG/PDF,
+  até 4 MB — guardado como base64 no banco por enquanto, já que a infraestrutura
+  de storage de arquivos, S3/R2, ainda não está configurada; trocar isso é só
+  mudar a função `arquivoParaBase64` em `$lib/server/agendamento.js`), e
+  acompanhantes até o limite de pessoas do tipo de evento
+- `/agendamentos/[id]` — confirmação com **QR Code** gerado na hora (pacote
+  `qrcode`), dados do agendamento, e opção de cancelar (libera o tipo de evento
+  pra reagendar)
+- Dossiê da unidade (admin) agora também lista os agendamentos da unidade
+
+### Simplificações conscientes (fase 2, como já estava no escopo)
+- Horários são fixos (sem integração com Google Agenda pra bloquear datas)
+- Sem confirmação por e-mail ainda (entra no módulo de atualizações/engajamento)
+- Documento fica em base64 no Postgres — funciona, mas não é o ideal pra escala;
+  trocar por S3/Cloudflare R2 quando configurar essa infra
+
 ### Próximo módulo
-Agendamento (os 5 tipos de evento, regras de bloqueio, upload de documento, QR Code).
+Check-in (scanner de QR Code do funcionário + confirmação de presença).
