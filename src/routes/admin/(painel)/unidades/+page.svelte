@@ -1,4 +1,6 @@
 <script>
+  import { goto } from '$app/navigation';
+
   let { data } = $props();
 
   const statusLabel = {
@@ -68,7 +70,7 @@
       {/each}
     </div>
 
-    <!-- desktop: tabela -->
+    <!-- desktop: tabela, com a linha inteira clicável -->
     <div class="card overflow-hidden hidden md:block">
       <table class="w-full border-collapse text-sm">
         <thead>
@@ -81,9 +83,16 @@
         </thead>
         <tbody>
           {#each data.unidades as u (u.id)}
-            <tr class="border-t border-gray-100 hover:bg-gray-50">
+            <tr
+              class="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
+              onclick={() => goto(`/admin/unidades/${u.id}`)}
+            >
               <td class="px-4 py-3.5">
-                <a href={`/admin/unidades/${u.id}`} class="font-bold text-calper-dark hover:text-calper-red">
+                <a
+                  href={`/admin/unidades/${u.id}`}
+                  class="font-bold text-calper-dark hover:text-calper-red"
+                  onclick={(e) => e.stopPropagation()}
+                >
                   {u.numero} — Bloco {u.bloco}
                 </a>
               </td>

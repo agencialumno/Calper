@@ -4,26 +4,10 @@
   let { data, children } = $props();
 
   const nav = [
-    {
-      href: '/admin/dashboard',
-      label: 'Dashboard',
-      icon: 'M3 3v18h18M7 14l4-4 4 4 5-6'
-    },
-    {
-      href: '/admin/unidades',
-      label: 'Unidades',
-      icon: 'M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6'
-    },
-    {
-      href: '/admin/checkin',
-      label: 'Check-in',
-      icon: 'M3 7V3h4M17 3h4v4M21 17v4h-4M7 21H3v-4M7 12h.01M12 7v.01M17 12v.01M12 17v.01'
-    },
-    {
-      href: '/admin/atualizacoes',
-      label: 'Atualizações',
-      icon: 'M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z'
-    }
+    { href: '/admin/dashboard', label: 'Dashboard' },
+    { href: '/admin/unidades', label: 'Unidades' },
+    { href: '/admin/checkin', label: 'Check-in' },
+    { href: '/admin/atualizacoes', label: 'Atualizações' }
     // Agenda entra em um próximo módulo.
   ];
 
@@ -88,20 +72,17 @@
   </aside>
 
   <!-- navegação mobile: fora do header escuro, bem visível logo acima do conteúdo -->
-  <nav class="md:hidden flex items-stretch gap-2 px-4 py-3 bg-white border-b border-gray-100 overflow-x-auto">
+  <nav class="md:hidden grid grid-cols-4 gap-2 px-4 py-3 bg-white border-b border-gray-100">
     {#each nav as item}
       {@const ativo = $page.url.pathname.startsWith(item.href)}
       <a
         href={item.href}
-        class="flex-1 min-w-[84px] flex flex-col items-center justify-center gap-1 px-2 py-2.5 rounded-xl text-[11.5px] font-bold transition-colors active:scale-95"
+        class="flex items-center justify-center px-1.5 py-2.5 rounded-xl text-[12px] font-bold text-center transition-colors active:scale-95"
         class:bg-calper-red={ativo}
         class:text-white={ativo}
         class:bg-gray-100={!ativo}
         class:text-gray-500={!ativo}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d={item.icon} stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
         {item.label}
       </a>
     {/each}
