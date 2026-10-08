@@ -86,6 +86,13 @@
       <p class="text-xs text-gray-400 leading-relaxed mt-8 pt-6 border-t border-gray-100">
         Primeiro acesso? Use a senha temporária enviada por e-mail.
       </p>
+
+      <a
+        href="/admin/login"
+        class="block text-center text-xs font-semibold text-gray-500 hover:text-calper-red mt-4 underline underline-offset-2"
+      >
+        Sou da equipe Calper
+      </a>
     </div>
   </div>
 </div>
