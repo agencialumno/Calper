@@ -107,15 +107,20 @@
           {:else}
             <a
               href={`/agendar/${t.slug}`}
-              class="card p-4 md:p-5 flex items-center justify-between hover:border-calper-red hover:shadow-sm transition-shadow"
+              class="card p-4 md:p-5 flex items-center justify-between gap-3 hover:border-calper-red hover:shadow-sm active:scale-[0.98] transition-all"
             >
-              <div>
+              <div class="min-w-0">
                 <div class="text-sm md:text-[15px] font-bold text-calper-dark">{t.nome}</div>
                 {#if t.exigeDocumento}
                   <div class="text-xs text-gray-500 mt-0.5">documento obrigatório</div>
                 {/if}
               </div>
-              <span class="text-xs font-semibold text-calper-red shrink-0">agendar →</span>
+              <span
+                class="text-xs font-bold text-white px-3.5 py-2 rounded-full shrink-0"
+                style="background: linear-gradient(135deg, #ef2334, #b80311)"
+              >
+                agendar
+              </span>
             </a>
           {/if}
         {/each}

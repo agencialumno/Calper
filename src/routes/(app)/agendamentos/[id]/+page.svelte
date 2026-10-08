@@ -1,6 +1,7 @@
 <script>
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
+  import BackLink from '$lib/components/BackLink.svelte';
 
   let { data } = $props();
   const a = data.agendamento;
@@ -36,7 +37,7 @@
 </svelte:head>
 
 <div class="max-w-3xl mx-auto p-5 md:p-10">
-  <a href="/painel" class="text-sm text-gray-500 hover:text-calper-dark">← Painel</a>
+  <BackLink href="/painel" label="Painel" />
 
   <div class="card mt-4 md:mt-6 p-7 md:p-0 md:flex md:overflow-hidden">
     <!-- QR Code -->
@@ -73,6 +74,12 @@
 
       {#if a.temDocumento}
         <p class="text-xs text-green-700 mb-4 text-left">Documento de identificação enviado ✓</p>
+      {/if}
+
+      {#if a.pesquisaPendente}
+        <a href={`/pesquisa/${a.id}`} class="btn-primary inline-block text-sm md:max-w-xs text-center">
+          Avaliar esta visita
+        </a>
       {/if}
 
       {#if a.status === 'confirmado'}

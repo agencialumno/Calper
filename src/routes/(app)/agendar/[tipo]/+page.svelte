@@ -2,6 +2,7 @@
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
+  import BackLink from '$lib/components/BackLink.svelte';
 
   let { data, form } = $props();
 
@@ -95,7 +96,7 @@
 </svelte:head>
 
 <div class="max-w-4xl mx-auto p-5 md:p-10">
-  <a href="/painel" class="text-sm text-gray-500 hover:text-calper-dark">← Painel</a>
+  <BackLink href="/painel" label="Painel" />
 
   <div class="mt-3 mb-6 md:mb-8">
     <h1 class="text-xl md:text-2xl font-bold text-calper-dark mb-1">{data.tipoEvento.nome}</h1>
