@@ -21,6 +21,7 @@ export const actions = {
     const novaSenha = String(form.get('novaSenha') ?? '');
     const confirmarSenha = String(form.get('confirmarSenha') ?? '');
     const email = String(form.get('email') ?? '').trim();
+    const aceitouTermo = form.get('aceitouTermo') === 'on';
 
     if (!senhaAceitavel(novaSenha)) {
       return fail(400, {
@@ -33,10 +34,13 @@ export const actions = {
     if (!email || !email.includes('@') || !email.includes('.')) {
       return fail(400, { erro: 'Informe um e-mail válido — é pra ele que vamos mandar suas notificações.' });
     }
+    if (!aceitouTermo) {
+      return fail(400, { erro: 'Você precisa aceitar o termo de consentimento para continuar.' });
+    }
 
     await db.investidor.update({
       where: { id: locals.investidor.id },
-      data: { senhaHash: hashSenha(novaSenha), primeiroAcesso: false }
+      data: { senhaHash: hashSenha(novaSenha), primeiroAcesso: false, termoAceitoEm: new Date() }
     });
 
     // o e-mail é definido uma única vez aqui, no primeiro acesso — depois

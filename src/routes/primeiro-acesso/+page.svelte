@@ -13,6 +13,8 @@
   let novaSenha = '';
   let confirmarSenha = '';
   let email = data.emailAtual ?? '';
+  let aceitouTermo = false;
+  let termoAberto = false;
   let enviando = false;
   let tentouEnviar = false;
 
@@ -20,10 +22,11 @@
   $: senhasConferem = novaSenha.length > 0 && novaSenha === confirmarSenha;
   $: mostrarAvisoForca = tentouEnviar && !senhaForteOk;
   $: mostrarAvisoConfirmacao = tentouEnviar && senhaForteOk && !senhasConferem;
+  $: mostrarAvisoTermo = tentouEnviar && !aceitouTermo;
 
   function aoSubmeter({ cancel }) {
     tentouEnviar = true;
-    if (!senhaForteOk || !senhasConferem) {
+    if (!senhaForteOk || !senhasConferem || !aceitouTermo) {
       cancel();
       return;
     }
@@ -108,6 +111,45 @@
 
       {#if mostrarAvisoConfirmacao}
         <AvisoSutil>As senhas digitadas não coincidem.</AvisoSutil>
+      {/if}
+
+      <div class="border border-gray-100 rounded-xl p-3.5 bg-gray-50">
+        <label class="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            name="aceitouTermo"
+            bind:checked={aceitouTermo}
+            class="mt-0.5 w-4 h-4 accent-calper-red shrink-0"
+          />
+          <span class="text-xs text-gray-600 leading-relaxed">
+            Li e aceito os termos de uso e a
+            <button
+              type="button"
+              onclick={() => (termoAberto = !termoAberto)}
+              class="font-bold text-calper-red underline"
+            >
+              política de privacidade
+            </button>
+            da Calper.
+          </span>
+        </label>
+
+        {#if termoAberto}
+          <div class="text-[11px] text-gray-500 leading-relaxed mt-3 pt-3 border-t border-gray-200">
+            A Calper coleta e utiliza seus dados (nome, CPF, e-mail e, quando aplicável,
+            documento de identificação enviado para agendamentos) exclusivamente para
+            viabilizar o relacionamento entre você e a construtora: autenticação, agendamentos,
+            check-in presencial, comunicações sobre sua unidade e andamento da obra. Dados
+            financeiros e contratuais permanecem no sistema de gestão da Calper, fora desta
+            plataforma. Seus dados não são compartilhados com terceiros para fins comerciais.
+            Em conformidade com a LGPD (Lei nº 13.709/2018), você pode solicitar acesso,
+            correção ou exclusão dos seus dados a qualquer momento junto à equipe Calper.
+          </div>
+        {/if}
+      </div>
+
+      {#if mostrarAvisoTermo}
+        <AvisoSutil>Você precisa aceitar o termo de consentimento para continuar.</AvisoSutil>
       {/if}
 
       <SubmitButton loading={enviando}>Salvar e continuar</SubmitButton>
