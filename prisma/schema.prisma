@@ -104,9 +104,31 @@ model Agendamento {
   // quando a infraestrutura de storage entrar.
   documentoBase64 String?
   acompanhantes   Acompanhante[]
+  pesquisa        PesquisaSatisfacao?
   createdAt       DateTime       @default(now())
+  
 
   @@index([unidadeId, tipoEventoId, status])
+}
+
+// Pesquisa pós-visita — baseada no formulário usado hoje pela Calper (Google Forms).
+// Escala de 5 pontos: otimo | muito_bom | bom | ruim | pessimo
+// Pesquisa pós-visita — baseada no formulário usado hoje pela Calper (Google Forms).
+// Escala de 5 pontos: otimo | muito_bom | bom | ruim | pessimo
+model PesquisaSatisfacao {
+  id                     String      @id @default(cuid())
+  agendamentoId          String      @unique
+  agendamento            Agendamento @relation(fields: [agendamentoId], references: [id])
+  educacaoFuncionarios   String
+  organizacaoLimpeza     String
+  expectativasAndamento  String
+  clarezaInformacoes     String
+  acabamentoObra         String
+  atendidoNoHorario      Boolean
+  indicariaCalper        Boolean
+  pontosFortes           String?
+  oportunidadesMelhoria  String?
+  createdAt              DateTime    @default(now())
 }
 
 model Acompanhante {

@@ -1,7 +1,7 @@
 import { db } from '$lib/server/db.js';
+import { mediaPesquisa } from '$lib/pesquisa.js';
 
 const PERIODOS = { '7': 7, '30': 30, '90': 90, '365': 365 };
-
 export async function load({ url }) {
   const periodo = PERIODOS[url.searchParams.get('periodo')] ?? 30;
   const empreendimentoId = url.searchParams.get('empreendimentoId') ?? '';
@@ -27,6 +27,13 @@ export async function load({ url }) {
     db.emailEnviado.findMany({ where: { createdAt: { gte: inicio, lte: fim } } })
   ]);
 
+    const pesquisasPeriodo = await db.pesquisaSatisfacao.findMany({
+    where: {
+      createdAt: { gte: inicio, lte: fim },
+      agendamento: filtroUnidade
+    }
+  });
+
   // KPIs
   const total = agendamentosPeriodo.length;
 
@@ -37,6 +44,16 @@ export async function load({ url }) {
   ).length;
   const baseComparecimento = realizados + naoCompareceram;
   const taxaComparecimento = baseComparecimento > 0 ? Math.round((realizados / baseComparecimento) * 100) : null;
+
+  const totalPesquisas = pesquisasPeriodo.length;
+  const satisfacaoMedia =
+    totalPesquisas > 0
+      ? pesquisasPeriodo.reduce((soma, p) => soma + mediaPesquisa(p), 0) / totalPesquisas
+      : null;
+  const taxaIndicaria =
+    totalPesquisas > 0
+      ? Math.round((pesquisasPeriodo.filter((p) => p.indicariaCalper).length / totalPesquisas) * 100)
+      : null;
 
   const totalEmails = emailsPeriodo.length;
   const emailsEnviados = emailsPeriodo.filter((e) => e.enviado).length;
@@ -77,7 +94,10 @@ export async function load({ url }) {
       total,
       taxaComparecimento,
       totalEmails,
-      taxaEnvioEmail
+      taxaEnvioEmail,
+      satisfacaoMedia: satisfacaoMedia !== null ? Math.round(satisfacaoMedia * 10) / 10 : null,
+      totalPesquisas,
+      taxaIndicaria
     },
     breakdownTipos: breakdownTipos.map((t) => ({ ...t, pct: Math.round((t.qtd / maiorQtdTipo) * 100) })),
     grafico: buckets.map((b) => ({

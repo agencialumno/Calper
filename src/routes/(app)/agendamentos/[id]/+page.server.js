@@ -5,7 +5,7 @@ import { db } from '$lib/server/db.js';
 export async function load({ params, locals }) {
   const agendamento = await db.agendamento.findUnique({
     where: { id: params.id },
-    include: { tipoEvento: true, acompanhantes: true }
+        include: { tipoEvento: true, acompanhantes: true, pesquisa: true }
   });
 
   if (!agendamento || agendamento.unidadeId !== locals.unidadeId) {
@@ -20,8 +20,9 @@ export async function load({ params, locals }) {
       tipoNome: agendamento.tipoEvento.nome,
       dataHora: agendamento.dataHora,
       status: agendamento.status,
-      acompanhantes: agendamento.acompanhantes.map((a) => a.nome),
-      temDocumento: Boolean(agendamento.documentoBase64)
+     acompanhantes: agendamento.acompanhantes.map((a) => a.nome),
+      temDocumento: Boolean(agendamento.documentoBase64),
+      pesquisaPendente: agendamento.status === 'realizado' && !agendamento.pesquisa
     },
     qrDataUrl
   };

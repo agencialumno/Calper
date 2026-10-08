@@ -8,7 +8,7 @@ export async function load({ locals }) {
     db.unidade.findUnique({ where: { id: unidadeId }, include: { empreendimento: true } }),
     db.agendamento.findMany({
       where: { unidadeId },
-      include: { tipoEvento: true },
+      include: { tipoEvento: true, pesquisa: true },
       orderBy: { dataHora: 'desc' }
     }),
     db.tipoEvento.findMany({ where: { ativo: true }, orderBy: { ordem: 'asc' } })
@@ -23,9 +23,14 @@ export async function load({ locals }) {
     }))
   );
 
+  const pesquisasPendentes = agendamentos
+    .filter((a) => a.status === 'realizado' && !a.pesquisa)
+    .map((a) => ({ id: a.id, tipoNome: a.tipoEvento.nome }));
+
   return {
     empreendimento: unidade.empreendimento.nome,
     estagioAtual: unidade.empreendimento.estagioAtual,
+    pesquisasPendentes,
     agendamentos: agendamentos.map((a) => ({
       id: a.id,
       tipoNome: a.tipoEvento.nome,

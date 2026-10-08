@@ -1,4 +1,6 @@
 <script>
+  import { page } from '$app/stores';
+
   let { data } = $props();
 
   const statusEstilo = {
@@ -15,6 +17,8 @@
       minute: '2-digit'
     });
   }
+
+  const mostrarObrigado = $derived($page.url.searchParams.get('pesquisa') === 'obrigado');
 </script>
 
 <svelte:head>
@@ -22,6 +26,28 @@
 </svelte:head>
 
 <div class="max-w-5xl mx-auto p-5 md:p-10">
+  {#if mostrarObrigado}
+    <div class="bg-green-50 border border-green-100 text-green-700 text-sm rounded-xl px-4 py-3 mb-6">
+      Obrigado por responder a pesquisa! Sua opinião ajuda a melhorar a jornada.
+    </div>
+  {/if}
+
+  {#if data.pesquisasPendentes.length > 0}
+    <div class="rounded-2xl bg-[#fdeceb] border border-[#f5c9cb] p-4 md:p-5 mb-6 flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <div class="text-sm font-bold text-calper-dark">Como foi sua visita?</div>
+        <div class="text-xs text-gray-600 mt-0.5">
+          {data.pesquisasPendentes.length === 1
+            ? `Deixe sua avaliação sobre "${data.pesquisasPendentes[0].tipoNome}"`
+            : `Você tem ${data.pesquisasPendentes.length} pesquisas de satisfação pendentes`}
+        </div>
+      </div>
+      <a href={`/pesquisa/${data.pesquisasPendentes[0].id}`} class="btn-primary text-sm !py-2.5 shrink-0">
+        Responder agora
+      </a>
+    </div>
+  {/if}
+
   <!-- estágio da obra -->
   <a
     href="/jornada"

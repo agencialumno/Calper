@@ -100,6 +100,34 @@ async function main() {
     create: { unidadeId: unidade3.id, investidorId: investidor2.id, email: 'carlos@exemplo.com' }
   });
 
+  // --- terceiro investidor de teste: fresco, primeiro acesso pendente, 1 única unidade
+  // (pra testar a troca de senha obrigatória sem reaproveitar os investidores já testados) ---
+  const unidade4 = await db.unidade.upsert({
+    where: {
+      empreendimentoId_bloco_numero: { empreendimentoId: empreendimento.id, bloco: 'C', numero: '501' }
+    },
+    update: {},
+    create: { empreendimentoId: empreendimento.id, bloco: 'C', numero: '501' }
+  });
+
+  // CPF de teste válido: 352.819.674-28
+  const investidor3 = await db.investidor.upsert({
+    where: { cpf: '35281967428' },
+    update: {},
+    create: {
+      nome: 'Juliana Ramos',
+      cpf: '35281967428',
+      senhaHash: hashSenha('Calper@123'),
+      primeiroAcesso: true
+    }
+  });
+
+  await db.unidadeInvestidor.upsert({
+    where: { unidadeId_investidorId: { unidadeId: unidade4.id, investidorId: investidor3.id } },
+    update: {},
+    create: { unidadeId: unidade4.id, investidorId: investidor3.id, email: 'juliana@exemplo.com' }
+  });
+
   await db.funcionario.upsert({
     where: { email: 'admin@calper.com.br' },
     update: {},
@@ -114,6 +142,7 @@ async function main() {
   console.log('Seed concluído.');
   console.log('Investidor 1 (1º acesso, 2 unidades) — CPF: 111.444.777-35 / senha: Calper@123');
   console.log('Investidor 2 (acesso direto, 1 unidade) — CPF: 123.456.789-09 / senha: Calper@123');
+  console.log('Investidor 3 (1º acesso pendente, fresco, 1 unidade) — CPF: 352.819.674-28 / senha: Calper@123');
   console.log('Funcionário de teste — e-mail: admin@calper.com.br / senha: Calper@123');
 }
 
