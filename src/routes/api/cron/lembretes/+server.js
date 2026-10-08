@@ -52,7 +52,8 @@ export async function GET({ request }) {
               tipoNome: ag.tipoEvento.nome,
               unidade: `${ag.unidade.numero} — Bloco ${ag.unidade.bloco}`,
               data,
-              horario
+              horario,
+              agendamentoId: ag.id
             })
           }
         : null

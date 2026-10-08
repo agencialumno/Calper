@@ -73,7 +73,10 @@ export function templateAtualizacaoObra({ nomeInvestidor, empreendimento, titulo
   `;
 }
 
-function baseEmail({ nomeInvestidor, titulo, corpo }) {
+function baseEmail({ nomeInvestidor, titulo, corpo, linkHref, linkTexto }) {
+  const href = linkHref ?? `${APP_URL}/painel`;
+  const texto = linkTexto ?? 'Acessar o painel Calper';
+
   return `
     <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#282e35">
       ${cabecalho()}
@@ -82,14 +85,19 @@ function baseEmail({ nomeInvestidor, titulo, corpo }) {
         <div style="font-size:16px;font-weight:700;margin-bottom:6px">${titulo}</div>
         <div style="font-size:14px;color:#44494f;line-height:1.6">${corpo}</div>
       </div>
-      <p style="font-size:12px;color:#9aa0a8;margin-top:28px">
-        Acompanhe tudo pelo seu painel Calper.
+      <p style="margin-top:28px">
+        <a
+          href="${href}"
+          style="display:inline-block;background:#dd0417;color:#ffffff;font-size:13px;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:10px"
+        >
+          ${texto}
+        </a>
       </p>
     </div>
   `;
 }
 
-export function templateAgendamentoConfirmado({ nomeInvestidor, tipoNome, unidade, data, horario }) {
+export function templateAgendamentoConfirmado({ nomeInvestidor, tipoNome, unidade, data, horario, agendamentoId }) {
   return baseEmail({
     nomeInvestidor,
     titulo: `${tipoNome} confirmado`,
@@ -98,11 +106,13 @@ export function templateAgendamentoConfirmado({ nomeInvestidor, tipoNome, unidad
       <strong>Unidade:</strong> ${unidade}<br />
       <strong>Data:</strong> ${data}<br />
       <strong>Horário:</strong> ${horario}
-    `
+    `,
+    linkHref: agendamentoId ? `${APP_URL}/agendamentos/${agendamentoId}` : undefined,
+    linkTexto: 'Ver agendamento no painel'
   });
 }
 
-export function templateLembreteVisita({ nomeInvestidor, tipoNome, unidade, data, horario }) {
+export function templateLembreteVisita({ nomeInvestidor, tipoNome, unidade, data, horario, agendamentoId }) {
   return baseEmail({
     nomeInvestidor,
     titulo: `Lembrete: ${tipoNome} amanhã`,
@@ -111,17 +121,21 @@ export function templateLembreteVisita({ nomeInvestidor, tipoNome, unidade, data
       <strong>Unidade:</strong> ${unidade}<br />
       <strong>Data:</strong> ${data}<br />
       <strong>Horário:</strong> ${horario}
-    `
+    `,
+    linkHref: agendamentoId ? `${APP_URL}/agendamentos/${agendamentoId}` : undefined,
+    linkTexto: 'Ver agendamento no painel'
   });
 }
 
-export function templatePesquisaDisponivel({ nomeInvestidor, tipoNome }) {
+export function templatePesquisaDisponivel({ nomeInvestidor, tipoNome, agendamentoId }) {
   return baseEmail({
     nomeInvestidor,
     titulo: 'Como foi sua visita?',
     corpo: `
       Seu check-in de "${tipoNome}" foi realizado. Conta pra gente como foi —
       leva menos de um minuto e ajuda a melhorar a experiência da Calper.
-    `
+    `,
+    linkHref: agendamentoId ? `${APP_URL}/pesquisa/${agendamentoId}` : undefined,
+    linkTexto: 'Responder pesquisa'
   });
 }

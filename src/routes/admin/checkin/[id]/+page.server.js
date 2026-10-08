@@ -80,7 +80,8 @@ export const actions = {
             subject: 'Como foi sua visita? — Calper',
             html: templatePesquisaDisponivel({
               nomeInvestidor: agendamento.investidor.nome,
-              tipoNome: agendamento.tipoEvento.nome
+              tipoNome: agendamento.tipoEvento.nome,
+              agendamentoId: agendamento.id
             })
           }
         : null

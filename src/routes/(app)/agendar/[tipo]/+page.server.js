@@ -163,7 +163,8 @@ export const actions = {
               tipoNome: tipoEvento.nome,
               unidade: `${unidade?.numero} — Bloco ${unidade?.bloco}`,
               data,
-              horario
+              horario,
+              agendamentoId: agendamento.id
             })
           }
         : null
