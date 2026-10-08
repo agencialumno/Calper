@@ -55,7 +55,8 @@ model Investidor {
   cpf             String              @unique
   senhaHash       String
   primeiroAcesso  Boolean             @default(true)
-  termoAceitoEm   DateTime?           // aceite do termo de consentimento LGPD, registrado no primeiro acesso
+  termoAceitoEm   DateTime?
+  tutorialVisto   Boolean             @default(false)
   unidades        UnidadeInvestidor[]
   sessoes         Sessao[]
   agendamentos    Agendamento[]

@@ -1,7 +1,9 @@
 <script>
   import { page } from '$app/stores';
+  import TutorialOnboarding from '$lib/components/TutorialOnboarding.svelte';
 
   let { data } = $props();
+  let tutorialAberto = $state(data.mostrarTutorial);
 
   const statusEstilo = {
     confirmado: { texto: 'Confirmado', bg: 'bg-green-50', fg: 'text-green-700' },
@@ -24,6 +26,8 @@
 <svelte:head>
   <title>Painel — Calper</title>
 </svelte:head>
+
+<TutorialOnboarding bind:aberto={tutorialAberto} />
 
 <div class="max-w-5xl mx-auto p-5 md:p-10">
   {#if mostrarObrigado}

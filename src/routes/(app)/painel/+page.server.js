@@ -3,6 +3,7 @@ import { temAgendamentoAtivo } from '$lib/server/agendamento.js';
 
 export async function load({ locals }) {
   const unidadeId = locals.unidadeId;
+  const mostrarTutorial = !locals.investidor.tutorialVisto;
 
   const [unidade, agendamentos, tipos] = await Promise.all([
     db.unidade.findUnique({ where: { id: unidadeId }, include: { empreendimento: true } }),
@@ -28,6 +29,7 @@ export async function load({ locals }) {
     .map((a) => ({ id: a.id, tipoNome: a.tipoEvento.nome }));
 
   return {
+    mostrarTutorial,
     empreendimento: unidade.empreendimento.nome,
     estagioAtual: unidade.empreendimento.estagioAtual,
     pesquisasPendentes,
