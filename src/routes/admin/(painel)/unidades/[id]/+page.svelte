@@ -3,7 +3,7 @@
   import SubmitButton from '$lib/components/SubmitButton.svelte';
 
   let { data } = $props();
-  const u = data.unidade;
+  let u = $derived(data.unidade);
   let adicionando = $state(false);
   let editandoEmailDe = $state(null); // investidorId em edição, ou null
   let salvandoEmail = $state(false);
@@ -85,7 +85,7 @@
                 method="POST"
                 action="?/atualizarEmail"
                 use:enhance={aoSubmeterEmail}
-                class="flex items-center gap-1.5 mt-1"
+                class="flex items-center gap-1.5 mt-1.5"
               >
                 <input type="hidden" name="investidorId" value={inv.investidorId} />
                 <input
@@ -115,10 +115,21 @@
               <button
                 type="button"
                 onclick={() => (editandoEmailDe = inv.investidorId)}
-                class="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5 hover:text-calper-red group"
+                class="w-full flex items-center justify-between gap-2 text-xs text-gray-600 mt-1.5 bg-gray-50 hover:bg-red-50 border border-gray-100 hover:border-red-100 rounded-lg px-2.5 py-2 transition-colors group"
               >
-                {inv.email}
-                <span class="text-[10px] font-bold text-gray-300 group-hover:text-calper-red">editar</span>
+                <span class="truncate">{inv.email}</span>
+                <span
+                  class="flex items-center gap-1 text-[11px] font-bold text-calper-red shrink-0"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path
+                      d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  editar
+                </span>
               </button>
             {/if}
 
