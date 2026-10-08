@@ -23,6 +23,8 @@ export async function load() {
       temMidia: Boolean(a.midiaBase64),
       totalEmails: a.emails.length,
       enviados: a.emails.filter((e) => e.enviado).length,
+      abertos: a.emails.filter((e) => e.abertoEm).length,
+      clicados: a.emails.filter((e) => e.clicadoEm).length,
       createdAt: a.createdAt
     }))
   };
@@ -71,8 +73,22 @@ export const actions = {
       distinct: ['investidorId']
     });
 
+    // os registros de EmailEnviado são criados ANTES de montar o e-mail, pra
+    // já termos o id de cada um disponível pro pixel de abertura e pro link
+    // de clique rastreado dentro do próprio e-mail
+    const idsGerados = vinculos.map(() => crypto.randomUUID());
+    await db.emailEnviado.createMany({
+      data: vinculos.map((v, i) => ({
+        id: idsGerados[i],
+        atualizacaoId: atualizacao.id,
+        investidorId: v.investidorId,
+        email: v.email,
+        enviado: false
+      }))
+    });
+
     const resultados = await Promise.allSettled(
-      vinculos.map((v) =>
+      vinculos.map((v, i) =>
         enviarEmail({
           to: v.email,
           subject: `Atualização — ${empreendimento.nome}`,
@@ -80,21 +96,24 @@ export const actions = {
             nomeInvestidor: v.investidor.nome,
             empreendimento: empreendimento.nome,
             titulo,
-            descricao
+            descricao,
+            emailEnviadoId: idsGerados[i]
           })
         })
       )
     );
 
-    await db.emailEnviado.createMany({
-      data: vinculos.map((v, i) => ({
-        atualizacaoId: atualizacao.id,
-        investidorId: v.investidorId,
-        email: v.email,
-        enviado: resultados[i].status === 'fulfilled',
-        erro: resultados[i].status === 'rejected' ? String(resultados[i].reason?.message ?? 'erro') : null
-      }))
-    });
+    await Promise.all(
+      idsGerados.map((id, i) =>
+        db.emailEnviado.update({
+          where: { id },
+          data: {
+            enviado: resultados[i].status === 'fulfilled',
+            erro: resultados[i].status === 'rejected' ? String(resultados[i].reason?.message ?? 'erro') : null
+          }
+        })
+      )
+    );
 
     // sino pra cada investidor do empreendimento — o e-mail já foi disparado acima
     await db.notificacao.createMany({

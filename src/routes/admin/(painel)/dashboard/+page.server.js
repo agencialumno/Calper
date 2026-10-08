@@ -2,6 +2,7 @@ import { db } from '$lib/server/db.js';
 import { mediaPesquisa } from '$lib/pesquisa.js';
 
 const PERIODOS = { '7': 7, '30': 30, '90': 90, '365': 365 };
+
 export async function load({ url }) {
   const periodo = PERIODOS[url.searchParams.get('periodo')] ?? 30;
   const empreendimentoId = url.searchParams.get('empreendimentoId') ?? '';
@@ -27,7 +28,7 @@ export async function load({ url }) {
     db.emailEnviado.findMany({ where: { createdAt: { gte: inicio, lte: fim } } })
   ]);
 
-    const pesquisasPeriodo = await db.pesquisaSatisfacao.findMany({
+  const pesquisasPeriodo = await db.pesquisaSatisfacao.findMany({
     where: {
       createdAt: { gte: inicio, lte: fim },
       agendamento: filtroUnidade
@@ -58,6 +59,12 @@ export async function load({ url }) {
   const totalEmails = emailsPeriodo.length;
   const emailsEnviados = emailsPeriodo.filter((e) => e.enviado).length;
   const taxaEnvioEmail = totalEmails > 0 ? Math.round((emailsEnviados / totalEmails) * 100) : null;
+
+  // abertura/clique só fazem sentido sobre o que foi de fato entregue
+  const emailsAbertos = emailsPeriodo.filter((e) => e.enviado && e.abertoEm).length;
+  const emailsClicados = emailsPeriodo.filter((e) => e.enviado && e.clicadoEm).length;
+  const taxaAbertura = emailsEnviados > 0 ? Math.round((emailsAbertos / emailsEnviados) * 100) : null;
+  const taxaClique = emailsEnviados > 0 ? Math.round((emailsClicados / emailsEnviados) * 100) : null;
 
   // breakdown por tipo de evento
   const porTipo = {};
@@ -95,6 +102,8 @@ export async function load({ url }) {
       taxaComparecimento,
       totalEmails,
       taxaEnvioEmail,
+      taxaAbertura,
+      taxaClique,
       satisfacaoMedia: satisfacaoMedia !== null ? Math.round(satisfacaoMedia * 10) / 10 : null,
       totalPesquisas,
       taxaIndicaria

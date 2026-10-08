@@ -98,6 +98,8 @@ model EmailEnviado {
   email         String
   enviado       Boolean            @default(true)
   erro          String?
+  abertoEm      DateTime?          // marcado quando o pixel de abertura é carregado
+  clicadoEm     DateTime?          // marcado quando o link de "acompanhar" é clicado
   createdAt     DateTime           @default(now())
 }
 
@@ -236,3 +238,4 @@ model ImportacaoLote {
   criadoPor     Funcionario @relation(fields: [criadoPorId], references: [id])
   createdAt     DateTime    @default(now())
 }
+

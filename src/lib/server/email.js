@@ -3,9 +3,9 @@
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'Calper <atualizacoes@calper.com.br>';
 
-// Domínio usado pra montar a URL pública da logo nos e-mails. Fica em env var
-// justamente porque o domínio final vai mudar — só trocar APP_URL na Vercel
-// quando migrar, sem precisar mexer em código nenhum.
+// Domínio usado pra montar a URL pública da logo e dos links de rastreio nos
+// e-mails. Fica em env var justamente porque o domínio final vai mudar — só
+// trocar APP_URL na Vercel quando migrar, sem precisar mexer em código nenhum.
 const APP_URL = process.env.APP_URL ?? 'https://calper-mocha.vercel.app';
 const LOGO_URL = `${APP_URL}/logo.png`;
 
@@ -42,7 +42,16 @@ function cabecalho() {
   `;
 }
 
-export function templateAtualizacaoObra({ nomeInvestidor, empreendimento, titulo, descricao }) {
+export function templateAtualizacaoObra({ nomeInvestidor, empreendimento, titulo, descricao, emailEnviadoId }) {
+  // link e pixel de rastreio só existem quando o id do EmailEnviado está disponível
+  // (ou seja, quando o chamador já criou o registro antes de montar o e-mail)
+  const linkJornada = emailEnviadoId
+    ? `${APP_URL}/api/rastreio/clique/${emailEnviadoId}?destino=${encodeURIComponent('/jornada')}`
+    : `${APP_URL}/jornada`;
+  const pixelAbertura = emailEnviadoId
+    ? `<img src="${APP_URL}/api/rastreio/abrir/${emailEnviadoId}" width="1" height="1" alt="" style="display:block;border:0" />`
+    : '';
+
   return `
     <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#282e35">
       ${cabecalho()}
@@ -55,8 +64,11 @@ export function templateAtualizacaoObra({ nomeInvestidor, empreendimento, titulo
         <div style="font-size:14px;color:#44494f;line-height:1.6">${descricao}</div>
       </div>
       <p style="font-size:12px;color:#9aa0a8;margin-top:28px">
-        Acompanhe a jornada completa no seu painel Calper.
+        <a href="${linkJornada}" style="color:#dd0417;font-weight:700;text-decoration:none">
+          Acompanhe a jornada completa no seu painel Calper.
+        </a>
       </p>
+      ${pixelAbertura}
     </div>
   `;
 }

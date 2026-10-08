@@ -78,16 +78,29 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-    <div class="card p-5 flex items-center justify-between">
+  <div class="card p-5 mb-6">
+    <div class="text-xs text-gray-400 font-semibold mb-3">E-mails de atualização de obra</div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
       <div>
-        <div class="text-xs text-gray-400 font-semibold">E-mails disparados</div>
+        <div class="text-xs text-gray-400">Disparados</div>
         <div class="text-xl font-bold text-calper-dark mt-1">{data.kpis.totalEmails}</div>
       </div>
-      <div class="text-right">
-        <div class="text-xs text-gray-400 font-semibold">Taxa de envio</div>
+      <div>
+        <div class="text-xs text-gray-400">Taxa de envio</div>
         <div class="text-xl font-bold text-calper-dark mt-1">
           {data.kpis.taxaEnvioEmail === null ? '—' : `${data.kpis.taxaEnvioEmail}%`}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-400">Taxa de abertura</div>
+        <div class="text-xl font-bold text-calper-dark mt-1">
+          {data.kpis.taxaAbertura === null ? '—' : `${data.kpis.taxaAbertura}%`}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-400">Taxa de clique</div>
+        <div class="text-xl font-bold text-calper-dark mt-1">
+          {data.kpis.taxaClique === null ? '—' : `${data.kpis.taxaClique}%`}
         </div>
       </div>
     </div>
