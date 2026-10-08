@@ -30,7 +30,7 @@ export async function load({ params }) {
       documentoBase64: agendamento.documentoBase64,
       investidorNome: agendamento.investidor.nome,
       investidorCpf: agendamento.investidor.cpf,
-      acompanhantes: agendamento.acompanhantes.map((a) => ({
+      acompanhantes: (agendamento.acompanhantes ?? []).map((a) => ({
         nome: a.nome,
         documentoBase64: a.documentoBase64
       }))
@@ -41,7 +41,7 @@ export async function load({ params }) {
       bloco: agendamento.unidade.bloco,
       empreendimento: agendamento.unidade.empreendimento.nome,
       status: agendamento.unidade.status,
-      investidores: agendamento.unidade.investidores.map((vi) => vi.investidor.nome)
+      investidores: (agendamento.unidade.investidores ?? []).map((vi) => vi.investidor.nome)
     }
   };
 }
