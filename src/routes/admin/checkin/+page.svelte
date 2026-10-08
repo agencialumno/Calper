@@ -1,13 +1,18 @@
 <script>
-  import { goto } from '$app/navigation';
   import QrScanner from '$lib/components/QrScanner.svelte';
   import BackLink from '$lib/components/BackLink.svelte';
 
   let { data } = $props();
   let q = $state(data.q);
+  let processando = $state(false);
 
+  // navegação "cheia" (não client-side) — em alguns navegadores de celular o
+  // goto() do SvelteKit falhava silenciosamente depois de ler o QR Code,
+  // deixando a câmera fechada sem levar a lugar nenhum. window.location
+  // garante que o redirecionamento sempre acontece.
   function aoDetectarQr(valor) {
-    goto(`/admin/checkin?q=${encodeURIComponent(valor)}`);
+    processando = true;
+    window.location.href = `/admin/checkin?q=${encodeURIComponent(valor.trim())}`;
   }
 
   function formatarDataHora(iso) {
@@ -31,7 +36,13 @@
   <h1 class="text-lg font-bold text-calper-dark mb-1">Check-in</h1>
   <p class="text-sm text-gray-500 mb-5">Escaneie o QR Code ou busque pela unidade</p>
 
-  <QrScanner onDetected={aoDetectarQr} />
+  {#if processando}
+    <div class="rounded-2xl bg-calper-dark text-white text-sm font-semibold text-center py-6" style="aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center;">
+      Buscando agendamento...
+    </div>
+  {:else}
+    <QrScanner onDetected={aoDetectarQr} />
+  {/if}
 
   <form method="GET" class="mt-5">
     <input
