@@ -73,6 +73,33 @@ model UnidadeInvestidor {
   @@unique([unidadeId, investidorId])
 }
 
+// --- Atualizações da obra (engajamento) ---
+
+model AtualizacaoEstagio {
+  id               String         @id @default(cuid())
+  empreendimentoId String
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id])
+  titulo           String
+  descricao        String
+  midiaBase64      String?        // foto do marco (opcional) — mesma limitação do documento: base64 até trocar por S3/R2
+  publicadoPorId   String
+  publicadoPor     Funcionario    @relation(fields: [publicadoPorId], references: [id])
+  emails           EmailEnviado[]
+  createdAt        DateTime       @default(now())
+}
+
+// Log de disparo — auditoria de quem recebeu cada atualização.
+model EmailEnviado {
+  id            String             @id @default(cuid())
+  atualizacaoId String
+  atualizacao   AtualizacaoEstagio @relation(fields: [atualizacaoId], references: [id])
+  investidorId  String
+  email         String
+  enviado       Boolean            @default(true)
+  erro          String?
+  createdAt     DateTime           @default(now())
+}
+
 // --- Agendamento ---
 
 // Módulo configurável de tipos de evento (não hardcoded) — hoje cobre os 5
@@ -103,16 +130,17 @@ model Agendamento {
   // armazenamento de arquivos (S3/R2) configurado; trocar por upload real
   // quando a infraestrutura de storage entrar.
   documentoBase64 String?
+  // ID do evento criado no Google Calendar da Calper — usado pra apagar o
+  // evento se o agendamento for cancelado, e nulo enquanto a integração
+  // não estiver configurada (nesse caso o agendamento segue normalmente).
+  googleEventId   String?
   acompanhantes   Acompanhante[]
   pesquisa        PesquisaSatisfacao?
   createdAt       DateTime       @default(now())
-  
 
   @@index([unidadeId, tipoEventoId, status])
 }
 
-// Pesquisa pós-visita — baseada no formulário usado hoje pela Calper (Google Forms).
-// Escala de 5 pontos: otimo | muito_bom | bom | ruim | pessimo
 // Pesquisa pós-visita — baseada no formulário usado hoje pela Calper (Google Forms).
 // Escala de 5 pontos: otimo | muito_bom | bom | ruim | pessimo
 model PesquisaSatisfacao {
@@ -183,31 +211,4 @@ model ImportacaoLote {
   criadoPorId   String
   criadoPor     Funcionario @relation(fields: [criadoPorId], references: [id])
   createdAt     DateTime    @default(now())
-}
-
-// --- Atualizações da obra (engajamento) ---
-
-model AtualizacaoEstagio {
-  id               String         @id @default(cuid())
-  empreendimentoId String
-  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id])
-  titulo           String
-  descricao        String
-  midiaBase64      String?        // foto do marco (opcional) — mesma limitação do documento: base64 até trocar por S3/R2
-  publicadoPorId   String
-  publicadoPor     Funcionario    @relation(fields: [publicadoPorId], references: [id])
-  emails           EmailEnviado[]
-  createdAt        DateTime       @default(now())
-}
-
-// Log de disparo — auditoria de quem recebeu cada atualização.
-model EmailEnviado {
-  id            String             @id @default(cuid())
-  atualizacaoId String
-  atualizacao   AtualizacaoEstagio @relation(fields: [atualizacaoId], references: [id])
-  investidorId  String
-  email         String
-  enviado       Boolean            @default(true)
-  erro          String?
-  createdAt     DateTime           @default(now())
 }

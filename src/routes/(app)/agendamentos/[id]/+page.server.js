@@ -1,11 +1,12 @@
 import { error, redirect } from '@sveltejs/kit';
 import QRCode from 'qrcode';
 import { db } from '$lib/server/db.js';
+import { removerEvento } from '$lib/server/googleCalendar.js';
 
 export async function load({ params, locals }) {
   const agendamento = await db.agendamento.findUnique({
     where: { id: params.id },
-        include: { tipoEvento: true, acompanhantes: true, pesquisa: true }
+    include: { tipoEvento: true, acompanhantes: true, pesquisa: true }
   });
 
   if (!agendamento || agendamento.unidadeId !== locals.unidadeId) {
@@ -20,7 +21,7 @@ export async function load({ params, locals }) {
       tipoNome: agendamento.tipoEvento.nome,
       dataHora: agendamento.dataHora,
       status: agendamento.status,
-     acompanhantes: agendamento.acompanhantes.map((a) => a.nome),
+      acompanhantes: agendamento.acompanhantes.map((a) => a.nome),
       temDocumento: Boolean(agendamento.documentoBase64),
       pesquisaPendente: agendamento.status === 'realizado' && !agendamento.pesquisa
     },
@@ -43,6 +44,12 @@ export const actions = {
         descricao: 'Agendamento cancelado pelo investidor'
       }
     });
+
+    // libera o horário na agenda real da Calper (best-effort — se o Calendar
+    // falhar aqui, o cancelamento já foi salvo normalmente)
+    if (agendamento.googleEventId) {
+      await removerEvento(agendamento.googleEventId);
+    }
 
     throw redirect(303, '/painel');
   }

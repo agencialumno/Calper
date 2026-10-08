@@ -7,6 +7,7 @@ import {
   gerarQrToken,
   temAgendamentoAtivo
 } from '$lib/server/agendamento.js';
+import { horarioOcupado, criarEvento } from '$lib/server/googleCalendar.js';
 
 export async function load({ params, locals }) {
   const tipoEvento = await db.tipoEvento.findUnique({ where: { slug: params.tipo } });
@@ -97,6 +98,15 @@ export const actions = {
     const [hora, minuto] = horario.split(':').map(Number);
     const dataHora = new Date(`${data}T00:00:00`);
     dataHora.setHours(hora, minuto, 0, 0);
+    const dataHoraFim = new Date(dataHora.getTime() + 60 * 60 * 1000); // slots de 1h
+
+    // checa a agenda real da Calper no Google Calendar — evita duas unidades
+    // marcadas no mesmo horário (ex: dois grupos de visita ao mesmo tempo)
+    if (await horarioOcupado(dataHora, dataHoraFim)) {
+      return fail(400, {
+        erro: 'Esse horário acabou de ficar indisponível na agenda da Calper. Escolha outro horário.'
+      });
+    }
 
     const agendamento = await db.agendamento.create({
       data: {
@@ -117,6 +127,22 @@ export const actions = {
         descricao: `Agendamento de "${tipoEvento.nome}" criado para ${data} às ${horario}`
       }
     });
+
+    // best-effort: se o Calendar não estiver configurado ou falhar, o
+    // agendamento já foi salvo normalmente — não bloqueia o investidor
+    const unidade = await db.unidade.findUnique({
+      where: { id: locals.unidadeId },
+      select: { numero: true, bloco: true }
+    });
+    const googleEventId = await criarEvento({
+      titulo: `${tipoEvento.nome} — Unidade ${unidade?.numero} Bloco ${unidade?.bloco}`,
+      descricao: `Investidor: ${locals.investidor.nome}${acompanhantesParaCriar.length ? ` + ${acompanhantesParaCriar.length} acompanhante(s)` : ''}`,
+      inicio: dataHora,
+      fim: dataHoraFim
+    });
+    if (googleEventId) {
+      await db.agendamento.update({ where: { id: agendamento.id }, data: { googleEventId } });
+    }
 
     throw redirect(303, `/agendamentos/${agendamento.id}`);
   }
