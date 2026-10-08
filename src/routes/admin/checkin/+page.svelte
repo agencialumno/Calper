@@ -1,6 +1,7 @@
 <script>
   import { goto } from '$app/navigation';
   import QrScanner from '$lib/components/QrScanner.svelte';
+  import BackLink from '$lib/components/BackLink.svelte';
 
   let { data } = $props();
   let q = $state(data.q);
@@ -24,6 +25,9 @@
 </svelte:head>
 
 <div class="p-6 max-w-md mx-auto">
+  <div class="mb-3 md:hidden">
+    <BackLink href="/admin/dashboard" label="Painel" />
+  </div>
   <h1 class="text-lg font-bold text-calper-dark mb-1">Check-in</h1>
   <p class="text-sm text-gray-500 mb-5">Escaneie o QR Code ou busque pela unidade</p>
 

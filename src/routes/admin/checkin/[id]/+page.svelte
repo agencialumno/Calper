@@ -1,6 +1,7 @@
 <script>
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
+  import BackLink from '$lib/components/BackLink.svelte';
 
   let { data, form } = $props();
   const a = data.agendamento;
@@ -38,7 +39,7 @@
 </svelte:head>
 
 <div class="p-5 max-w-3xl mx-auto">
-  <a href="/admin/checkin" class="text-sm text-gray-500 hover:text-calper-dark">← Check-in</a>
+  <BackLink href="/admin/checkin" label="Check-in" />
 
   <div class="flex items-center justify-between flex-wrap gap-3 mt-3 mb-5">
     <div>
@@ -96,7 +97,7 @@
         </div>
       </div>
 
-            {#if a.acompanhantes.length}
+      {#if a.acompanhantes.length}
         <div class="flex flex-col gap-2 mb-5">
           {#each a.acompanhantes as ac}
             <div class="flex items-center gap-2.5 text-sm">

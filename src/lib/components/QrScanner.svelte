@@ -86,7 +86,12 @@
         </svg>
         <p class="text-xs text-gray-400">Câmera desligada</p>
       {/if}
-      <button type="button" class="btn-outline text-xs !py-2 !px-4" onclick={iniciar}>
+      <button
+        type="button"
+        class="text-xs font-bold text-white !py-2.5 !px-5 rounded-full"
+        style="background: linear-gradient(135deg, #ef2334, #b80311)"
+        onclick={iniciar}
+      >
         {erro ? 'Tentar novamente' : 'Ligar câmera'}
       </button>
     </div>

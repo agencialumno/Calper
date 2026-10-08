@@ -6,6 +6,18 @@
   let publicando = $state(false);
   let arquivoNome = $state('');
 
+  // input único e persistente que de fato vai no submit — a galeria e a câmera
+  // são só "gatilhos" que copiam o arquivo escolhido pra dentro dele.
+  let inputMidia;
+
+  function aplicarArquivo(f) {
+    if (!f) return;
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    inputMidia.files = dt.files;
+    arquivoNome = f.name;
+  }
+
   function aoSubmeter() {
     publicando = true;
     return async ({ update }) => {
@@ -79,16 +91,40 @@
 
     <div>
       <div class="block text-sm font-semibold text-calper-dark mb-1.5">Foto (opcional)</div>
-      <label class="card border-dashed p-4 flex items-center justify-center text-center cursor-pointer hover:border-calper-red">
-        <span class="text-sm text-gray-500">{arquivoNome || 'Clique para enviar uma foto'}</span>
-        <input
-          type="file"
-          name="midia"
-          accept="image/jpeg,image/png"
-          class="hidden"
-          onchange={(e) => (arquivoNome = e.target.files?.[0]?.name ?? '')}
-        />
-      </label>
+
+      <!-- input real, único — é o que de fato vai no submit -->
+      <input bind:this={inputMidia} type="file" name="midia" accept="image/jpeg,image/png" class="hidden" />
+
+      <div class="flex gap-2.5">
+        <label
+          class="card border-dashed p-4 flex-1 flex items-center justify-center text-center cursor-pointer hover:border-calper-red"
+        >
+          <span class="text-sm text-gray-500 truncate">{arquivoNome || 'Escolher da galeria'}</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png"
+            class="hidden"
+            onchange={(e) => aplicarArquivo(e.target.files?.[0] ?? null)}
+          />
+        </label>
+
+        <!-- no celular, abre a câmera diretamente (atributo "capture") -->
+        <label
+          class="card border-dashed p-4 flex items-center justify-center gap-2 cursor-pointer hover:border-calper-red shrink-0 md:hidden"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dd0417" stroke-width="2">
+            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          <input
+            type="file"
+            accept="image/jpeg,image/png"
+            capture="environment"
+            class="hidden"
+            onchange={(e) => aplicarArquivo(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      </div>
     </div>
 
     <SubmitButton loading={publicando}>Publicar e notificar investidores</SubmitButton>

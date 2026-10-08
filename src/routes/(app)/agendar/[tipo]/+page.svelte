@@ -10,7 +10,6 @@
   let enviando = $state(false);
   let tentouEnviar = $state(false);
 
-  // documento principal
   let inputPrincipal;
   let arquivoPrincipal = $state(null);
   let previewPrincipal = $state('');
@@ -116,7 +115,7 @@
       <AvisoSutil>{form.erro}</AvisoSutil>
     {/if}
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label for="data" class="block text-sm font-semibold text-calper-dark mb-1.5">Data</label>
         <input
@@ -146,7 +145,6 @@
           Documento de identificação
         </label>
 
-        <!-- input único e persistente — nunca é recriado, por isso o arquivo não se perde -->
         <input
           bind:this={inputPrincipal}
           id="documento-principal"
@@ -274,7 +272,6 @@
     <SubmitButton loading={enviando}>Confirmar agendamento</SubmitButton>
   </form>
 
-  <!-- resumo (visível já no mobile embaixo do form, e fixo ao lado no desktop) -->
   <aside class="card p-6 md:sticky md:top-24 flex flex-col gap-4">
     <div>
       <div class="text-xs font-bold text-gray-400 tracking-wide mb-1">EVENTO</div>

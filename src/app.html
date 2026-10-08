@@ -4,13 +4,25 @@
   <meta charset="utf-8" />
   <link rel="icon" href="%sveltekit.assets%/favicon.png" />
   <meta
-  name="viewport"
-  content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
-/>
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+  />
   <title>Calper — Plataforma do Investidor</title>
+  <style>
+    html,
+    body {
+      touch-action: manipulation; /* evita o zoom no duplo-toque */
+    }
+  </style>
   %sveltekit.head%
 </head>
 <body data-sveltekit-preload-data="hover" class="bg-white text-calper-dark">
   <div style="display: contents">%sveltekit.body%</div>
+  <script>
+    // Safari/iOS ignora "user-scalable=no" do viewport — isso bloqueia o
+    // gesto de pinça (pinch-to-zoom) diretamente, que é o jeito que ainda funciona lá.
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('gesturechange', (e) => e.preventDefault());
+  </script>
 </body>
 </html>

@@ -16,5 +16,13 @@ export async function handle({ event, resolve }) {
   event.locals.funcionario = sessaoStaff?.funcionario ?? null;
   event.locals.staffSessionToken = sessaoStaff ? staffToken : null;
 
-  return resolve(event);
+  const response = await resolve(event);
+
+  // Impede o navegador de guardar essas páginas no cache (bfcache) — sem isso,
+  // o botão "voltar" reexibiria uma tela antiga (ex: um agendamento já
+  // cancelado, ou a confirmação de um check-in) deixando a ação parecer
+  // reversível quando na verdade já foi persistida no banco.
+  response.headers.set('cache-control', 'no-store, must-revalidate');
+
+  return response;
 }
