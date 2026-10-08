@@ -1,7 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import { PERFIS_COM_ACESSO_CADASTRO } from '$lib/server/auth-staff.js';
+import { listarNotificacoes } from '$lib/server/notificacao.js';
 
-export function load({ locals }) {
+export async function load({ locals }) {
   if (!locals.funcionario) throw redirect(303, '/admin/login');
 
   if (!PERFIS_COM_ACESSO_CADASTRO.includes(locals.funcionario.perfil)) {
@@ -10,10 +11,13 @@ export function load({ locals }) {
     throw redirect(303, '/admin/sem-acesso');
   }
 
+  const notificacoes = await listarNotificacoes({ funcionarioId: locals.funcionario.id });
+
   return {
     funcionario: {
       nome: locals.funcionario.nome,
       perfil: locals.funcionario.perfil
-    }
+    },
+    notificacoes
   };
 }

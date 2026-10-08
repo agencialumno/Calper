@@ -134,11 +134,34 @@ model Agendamento {
   // evento se o agendamento for cancelado, e nulo enquanto a integração
   // não estiver configurada (nesse caso o agendamento segue normalmente).
   googleEventId   String?
+  // Evita mandar o lembrete da véspera mais de uma vez caso o cron rode de novo.
+  lembreteEnviado Boolean        @default(false)
   acompanhantes   Acompanhante[]
   pesquisa        PesquisaSatisfacao?
   createdAt       DateTime       @default(now())
 
   @@index([unidadeId, tipoEventoId, status])
+}
+
+// --- Notificações internas (sino) ---
+// Guarda um registro visível no sistema pra cada evento relevante, além do
+// e-mail (quando aplicável) — assim a pessoa não depende só da caixa de
+// entrada pra saber o que aconteceu. Sem relação formal com Investidor/
+// Funcionario (só um dos dois ids é preenchido) pra não exigir dois campos
+// opcionais de relação só pra isso.
+model Notificacao {
+  id               String   @id @default(cuid())
+  destinatarioTipo String   // investidor | funcionario
+  investidorId     String?
+  funcionarioId    String?
+  titulo           String
+  mensagem         String
+  link             String?
+  lida             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([investidorId, lida])
+  @@index([funcionarioId, lida])
 }
 
 // Pesquisa pós-visita — baseada no formulário usado hoje pela Calper (Google Forms).

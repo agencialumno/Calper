@@ -8,6 +8,8 @@ import {
   temAgendamentoAtivo
 } from '$lib/server/agendamento.js';
 import { horarioOcupado, criarEvento } from '$lib/server/googleCalendar.js';
+import { notificarInvestidor, notificarFuncionarios, emailDoInvestidorNaUnidade } from '$lib/server/notificacao.js';
+import { templateAgendamentoConfirmado } from '$lib/server/email.js';
 
 export async function load({ params, locals }) {
   const tipoEvento = await db.tipoEvento.findUnique({ where: { slug: params.tipo } });
@@ -143,6 +145,35 @@ export const actions = {
     if (googleEventId) {
       await db.agendamento.update({ where: { id: agendamento.id }, data: { googleEventId } });
     }
+
+    // notifica o investidor (sino + e-mail, se tivermos um e-mail cadastrado
+    // pra ele nessa unidade) e avisa o time Calper que entrou um agendamento novo
+    const emailInvestidor = await emailDoInvestidorNaUnidade(locals.investidor.id, locals.unidadeId);
+    await notificarInvestidor({
+      investidorId: locals.investidor.id,
+      titulo: `${tipoEvento.nome} confirmado`,
+      mensagem: `Agendado para ${data} às ${horario}.`,
+      link: `/agendamentos/${agendamento.id}`,
+      email: emailInvestidor
+        ? {
+            to: emailInvestidor,
+            subject: `Agendamento confirmado — ${tipoEvento.nome}`,
+            html: templateAgendamentoConfirmado({
+              nomeInvestidor: locals.investidor.nome,
+              tipoNome: tipoEvento.nome,
+              unidade: `${unidade?.numero} — Bloco ${unidade?.bloco}`,
+              data,
+              horario
+            })
+          }
+        : null
+    });
+
+    await notificarFuncionarios({
+      titulo: 'Novo agendamento',
+      mensagem: `${locals.investidor.nome} marcou "${tipoEvento.nome}" para ${data} às ${horario} (Unidade ${unidade?.numero} — Bloco ${unidade?.bloco}).`,
+      link: '/admin/checkin'
+    });
 
     throw redirect(303, `/agendamentos/${agendamento.id}`);
   }

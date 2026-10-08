@@ -1,5 +1,6 @@
 <script>
   import { page } from '$app/stores';
+  import NotificationBell from '$lib/components/NotificationBell.svelte';
 
   let { data, children } = $props();
 
@@ -19,8 +20,11 @@
   <aside
     class="md:basis-[240px] md:min-w-[240px] md:h-screen md:sticky md:top-0 md:flex-col md:overflow-y-auto bg-calper-dark flex items-center md:items-stretch justify-between md:justify-start gap-1 px-4 md:px-4 py-3 md:py-6"
   >
-    <div class="px-0 md:px-3 md:pb-7 shrink-0">
+    <div class="px-0 md:px-3 md:pb-7 shrink-0 md:flex md:items-center md:justify-between">
       <img src="/logo-branca.png" alt="Calper" class="h-5 md:h-6" />
+      <div class="hidden md:block text-white">
+        <NotificationBell notificacoes={data.notificacoes} />
+      </div>
     </div>
 
     <!-- navegação: só no desktop fica aqui na sidebar -->
@@ -58,8 +62,11 @@
       >
     </form>
 
-    <!-- versão compacta pra mobile: avatar + sair, sem as abas -->
-    <div class="md:hidden flex items-center gap-2.5">
+    <!-- versão compacta pra mobile: sino + avatar + sair, sem as abas -->
+    <div class="md:hidden flex items-center gap-1.5">
+      <div class="text-white">
+        <NotificationBell notificacoes={data.notificacoes} />
+      </div>
       <div
         class="w-7 h-7 rounded-full bg-calper-red text-white flex items-center justify-center text-[10px] font-bold shrink-0"
       >

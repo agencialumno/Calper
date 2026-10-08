@@ -1,5 +1,6 @@
 <script>
   import { page } from '$app/stores';
+  import NotificationBell from '$lib/components/NotificationBell.svelte';
 
   /** @type {{ data: import('./$types').LayoutData, children: import('svelte').Snippet }} */
   let { data, children } = $props();
@@ -46,11 +47,14 @@
       </nav>
     </div>
 
-    <form method="POST" action="/logout" class="shrink-0">
-      <button type="submit" class="text-sm font-semibold text-gray-500 hover:text-calper-red px-2 py-2"
-        >Sair</button
-      >
-    </form>
+    <div class="flex items-center gap-1 shrink-0">
+      <NotificationBell notificacoes={data.notificacoes} />
+      <form method="POST" action="/logout">
+        <button type="submit" class="text-sm font-semibold text-gray-500 hover:text-calper-red px-2 py-2"
+          >Sair</button
+        >
+      </form>
+    </div>
   </div>
 
   <!-- navegação mobile: abas maiores e com ícone, mais fáceis de tocar -->

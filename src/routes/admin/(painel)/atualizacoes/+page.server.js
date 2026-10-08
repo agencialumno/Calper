@@ -96,6 +96,17 @@ export const actions = {
       }))
     });
 
+    // sino pra cada investidor do empreendimento — o e-mail já foi disparado acima
+    await db.notificacao.createMany({
+      data: vinculos.map((v) => ({
+        destinatarioTipo: 'investidor',
+        investidorId: v.investidorId,
+        titulo: `Atualização — ${empreendimento.nome}`,
+        mensagem: titulo,
+        link: '/jornada'
+      }))
+    });
+
     return { sucesso: true, totalEnviados: vinculos.length };
   }
 };

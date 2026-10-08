@@ -43,3 +43,56 @@ export function templateAtualizacaoObra({ nomeInvestidor, empreendimento, titulo
     </div>
   `;
 }
+
+function baseEmail({ nomeInvestidor, titulo, corpo }) {
+  return `
+    <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#282e35">
+      <div style="font-size:18px;font-weight:800;letter-spacing:.5px;margin-bottom:24px">CALPER</div>
+      <p style="font-size:14px;color:#6c7079">Olá, ${nomeInvestidor},</p>
+      <div style="background:#f6f6f7;border-radius:14px;padding:18px;margin:16px 0">
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px">${titulo}</div>
+        <div style="font-size:14px;color:#44494f;line-height:1.6">${corpo}</div>
+      </div>
+      <p style="font-size:12px;color:#9aa0a8;margin-top:28px">
+        Acompanhe tudo pelo seu painel Calper.
+      </p>
+    </div>
+  `;
+}
+
+export function templateAgendamentoConfirmado({ nomeInvestidor, tipoNome, unidade, data, horario }) {
+  return baseEmail({
+    nomeInvestidor,
+    titulo: `${tipoNome} confirmado`,
+    corpo: `
+      Seu agendamento foi confirmado com sucesso.<br /><br />
+      <strong>Unidade:</strong> ${unidade}<br />
+      <strong>Data:</strong> ${data}<br />
+      <strong>Horário:</strong> ${horario}
+    `
+  });
+}
+
+export function templateLembreteVisita({ nomeInvestidor, tipoNome, unidade, data, horario }) {
+  return baseEmail({
+    nomeInvestidor,
+    titulo: `Lembrete: ${tipoNome} amanhã`,
+    corpo: `
+      Passando pra lembrar do seu agendamento de amanhã.<br /><br />
+      <strong>Unidade:</strong> ${unidade}<br />
+      <strong>Data:</strong> ${data}<br />
+      <strong>Horário:</strong> ${horario}
+    `
+  });
+}
+
+export function templatePesquisaDisponivel({ nomeInvestidor, tipoNome }) {
+  return baseEmail({
+    nomeInvestidor,
+    titulo: 'Como foi sua visita?',
+    corpo: `
+      Seu check-in de "${tipoNome}" foi realizado. Conta pra gente como foi —
+      leva menos de um minuto e ajuda a melhorar a experiência da Calper.
+    `
+  });
+}
