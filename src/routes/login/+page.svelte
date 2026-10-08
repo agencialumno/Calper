@@ -80,19 +80,18 @@
         <div class="mt-2">
           <SubmitButton loading={entrando}>Entrar</SubmitButton>
         </div>
+        <a
+          href="/admin/login"
+          class="w-full block text-center rounded-xl font-semibold px-5 py-3.5 text-[15px] transition-all duration-200 bg-gradient-to-br from-[#ef2334] to-[#b80311] text-white hover:opacity-90"
+        >
+          Sou da equipe Calper
+        </a>
         <a href="/esqueci-senha" class="text-sm text-calper-red text-center mt-1">Esqueci minha senha</a>
       </form>
 
       <p class="text-xs text-gray-400 leading-relaxed mt-8 pt-6 border-t border-gray-100">
         Primeiro acesso? Use a senha temporária enviada por e-mail.
       </p>
-
-      <a
-        href="/admin/login"
-        class="block text-center text-xs font-semibold text-gray-500 hover:text-calper-red mt-4 underline underline-offset-2"
-      >
-        Sou da equipe Calper
-      </a>
     </div>
   </div>
 </div>
