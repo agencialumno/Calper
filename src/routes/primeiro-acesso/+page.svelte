@@ -7,9 +7,12 @@
 
   /** @type {import('./$types').ActionData} */
   export let form;
+  /** @type {import('./$types').PageData} */
+  export let data;
 
   let novaSenha = '';
   let confirmarSenha = '';
+  let email = data.emailAtual ?? '';
   let enviando = false;
   let tentouEnviar = false;
 
@@ -38,15 +41,32 @@
 
 <div class="min-h-screen flex items-center justify-center bg-gray-50 px-6 py-12">
   <div class="card w-full max-w-sm p-7">
-    <h1 class="text-xl font-bold text-calper-dark mb-1">Defina sua senha</h1>
+    <h1 class="text-xl font-bold text-calper-dark mb-1">Primeiro acesso</h1>
     <p class="text-sm text-gray-500 mb-6">
-      Este é o seu primeiro acesso — crie uma senha nova para continuar
+      Crie sua senha e confirme seu e-mail de contato para continuar
     </p>
 
     <form method="POST" use:enhance={aoSubmeter} class="flex flex-col gap-4">
       {#if form?.erro}
         <AvisoSutil>{form.erro}</AvisoSutil>
       {/if}
+
+      <div>
+        <label for="email" class="block text-sm font-semibold text-calper-dark mb-1.5"> E-mail de contato </label>
+        <input
+          id="email"
+          name="email"
+          class="input"
+          type="email"
+          placeholder="seu@email.com"
+          bind:value={email}
+          required
+        />
+        <p class="text-xs text-gray-400 mt-1.5">
+          É pra esse e-mail que vamos mandar confirmações de agendamento, lembretes e novidades da obra.
+          Depois de definido, só o time Calper pode alterar.
+        </p>
+      </div>
 
       <div>
         <label for="novaSenha" class="block text-sm font-semibold text-calper-dark mb-1.5">
