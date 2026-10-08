@@ -2,7 +2,8 @@ import { error, redirect } from '@sveltejs/kit';
 import QRCode from 'qrcode';
 import { db } from '$lib/server/db.js';
 import { removerEvento } from '$lib/server/googleCalendar.js';
-import { notificarInvestidor, notificarFuncionarios } from '$lib/server/notificacao.js';
+import { notificarInvestidor, notificarFuncionarios, emailDoInvestidorNaUnidade } from '$lib/server/notificacao.js';
+import { templateAgendamentoCancelado } from '$lib/server/email.js';
 
 export async function load({ params, locals }) {
   const agendamento = await db.agendamento.findUnique({
@@ -55,12 +56,28 @@ export const actions = {
       await removerEvento(agendamento.googleEventId);
     }
 
-    // só sino — sem e-mail aqui: quem cancelou já sabe, não precisa de inbox
+    const emailInvestidor = await emailDoInvestidorNaUnidade(locals.investidor.id, locals.unidadeId);
+    const dataFormatada = agendamento.dataHora.toLocaleDateString('pt-BR');
+    const horarioFormatado = agendamento.dataHora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
     await notificarInvestidor({
       investidorId: locals.investidor.id,
       titulo: 'Agendamento cancelado',
-      mensagem: `${agendamento.tipoEvento.nome} de ${agendamento.dataHora.toLocaleDateString('pt-BR')} foi cancelado.`,
-      link: '/painel'
+      mensagem: `${agendamento.tipoEvento.nome} de ${dataFormatada} foi cancelado.`,
+      link: '/painel',
+      email: emailInvestidor
+        ? {
+            to: emailInvestidor,
+            subject: `Agendamento cancelado — ${agendamento.tipoEvento.nome}`,
+            html: templateAgendamentoCancelado({
+              nomeInvestidor: locals.investidor.nome,
+              tipoNome: agendamento.tipoEvento.nome,
+              unidade: `${agendamento.unidade.numero} — Bloco ${agendamento.unidade.bloco}`,
+              data: dataFormatada,
+              horario: horarioFormatado
+            })
+          }
+        : null
     });
 
     await notificarFuncionarios({

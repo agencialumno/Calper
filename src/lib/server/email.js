@@ -3,9 +3,9 @@
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'Calper <atualizacoes@calper.com.br>';
 
-// Domínio usado pra montar a URL pública da logo e dos links de rastreio nos
-// e-mails. Fica em env var justamente porque o domínio final vai mudar — só
-// trocar APP_URL na Vercel quando migrar, sem precisar mexer em código nenhum.
+// Domínio usado pra montar a URL pública da logo nos e-mails. Fica em env var
+// justamente porque o domínio final vai mudar — só trocar APP_URL na Vercel
+// quando migrar, sem precisar mexer em código nenhum.
 const APP_URL = process.env.APP_URL ?? 'https://calper-mocha.vercel.app';
 const LOGO_URL = `${APP_URL}/logo.png`;
 
@@ -109,6 +109,21 @@ export function templateAgendamentoConfirmado({ nomeInvestidor, tipoNome, unidad
     `,
     linkHref: agendamentoId ? `${APP_URL}/agendamentos/${agendamentoId}` : undefined,
     linkTexto: 'Ver agendamento no painel'
+  });
+}
+
+export function templateAgendamentoCancelado({ nomeInvestidor, tipoNome, unidade, data, horario }) {
+  return baseEmail({
+    nomeInvestidor,
+    titulo: `${tipoNome} cancelado`,
+    corpo: `
+      Seu agendamento foi cancelado.<br /><br />
+      <strong>Unidade:</strong> ${unidade}<br />
+      <strong>Data:</strong> ${data}<br />
+      <strong>Horário:</strong> ${horario}<br /><br />
+      Se foi engano, você pode marcar um novo horário a qualquer momento pelo painel.
+    `,
+    linkTexto: 'Agendar novamente'
   });
 }
 
