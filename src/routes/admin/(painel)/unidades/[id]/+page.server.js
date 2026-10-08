@@ -24,6 +24,7 @@ export async function load({ params }) {
       empreendimento: unidade.empreendimento.nome,
       createdAt: unidade.createdAt,
       investidores: unidade.investidores.map((vi) => ({
+        investidorId: vi.investidorId,
         nome: vi.investidor.nome,
         cpf: vi.investidor.cpf,
         email: vi.email,
@@ -76,5 +77,37 @@ export const actions = {
       data: { unidadeId: params.id, tipo, descricao, criadoPorId: locals.funcionario.id }
     });
     return { sucesso: true };
+  },
+
+  atualizarEmail: async ({ request, params, locals }) => {
+    const form = await request.formData();
+    const investidorId = String(form.get('investidorId') ?? '');
+    const email = String(form.get('email') ?? '').trim();
+
+    if (!investidorId) return fail(400, { erro: 'Investidor inválido.' });
+    if (!email || !email.includes('@') || !email.includes('.')) {
+      return fail(400, { erro: 'Informe um e-mail válido.' });
+    }
+
+    const vinculo = await db.unidadeInvestidor.findUnique({
+      where: { unidadeId_investidorId: { unidadeId: params.id, investidorId } }
+    });
+    if (!vinculo) return fail(404, { erro: 'Vínculo não encontrado.' });
+
+    await db.unidadeInvestidor.update({
+      where: { unidadeId_investidorId: { unidadeId: params.id, investidorId } },
+      data: { email }
+    });
+
+    await db.historicoUnidade.create({
+      data: {
+        unidadeId: params.id,
+        tipo: 'outro',
+        descricao: `E-mail de contato atualizado para ${email}`,
+        criadoPorId: locals.funcionario.id
+      }
+    });
+
+    return { sucesso: true, emailAtualizado: true };
   }
 };

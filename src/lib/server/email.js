@@ -3,6 +3,12 @@
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'Calper <atualizacoes@calper.com.br>';
 
+// Domínio usado pra montar a URL pública da logo nos e-mails. Fica em env var
+// justamente porque o domínio final vai mudar — só trocar APP_URL na Vercel
+// quando migrar, sem precisar mexer em código nenhum.
+const APP_URL = process.env.APP_URL ?? 'https://calper-mocha.vercel.app';
+const LOGO_URL = `${APP_URL}/logo.png`;
+
 export async function enviarEmail({ to, subject, html }) {
   const apiKey = process.env.RESEND_API_KEY;
 
@@ -25,10 +31,21 @@ export async function enviarEmail({ to, subject, html }) {
   return { enviado: true, modo: 'resend' };
 }
 
+// Cabeçalho com a logo, reaproveitado em todos os templates. Imagem pequena
+// (só a wordmark) — nada de banner grande, pra não parecer spam nem pesar o
+// carregamento.
+function cabecalho() {
+  return `
+    <div style="margin-bottom:28px">
+      <img src="${LOGO_URL}" alt="Calper" height="22" style="display:block;height:22px;width:auto" />
+    </div>
+  `;
+}
+
 export function templateAtualizacaoObra({ nomeInvestidor, empreendimento, titulo, descricao }) {
   return `
     <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#282e35">
-      <div style="font-size:18px;font-weight:800;letter-spacing:.5px;margin-bottom:24px">CALPER</div>
+      ${cabecalho()}
       <p style="font-size:14px;color:#6c7079">Olá, ${nomeInvestidor},</p>
       <p style="font-size:14px;color:#6c7079;line-height:1.6">
         O empreendimento <strong>${empreendimento}</strong> tem uma nova atualização:
@@ -47,7 +64,7 @@ export function templateAtualizacaoObra({ nomeInvestidor, empreendimento, titulo
 function baseEmail({ nomeInvestidor, titulo, corpo }) {
   return `
     <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#282e35">
-      <div style="font-size:18px;font-weight:800;letter-spacing:.5px;margin-bottom:24px">CALPER</div>
+      ${cabecalho()}
       <p style="font-size:14px;color:#6c7079">Olá, ${nomeInvestidor},</p>
       <div style="background:#f6f6f7;border-radius:14px;padding:18px;margin:16px 0">
         <div style="font-size:16px;font-weight:700;margin-bottom:6px">${titulo}</div>

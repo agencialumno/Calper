@@ -5,12 +5,23 @@
   let { data } = $props();
   const u = data.unidade;
   let adicionando = $state(false);
+  let editandoEmailDe = $state(null); // investidorId em edição, ou null
+  let salvandoEmail = $state(false);
 
   function aoSubmeterApontamento() {
     adicionando = true;
     return async ({ update }) => {
       await update();
       adicionando = false;
+    };
+  }
+
+  function aoSubmeterEmail() {
+    salvandoEmail = true;
+    return async ({ update }) => {
+      await update();
+      salvandoEmail = false;
+      editandoEmailDe = null;
     };
   }
 
@@ -65,10 +76,52 @@
     <div class="card p-6">
       <div class="text-sm font-bold text-calper-dark mb-4">Investidores vinculados</div>
       <div class="flex flex-col gap-3">
-        {#each u.investidores as inv}
+        {#each u.investidores as inv (inv.investidorId)}
           <div class="border border-gray-100 rounded-xl p-3.5">
             <div class="font-bold text-sm text-calper-dark">{inv.nome}</div>
-            <div class="text-xs text-gray-500 mt-0.5">{inv.email}</div>
+
+            {#if editandoEmailDe === inv.investidorId}
+              <form
+                method="POST"
+                action="?/atualizarEmail"
+                use:enhance={aoSubmeterEmail}
+                class="flex items-center gap-1.5 mt-1"
+              >
+                <input type="hidden" name="investidorId" value={inv.investidorId} />
+                <input
+                  type="email"
+                  name="email"
+                  value={inv.email}
+                  required
+                  class="input !py-1.5 text-xs flex-1"
+                  autofocus
+                />
+                <button
+                  type="submit"
+                  disabled={salvandoEmail}
+                  class="text-[11px] font-bold text-white bg-calper-red px-2.5 py-1.5 rounded-lg shrink-0 disabled:opacity-50"
+                >
+                  Salvar
+                </button>
+                <button
+                  type="button"
+                  onclick={() => (editandoEmailDe = null)}
+                  class="text-[11px] font-semibold text-gray-400 px-1.5 py-1.5 shrink-0"
+                >
+                  Cancelar
+                </button>
+              </form>
+            {:else}
+              <button
+                type="button"
+                onclick={() => (editandoEmailDe = inv.investidorId)}
+                class="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5 hover:text-calper-red group"
+              >
+                {inv.email}
+                <span class="text-[10px] font-bold text-gray-300 group-hover:text-calper-red">editar</span>
+              </button>
+            {/if}
+
             <div class="text-xs text-gray-400 mt-0.5">CPF: {inv.cpf}</div>
             {#if inv.primeiroAcesso}
               <span class="inline-block mt-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
