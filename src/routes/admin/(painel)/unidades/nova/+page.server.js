@@ -13,7 +13,6 @@ export const actions = {
     const form = await request.formData();
 
     const empreendimentoId = String(form.get('empreendimentoId') ?? '');
-    const novoEmpreendimentoNome = String(form.get('novoEmpreendimentoNome') ?? '').trim();
     const bloco = String(form.get('bloco') ?? '').trim();
     const numero = String(form.get('numero') ?? '').trim();
 
@@ -24,8 +23,8 @@ export const actions = {
     if (!bloco || !numero) {
       return fail(400, { erro: 'Informe bloco e número da unidade.' });
     }
-    if (!empreendimentoId && !novoEmpreendimentoNome) {
-      return fail(400, { erro: 'Selecione um empreendimento ou cadastre um novo.' });
+    if (!empreendimentoId) {
+      return fail(400, { erro: 'Selecione um empreendimento.' });
     }
 
     const investidoresForm = nomes
@@ -48,13 +47,8 @@ export const actions = {
       const credenciaisGeradas = [];
 
       const resultado = await db.$transaction(async (tx) => {
-        let empreendimento;
-        if (empreendimentoId) {
-          empreendimento = await tx.empreendimento.findUnique({ where: { id: empreendimentoId } });
-          if (!empreendimento) throw new Error('Empreendimento não encontrado.');
-        } else {
-          empreendimento = await tx.empreendimento.create({ data: { nome: novoEmpreendimentoNome } });
-        }
+        const empreendimento = await tx.empreendimento.findUnique({ where: { id: empreendimentoId } });
+        if (!empreendimento) throw new Error('Empreendimento não encontrado.');
 
         const unidade = await tx.unidade.create({
           data: { empreendimentoId: empreendimento.id, bloco, numero }

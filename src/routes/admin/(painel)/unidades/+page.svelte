@@ -16,7 +16,10 @@
 
 <div class="p-5 md:p-8 max-w-6xl">
   <!-- no mobile, as ações ficam em botões logo no topo, acima do título -->
-  <div class="flex gap-2.5 mb-4 md:hidden">
+  <div class="flex flex-wrap gap-2.5 mb-4 md:hidden">
+    <a href="/admin/empreendimentos/nova" class="btn-outline text-sm !py-2.5 w-full text-center"
+      >+ Novo empreendimento</a
+    >
     <a href="/admin/unidades/importar" class="btn-outline text-sm !py-2.5 flex-1 text-center"
       >Importar planilha</a
     >
@@ -25,10 +28,11 @@
 
   <div class="flex items-center justify-between flex-wrap gap-4 mb-5 md:mb-7">
     <div>
-      <h1 class="text-xl font-bold text-calper-dark">Unidades</h1>
-      <p class="text-sm text-gray-500 mt-0.5">{data.total} unidades cadastradas</p>
+      <h1 class="text-2xl font-extrabold text-calper-dark">Unidades</h1>
+      <p class="text-sm text-gray-500 mt-1">{data.total} unidades cadastradas</p>
     </div>
     <div class="hidden md:flex gap-2.5">
+      <a href="/admin/empreendimentos/nova" class="btn-outline text-sm !py-2.5">+ Novo empreendimento</a>
       <a href="/admin/unidades/importar" class="btn-outline text-sm !py-2.5">Importar planilha</a>
       <a href="/admin/unidades/nova" class="btn-primary text-sm !py-2.5">+ Nova unidade</a>
     </div>

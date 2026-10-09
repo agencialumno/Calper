@@ -7,7 +7,7 @@
   const nav = [
     { href: '/admin/dashboard', label: 'Dashboard' },
     { href: '/admin/unidades', label: 'Unidades' },
-    { href: '/admin/checkin', label: 'Check-in' },
+    { href: '/admin/checkin', label: 'Check-in', soMobile: true },
     { href: '/admin/atualizacoes', label: 'Atualizações' }
     // Agenda entra em um próximo módulo.
   ];
@@ -29,10 +29,10 @@
 
     <!-- navegação: só no desktop fica aqui na sidebar -->
     <nav class="hidden md:flex md:flex-col gap-1 flex-1">
-      {#each nav as item}
+      {#each nav.filter((i) => !i.soMobile) as item}
         <a
           href={item.href}
-          class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap"
+          class="flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-semibold whitespace-nowrap"
           class:bg-white={$page.url.pathname.startsWith(item.href)}
           class:text-calper-dark={$page.url.pathname.startsWith(item.href)}
           class:text-gray-400={!$page.url.pathname.startsWith(item.href)}

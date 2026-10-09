@@ -4,7 +4,6 @@
 
   let { data, form } = $props();
 
-  let usarNovoEmpreendimento = $state(data.empreendimentos.length === 0);
   let investidores = $state([{ nome: '', cpf: '', email: '' }]);
   let cadastrando = $state(false);
 
@@ -62,31 +61,23 @@
       {/if}
 
       <div>
-        <div class="block text-sm font-semibold text-calper-dark mb-1.5">Empreendimento</div>
-        {#if !usarNovoEmpreendimento}
-          <select name="empreendimentoId" class="input">
+        <label for="empreendimentoId" class="block text-sm font-semibold text-calper-dark mb-2">
+          Empreendimento
+        </label>
+        {#if data.empreendimentos.length > 0}
+          <select id="empreendimentoId" name="empreendimentoId" class="input" required>
             {#each data.empreendimentos as emp}
               <option value={emp.id}>{emp.nome}</option>
             {/each}
           </select>
-          <button
-            type="button"
-            class="text-xs text-calper-red font-semibold mt-1.5"
-            onclick={() => (usarNovoEmpreendimento = true)}
-          >
+          <a href="/admin/empreendimentos/nova" class="inline-block text-sm text-calper-red font-semibold mt-2">
             + cadastrar novo empreendimento
-          </button>
+          </a>
         {:else}
-          <input name="novoEmpreendimentoNome" class="input" placeholder="Nome do empreendimento" />
-          {#if data.empreendimentos.length > 0}
-            <button
-              type="button"
-              class="text-xs text-gray-500 font-semibold mt-1.5"
-              onclick={() => (usarNovoEmpreendimento = false)}
-            >
-              usar um empreendimento existente
-            </button>
-          {/if}
+          <div class="rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm px-4 py-3">
+            Nenhum empreendimento cadastrado.
+            <a href="/admin/empreendimentos/nova" class="font-bold underline">Cadastre o primeiro</a> para poder criar unidades.
+          </div>
         {/if}
       </div>
 
