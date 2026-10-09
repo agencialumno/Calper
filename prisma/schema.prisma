@@ -15,6 +15,7 @@ model Empreendimento {
   id          String    @id @default(cuid())
   nome        String
   estagioAtual String   @default("Início da Jornada")
+  etapa        String   @default("construcao") // lancamento | assinatura | construcao | entrega_chaves
   unidades    Unidade[]
   atualizacoes AtualizacaoEstagio[]
   createdAt   DateTime  @default(now())

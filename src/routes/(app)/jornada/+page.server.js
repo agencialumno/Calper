@@ -14,6 +14,7 @@ export async function load({ locals }) {
   return {
     empreendimento: unidade.empreendimento.nome,
     estagioAtual: unidade.empreendimento.estagioAtual,
+    etapa: unidade.empreendimento.etapa,
     atualizacoes: atualizacoes.map((a) => ({
       id: a.id,
       titulo: a.titulo,

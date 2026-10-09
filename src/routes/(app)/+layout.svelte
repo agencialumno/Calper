@@ -1,6 +1,8 @@
 <script>
   import { page } from '$app/stores';
   import NotificationBell from '$lib/components/NotificationBell.svelte';
+  import UnitSwitcher from '$lib/components/UnitSwitcher.svelte';
+  import UserMenu from '$lib/components/UserMenu.svelte';
 
   /** @type {{ data: import('./$types').LayoutData, children: import('svelte').Snippet }} */
   let { data, children } = $props();
@@ -19,20 +21,15 @@
   ];
 </script>
 
-<header class="border-b border-gray-100 bg-white md:sticky md:top-0 md:z-10">
-  <div class="max-w-5xl mx-auto px-5 md:px-8 py-4 md:py-5 flex items-center justify-between gap-6">
+<header class="border-b border-gray-100 bg-white md:sticky md:top-0 md:z-20">
+  <div class="max-w-5xl mx-auto px-5 md:px-8 py-3.5 md:py-4 flex items-center justify-between gap-4 md:gap-6">
     <div class="flex items-center gap-3 md:gap-8 min-w-0">
-      <img src="/logo.png" alt="Calper" class="h-6 md:h-6 shrink-0" />
-      <div class="min-w-0 border-l border-gray-100 pl-3 md:pl-0 md:border-l-0">
-        <div class="text-[11px] font-semibold text-gray-400 tracking-wide">UNIDADE</div>
-        {#if data.unidade}
-          <div class="text-base md:text-lg font-extrabold text-calper-dark truncate">
-            Unidade {data.unidade.numero} — Bloco {data.unidade.bloco}
-          </div>
-        {/if}
+      <img src="/logo.png" alt="Calper" class="h-6 shrink-0" />
+      <div class="min-w-0 border-l border-gray-100 pl-3 md:pl-6">
+        <UnitSwitcher unidade={data.unidade} unidades={data.unidades} />
       </div>
 
-      <nav class="hidden md:flex items-center gap-1 ml-4">
+      <nav class="hidden md:flex items-center gap-1 ml-2">
         {#each nav as item}
           <a
             href={item.href}
@@ -47,18 +44,14 @@
       </nav>
     </div>
 
-    <div class="flex items-center gap-1 shrink-0">
+    <div class="flex items-center gap-2 shrink-0">
       <NotificationBell notificacoes={data.notificacoes} />
-      <form method="POST" action="/logout">
-        <button type="submit" class="text-sm font-semibold text-gray-500 hover:text-calper-red px-2 py-2"
-          >Sair</button
-        >
-      </form>
+      <UserMenu investidor={data.investidor} />
     </div>
   </div>
 
   <!-- navegação mobile: abas maiores e com ícone, mais fáceis de tocar -->
-  <nav class="md:hidden flex items-stretch gap-2 px-4 pb-3 -mt-1">
+  <nav class="md:hidden flex items-stretch gap-2 px-5 pb-3">
     {#each nav as item}
       {@const ativo = $page.url.pathname.startsWith(item.href)}
       <a

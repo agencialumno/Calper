@@ -22,7 +22,7 @@ async function main() {
   let empreendimento = await db.empreendimento.findFirst({ where: { nome: 'Arte Botânica' } });
   if (!empreendimento) {
     empreendimento = await db.empreendimento.create({
-      data: { nome: 'Arte Botânica', estagioAtual: 'Início das Obras' }
+      data: { nome: 'Arte Botânica', estagioAtual: 'Início das Obras', etapa: 'construcao' }
     });
   }
 
@@ -70,7 +70,7 @@ async function main() {
   let empreendimento2 = await db.empreendimento.findFirst({ where: { nome: 'Nexus Macaé' } });
   if (!empreendimento2) {
     empreendimento2 = await db.empreendimento.create({
-      data: { nome: 'Nexus Macaé', estagioAtual: 'Entrega das Chaves' }
+      data: { nome: 'Nexus Macaé', estagioAtual: 'Entrega das Chaves', etapa: 'entrega_chaves' }
     });
   }
 

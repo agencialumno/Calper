@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { arquivoParaBase64 } from '$lib/server/agendamento.js';
+import { ETAPAS } from '$lib/etapas.js';
 import { enviarEmail, templateAtualizacaoObra } from '$lib/server/email.js';
 
 export async function load() {
@@ -14,6 +15,7 @@ export async function load() {
   ]);
 
   return {
+    etapas: ETAPAS.map((e) => ({ id: e.id, nome: e.nome })),
     empreendimentos,
     atualizacoes: atualizacoes.map((a) => ({
       id: a.id,
@@ -36,6 +38,7 @@ export const actions = {
     const empreendimentoId = String(form.get('empreendimentoId') ?? '');
     const titulo = String(form.get('titulo') ?? '').trim();
     const descricao = String(form.get('descricao') ?? '').trim();
+    const etapa = String(form.get('etapa') ?? '');
 
     if (!empreendimentoId || !titulo || !descricao) {
       return fail(400, { erro: 'Preencha empreendimento, título e descrição.' });
@@ -64,7 +67,8 @@ export const actions = {
       }
     });
 
-    await db.empreendimento.update({ where: { id: empreendimentoId }, data: { estagioAtual: titulo } });
+    await db.empreendimento.update({ where: { id: empreendimentoId }, data: { estagioAtual: titulo, ...(ETAPAS.some((e) => e.id === etapa) ? { etapa } : {}) }
+    });
 
     // destinatários: todos os e-mails de investidores com unidade nesse empreendimento
     const vinculos = await db.unidadeInvestidor.findMany({

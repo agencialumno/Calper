@@ -7,15 +7,27 @@ import {
   gerarQrToken,
   temAgendamentoAtivo
 } from '$lib/server/agendamento.js';
+import { tipoLiberadoNaEtapa } from '$lib/etapas.js';
 import { horarioOcupado, criarEvento } from '$lib/server/googleCalendar.js';
 import { notificarInvestidor, notificarFuncionarios, emailDoInvestidorNaUnidade } from '$lib/server/notificacao.js';
 import { templateAgendamentoConfirmado } from '$lib/server/email.js';
+
+async function etapaLiberaTipo(unidadeId, slug) {
+  const unidade = await db.unidade.findUnique({
+    where: { id: unidadeId },
+    select: { empreendimento: { select: { etapa: true } } }
+  });
+  return tipoLiberadoNaEtapa(slug, unidade?.empreendimento.etapa);
+}
 
 export async function load({ params, locals }) {
   const tipoEvento = await db.tipoEvento.findUnique({ where: { slug: params.tipo } });
   if (!tipoEvento || !tipoEvento.ativo) throw error(404, 'Tipo de evento não encontrado');
 
   if (await temAgendamentoAtivo(locals.unidadeId, tipoEvento.id)) {
+    throw redirect(303, '/painel');
+  }
+  if (!(await etapaLiberaTipo(locals.unidadeId, tipoEvento.slug))) {
     throw redirect(303, '/painel');
   }
 
@@ -42,6 +54,10 @@ export const actions = {
     // revalida a regra de bloqueio (proteção contra corrida/duplo clique)
     if (await temAgendamentoAtivo(locals.unidadeId, tipoEvento.id)) {
       return fail(400, { erro: 'Esta unidade já tem um agendamento ativo para este tipo de evento.' });
+    }
+
+    if (!(await etapaLiberaTipo(locals.unidadeId, tipoEvento.slug))) {
+      return fail(400, { erro: 'Este tipo de agendamento ainda não está disponível na etapa atual do empreendimento.' });
     }
 
     const form = await request.formData();

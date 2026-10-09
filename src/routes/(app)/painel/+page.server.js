@@ -1,4 +1,5 @@
 import { db } from '$lib/server/db.js';
+import { tipoLiberadoNaEtapa, motivoBloqueioEtapa } from '$lib/etapas.js';
 import { temAgendamentoAtivo } from '$lib/server/agendamento.js';
 
 export async function load({ locals }) {
@@ -20,7 +21,9 @@ export async function load({ locals }) {
       slug: t.slug,
       nome: t.nome,
       exigeDocumento: t.exigeDocumento,
-      bloqueado: await temAgendamentoAtivo(unidadeId, t.id)
+      bloqueado: await temAgendamentoAtivo(unidadeId, t.id),
+      foraDaEtapa: !tipoLiberadoNaEtapa(t.slug, unidade.empreendimento.etapa),
+      motivoEtapa: motivoBloqueioEtapa(t.slug)
     }))
   );
 
@@ -32,6 +35,7 @@ export async function load({ locals }) {
     mostrarTutorial,
     empreendimento: unidade.empreendimento.nome,
     estagioAtual: unidade.empreendimento.estagioAtual,
+    etapa: unidade.empreendimento.etapa,
     pesquisasPendentes,
     agendamentos: agendamentos.map((a) => ({
       id: a.id,

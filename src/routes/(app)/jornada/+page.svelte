@@ -1,4 +1,5 @@
 <script>
+  import EtapasTimeline from '$lib/components/EtapasTimeline.svelte';
   import BackLink from '$lib/components/BackLink.svelte';
 
   let { data } = $props();
@@ -12,15 +13,22 @@
   <title>Jornada — Calper</title>
 </svelte:head>
 
-<div class="max-w-3xl mx-auto p-5 md:p-10">
+<div class="max-w-3xl mx-auto px-5 md:px-8 py-6 md:py-10">
   <BackLink href="/painel" label="Painel" />
 
-  <div class="mt-3 mb-8 md:mb-10">
-    <h1 class="text-xl md:text-3xl font-bold text-calper-dark">{data.empreendimento}</h1>
-    <p class="text-sm md:text-base text-gray-500 mt-1">
-      Estágio atual: <span class="font-semibold text-calper-red">{data.estagioAtual}</span>
+  <div class="mt-4 mb-8 md:mb-10">
+    <h1 class="text-2xl md:text-3xl font-extrabold text-calper-dark leading-tight">{data.empreendimento}</h1>
+    <p class="text-sm md:text-base text-gray-500 mt-1.5">
+      Último marco: <span class="font-semibold text-calper-red">{data.estagioAtual}</span>
     </p>
   </div>
+
+  <section class="card p-5 md:p-8 mb-10 md:mb-12">
+    <h2 class="text-lg md:text-xl font-bold text-calper-dark mb-6 md:mb-8">Etapas do empreendimento</h2>
+    <EtapasTimeline etapa={data.etapa} detalhado />
+  </section>
+
+  <h2 class="text-lg md:text-xl font-bold text-calper-dark mb-5">Atualizações da obra</h2>
 
   {#if data.atualizacoes.length === 0}
     <p class="text-sm text-gray-400">Ainda não há atualizações publicadas para este empreendimento.</p>

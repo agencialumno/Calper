@@ -72,6 +72,21 @@
     </div>
 
     <div>
+      <label for="etapa" class="block text-sm font-semibold text-calper-dark mb-1.5">
+        Etapa do empreendimento
+      </label>
+      <select id="etapa" name="etapa" class="input">
+        <option value="">manter etapa atual</option>
+        {#each data.etapas as e}
+          <option value={e.id}>{e.nome}</option>
+        {/each}
+      </select>
+      <p class="text-xs text-gray-400 mt-1.5">
+        Define a linha do tempo e quais agendamentos ficam liberados para os investidores.
+      </p>
+    </div>
+
+    <div>
       <label for="titulo" class="block text-sm font-semibold text-calper-dark mb-1.5">
         Título do marco
       </label>
