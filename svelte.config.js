@@ -5,7 +5,9 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter()
+    adapter: adapter(),
+    // SW é registrado manualmente em src/hooks.client.js (vite-pwa renomeia para /sw.js)
+    serviceWorker: { register: false }
   }
 };
 

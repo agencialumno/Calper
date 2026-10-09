@@ -16,7 +16,13 @@ export async function handle({ event, resolve }) {
   event.locals.funcionario = sessaoStaff?.funcionario ?? null;
   event.locals.staffSessionToken = sessaoStaff ? staffToken : null;
 
-  const response = await resolve(event);
+  // Área da equipe usa manifest próprio (PWA separado, abre em /admin).
+  const response = await resolve(event, {
+    transformPageChunk: ({ html }) =>
+      event.url.pathname.startsWith('/admin')
+        ? html.replace('href="/manifest.webmanifest"', 'href="/manifest-equipe.webmanifest"')
+        : html
+  });
 
   // Impede o navegador de guardar essas páginas no cache (bfcache) — sem isso,
   // o botão "voltar" reexibiria uma tela antiga (ex: um agendamento já
