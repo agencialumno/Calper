@@ -20,7 +20,9 @@ export async function load() {
     checklist: { conteudo: checklist.conteudo, atualizadoEm: checklist.atualizadoEm },
     variaveis: VARIAVEIS_EMPREENDIMENTO.map((v) => ({
       ...v,
-      valor: termo.variaveis?.[v.chave] ?? ''
+      valor: termo.variaveis?.[v.chave] ?? '',
+      // valor provisório gravado como fictício até alguém informar o real
+      ficticio: Array.isArray(termo.variaveis?.ficticias) && termo.variaveis.ficticias.includes(v.chave)
     }))
   };
 }
@@ -48,10 +50,15 @@ export const actions = {
     const murano = await buscarMurano();
     if (!murano) return fail(404, { erro: 'Empreendimento Murano não encontrado.' });
 
+    const termo = await obterTemplate(murano.id, TIPO_TERMO);
+    const atuais = termo.variaveis ?? {};
     const variaveis = Object.fromEntries(
       VARIAVEIS_EMPREENDIMENTO.map((v) => [v.chave, String(form.get(v.chave) ?? '').trim()])
     );
-    await obterTemplate(murano.id, TIPO_TERMO);
+    // o aviso "fictício" só some quando o valor é alterado (ou apagado)
+    variaveis.ficticias = (Array.isArray(atuais.ficticias) ? atuais.ficticias : []).filter(
+      (chave) => variaveis[chave] && variaveis[chave] === atuais[chave]
+    );
     await db.documentoTemplate.update({
       where: { empreendimentoId_tipo: { empreendimentoId: murano.id, tipo: TIPO_TERMO } },
       data: { variaveis }

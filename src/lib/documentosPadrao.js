@@ -37,7 +37,7 @@ Diante de todo o exposto, o(s) INVESTIDOR(ES) declara(m) receber a posse direta 
 
 Rio de Janeiro, {{dataAssinatura}}.
 
-[ASSINATURA DO INVESTIDOR: {{proprietarios}}]
+[ASSINATURA DO INVESTIDOR: {{assinante}}]
 
 [ASSINATURA: M1 EMPREENDIMENTOS IMOBILIÁRIOS SPE LTDA]`;
 
@@ -64,7 +64,7 @@ Declaro ter recebido da M1 EMPREENDIMENTOS IMOBILIÁRIOS SPE LTDA. os itens e do
 
 Rio de Janeiro, {{dataAssinatura}}.
 
-[ASSINATURA DO INVESTIDOR: {{proprietarios}}]`;
+[ASSINATURA DO INVESTIDOR: {{assinante}}]`;
 
 export const PADROES = { [TIPO_TERMO]: TERMO_PADRAO, [TIPO_CHECKLIST]: CHECKLIST_PADRAO };
 

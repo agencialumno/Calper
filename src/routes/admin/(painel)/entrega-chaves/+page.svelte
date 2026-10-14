@@ -31,7 +31,10 @@
 </svelte:head>
 
 <div class="p-5 md:p-8 max-w-6xl">
-  <h1 class="text-xl font-bold text-calper-dark">Entrega de chaves</h1>
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-xl font-bold text-calper-dark">Entrega de chaves</h1>
+    <a href="/admin/presenca" class="text-sm font-bold text-calper-red">Lista de presença →</a>
+  </div>
   <p class="text-sm text-gray-500 mt-0.5 mb-6">Murano Residencial — {data.agendamentos.length} agendamento(s)</p>
 
   {#if data.semMurano}
@@ -57,8 +60,8 @@
           </div>
 
           <div class="text-xs text-gray-600 mt-2">
-            {a.nome ?? '—'} · {a.telefone ?? '—'} · {a.email ?? '—'}
-            · {a.ehProprietario === false ? (a.temProcuracao ? 'procurador (procuração anexada)' : 'procurador') : 'proprietário'}
+            Agendado por {a.nome ?? '—'} · {a.telefone ?? '—'} · {a.email ?? '—'}
+            {#if a.retiranteNome}· Retira: <strong>{a.retiranteNome}</strong>{#if a.temProcuracao} (procuração anexada){/if}{:else}· retirante ainda não confirmado{/if}
           </div>
 
           <div class="flex items-center gap-3 mt-3 text-xs font-bold">
@@ -74,11 +77,11 @@
 
           <div class="flex flex-wrap gap-1.5 mt-3 text-[11px] font-bold">
             <span
-              class="px-2 py-0.5 rounded-full {u.statusPagamento === 'quitado'
+              class="px-2 py-0.5 rounded-full {u.statusQuitacao === 'quitada'
                 ? 'bg-green-50 text-green-700'
                 : 'bg-amber-50 text-amber-700'}"
             >
-              Pagamento: {u.statusPagamento}
+              Pagamento: {u.statusQuitacao === 'quitada' ? 'quitada' : u.statusQuitacao === 'a_vencer' ? 'a vencer' : 'não informado'}
             </span>
             <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
               {u.financiado ? `Financiado (grupo ${u.grupoFinanciamento ?? '?'})` : 'Sem financiamento'}

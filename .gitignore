@@ -5,3 +5,7 @@ dist
 .env
 .env.*
 !.env.example
+
+# dados pessoais de clientes (planilha/documentos de referência e base importada do Murano)
+docs-referencia/
+scripts/murano-dados.json

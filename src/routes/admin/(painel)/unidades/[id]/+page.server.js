@@ -1,6 +1,7 @@
 import { error, fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
+import { quartosDaUnidade } from '$lib/server/documentos.js';
 
 async function logUnidade(event, acao, texto) {
   const u = await db.unidade.findUnique({ where: { id: event.params.id }, select: { numero: true, bloco: true } });
@@ -21,7 +22,7 @@ export async function load({ params }) {
       empreendimento: true,
       investidores: { include: { investidor: true } },
       historico: { orderBy: { createdAt: 'desc' } },
-      agendamentos: { include: { tipoEvento: true, documentosAssinados: { where: { status: 'assinado' }, select: { tipo: true } } }, orderBy: { dataHora: 'desc' } }
+      agendamentos: { include: { tipoEvento: true, documentosAssinados: { select: { tipo: true, status: true } }, presencas: { orderBy: { createdAt: 'asc' } } }, orderBy: { dataHora: 'desc' } }
     }
   });
 
@@ -34,8 +35,11 @@ export async function load({ params }) {
       bloco: unidade.bloco,
       status: unidade.status,
       observacoes: unidade.observacoes,
-      quartos: unidade.quartos,
-      statusPagamento: unidade.statusPagamento,
+      quartos: quartosDaUnidade(unidade),
+      tipologia: unidade.tipologia,
+      grupo: unidade.grupo,
+      statusQuitacao: unidade.statusQuitacao,
+      compradores: Array.isArray(unidade.compradores) ? unidade.compradores : [],
       financiado: unidade.financiado,
       grupoFinanciamento: unidade.grupoFinanciamento,
       vistoriaAprovada: unidade.vistoriaAprovada,
@@ -58,9 +62,15 @@ export async function load({ params }) {
       agendamentos: unidade.agendamentos.map((a) => ({
         id: a.id,
         tipoNome: a.tipoEvento.nome,
+        ehEntregaChaves: a.tipoEvento.slug === 'entrega-chaves',
+        agendadoPor: a.nomeCompareceu,
+        retirante: a.retiranteNome
+          ? { nome: a.retiranteNome, vinculo: a.presencas.find((p) => p.vinculo !== 'acompanhante')?.vinculo ?? null }
+          : null,
         dataHora: a.dataHora,
         status: a.status,
-        documentosAssinados: a.documentosAssinados.map((d) => d.tipo)
+        documentos: a.documentosAssinados.map((d) => ({ tipo: d.tipo, status: d.status })),
+        presencas: a.presencas.map((p) => ({ id: p.id, nome: p.nome, vinculo: p.vinculo, createdAt: p.createdAt }))
       }))
     }
   };
@@ -113,13 +123,13 @@ export const actions = {
   atualizarFinanceiroJuridico: async (event) => {
     const { request, params, locals } = event;
     const form = await request.formData();
-    const statusPagamento = String(form.get('statusPagamento') ?? '');
+    const statusQuitacao = String(form.get('statusQuitacao') ?? '') || null;
     const financiado = form.get('financiado') === 'on';
     const grupoBruto = String(form.get('grupoFinanciamento') ?? '');
     const vistoriaAprovada = form.get('vistoriaAprovada') === 'on';
     const escrituraRegistrada = form.get('escrituraRegistrada') === 'on';
 
-    if (!['quitado', 'pendente'].includes(statusPagamento)) {
+    if (statusQuitacao !== null && !['quitada', 'a_vencer'].includes(statusQuitacao)) {
       return fail(400, { erro: 'Status de pagamento inválido.' });
     }
     if (financiado && !['A', 'B'].includes(grupoBruto)) {
@@ -129,13 +139,13 @@ export const actions = {
 
     await db.unidade.update({
       where: { id: params.id },
-      data: { statusPagamento, financiado, grupoFinanciamento, vistoriaAprovada, escrituraRegistrada }
+      data: { statusQuitacao, financiado, grupoFinanciamento, vistoriaAprovada, escrituraRegistrada }
     });
     await db.historicoUnidade.create({
       data: {
         unidadeId: params.id,
         tipo: 'outro',
-        descricao: `Status financeiro/jurídico atualizado: pagamento ${statusPagamento}, ${
+        descricao: `Status financeiro/jurídico atualizado: pagamento ${statusQuitacao ?? 'não informado'}, ${
           financiado ? `financiada (grupo ${grupoFinanciamento})` : 'não financiada'
         }, vistoria ${vistoriaAprovada ? 'aprovada' : 'pendente'}, escritura ${
           escrituraRegistrada ? 'registrada' : 'não registrada'
@@ -143,7 +153,7 @@ export const actions = {
         criadoPorId: locals.funcionario.id
       }
     });
-    await logUnidade(event, 'unidade_editada', `atualizou o status financeiro/jurídico (pagamento ${statusPagamento}, ${financiado ? 'financiada, grupo ' + grupoFinanciamento : 'não financiada'}, vistoria ${vistoriaAprovada ? 'aprovada' : 'pendente'}, escritura ${escrituraRegistrada ? 'registrada' : 'não registrada'})`);
+    await logUnidade(event, 'unidade_editada', `atualizou o status financeiro/jurídico (pagamento ${statusQuitacao ?? 'não informado'}, ${financiado ? 'financiada, grupo ' + grupoFinanciamento : 'não financiada'}, vistoria ${vistoriaAprovada ? 'aprovada' : 'pendente'}, escritura ${escrituraRegistrada ? 'registrada' : 'não registrada'})`);
     return { sucesso: true };
   },
 

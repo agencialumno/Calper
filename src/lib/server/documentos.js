@@ -29,6 +29,12 @@ export function dataPorExtenso(data = new Date()) {
   });
 }
 
+/** Nº de quartos da unidade: vem da tipologia ("3 QUARTOS") da base Murano; cai no campo `quartos` se faltar. */
+export function quartosDaUnidade(unidade) {
+  const doTexto = Number(String(unidade.tipologia ?? '').match(/\d+/)?.[0]);
+  return doTexto || unidade.quartos || null;
+}
+
 /** Regra de chaves de porta interior: 2 quartos → 4, 3 quartos → 6, desconhecido → em branco. */
 export function chavesInterior(quartos) {
   if (quartos === 2) return '4';
@@ -36,7 +42,47 @@ export function chavesInterior(quartos) {
   return '';
 }
 
-export function montarVariaveis({ unidade, proprietarios, variaveisTemplate }) {
+/**
+ * Pessoas que podem retirar as chaves: Unidade.compradores (principal primeiro) ou, se vazio,
+ * os investidores vinculados. `id` é o valor usado no passo "quem retira" do fluxo de entrega.
+ */
+export function titularesDaUnidade(unidade) {
+  const compradores = Array.isArray(unidade.compradores) ? unidade.compradores : [];
+  if (compradores.length > 0) {
+    return compradores
+      .map((c, i) => ({ id: `c${i}`, nome: c.nome, principal: Boolean(c.principal), cpf: null, email: null }))
+      .sort((a, b) => Number(b.principal) - Number(a.principal));
+  }
+  return (unidade.investidores ?? []).map((v) => ({
+    id: v.investidorId,
+    nome: v.investidor.nome,
+    principal: false,
+    cpf: v.investidor.cpf,
+    email: v.email
+  }));
+}
+
+/**
+ * Textos de "proprietário(s)" e "assinante" do documento.
+ * - Quem retira é comprador (ou ainda não foi confirmado): os nomes dos compradores.
+ * - Quem retira é procurador: deixa clara a representação.
+ *   Com compradores: "A, B, neste ato representados por X, portador(a) de procuração".
+ *   Sem compradores: "X, na qualidade de procurador, conforme documento de procuração anexo".
+ * Retorna campos ausentes (undefined) quando não há dado, pra {{variável}} ficar visível.
+ */
+export function textosDePartes(nomesCompradores, retirante) {
+  const nomes = nomesCompradores.join(', ');
+  if (retirante?.vinculo === 'procurador' && retirante.nome) {
+    const proprietarios =
+      nomesCompradores.length > 0
+        ? `${nomes}, neste ato ${nomesCompradores.length > 1 ? 'representados' : 'representado'} por ${retirante.nome}, portador(a) de procuração`
+        : `${retirante.nome}, na qualidade de procurador, conforme documento de procuração anexo`;
+    return { proprietarios, assinante: `${retirante.nome} (procurador)` };
+  }
+  return nomesCompradores.length > 0 ? { proprietarios: nomes, assinante: nomes } : {};
+}
+
+export function montarVariaveis({ unidade, partes, variaveisTemplate }) {
   const fixas = Object.fromEntries(
     Object.entries(variaveisTemplate ?? {}).filter(([, v]) => typeof v === 'string' && v.trim() !== '')
   );
@@ -44,10 +90,42 @@ export function montarVariaveis({ unidade, proprietarios, variaveisTemplate }) {
     ...fixas,
     bloco: unidade.bloco,
     unidade: unidade.numero,
-    proprietarios: proprietarios.join(', '),
+    // sem dados, {{proprietarios}} / {{assinante}} ficam visíveis pra equipe completar (e o aviso aparece)
+    ...partes,
     dataAssinatura: dataPorExtenso(),
-    chavesInterior: chavesInterior(unidade.quartos)
+    chavesInterior: chavesInterior(quartosDaUnidade(unidade))
   };
+}
+
+const TIPO_TEMPLATE = { termo: 'termo_entrega_chaves', checklist: 'checklist' };
+
+/**
+ * Texto final de um documento pra uma unidade (termo ou checklist), com as variáveis preenchidas
+ * a partir de Unidade (bloco, número, tipologia, compradores) e dos dados fixos do empreendimento.
+ * Variáveis sem valor continuam como {{variavel}} pro atendente completar.
+ * Mesmo texto que depois é convertido em PDF e mandado pro DocuSign.
+ */
+export async function montarDocumento(unidadeId, tipo, { retirante = null } = {}) {
+  const unidade = await db.unidade.findUnique({
+    where: { id: unidadeId },
+    include: { investidores: { include: { investidor: true } } }
+  });
+  if (!unidade) throw new Error('Unidade não encontrada.');
+
+  const [template, termo] = await Promise.all([
+    obterTemplate(unidade.empreendimentoId, TIPO_TEMPLATE[tipo]),
+    obterTemplate(unidade.empreendimentoId, TIPO_TEMPLATE.termo) // guarda os dados fixos do empreendimento
+  ]);
+
+  const titulares = titularesDaUnidade(unidade);
+  const variaveis = montarVariaveis({
+    unidade,
+    // `retirante` = { nome, vinculo } de quem retira as chaves (passo 2 do fluxo), quando já confirmado
+    partes: textosDePartes(titulares.map((t) => t.nome), retirante),
+    variaveisTemplate: termo.variaveis
+  });
+
+  return { texto: preencher(template.conteudo, variaveis), unidade, titulares };
 }
 
 // --- PDF (pdf-lib, sem browser headless — roda no Vercel) ---

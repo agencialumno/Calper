@@ -48,6 +48,13 @@
     };
   }
 
+  const vinculoRotulo = {
+    comprador_principal: 'comprador principal',
+    comprador: 'comprador',
+    procurador: 'procurador',
+    acompanhante: 'acompanhante'
+  };
+
   const statusLabel = {
     regularizado: 'Regularizado',
     troca_titularidade: 'Troca de titularidade',
@@ -132,10 +139,11 @@
         <div class="text-sm font-bold text-calper-dark">Status financeiro e jurídico</div>
 
         <div>
-          <label for="statusPagamento" class="block text-xs font-semibold text-gray-500 mb-1">Pagamento</label>
-          <select id="statusPagamento" name="statusPagamento" class="input !py-2 text-sm">
-            <option value="pendente" selected={u.statusPagamento === 'pendente'}>Pendente</option>
-            <option value="quitado" selected={u.statusPagamento === 'quitado'}>Quitado</option>
+          <label for="statusQuitacao" class="block text-xs font-semibold text-gray-500 mb-1">Pagamento</label>
+          <select id="statusQuitacao" name="statusQuitacao" class="input !py-2 text-sm">
+            <option value="" selected={!u.statusQuitacao}>Não informado</option>
+            <option value="a_vencer" selected={u.statusQuitacao === 'a_vencer'}>A vencer</option>
+            <option value="quitada" selected={u.statusQuitacao === 'quitada'}>Quitada</option>
           </select>
         </div>
 
@@ -169,6 +177,43 @@
         <SubmitButton loading={salvandoFin} variant="outline" class="!py-2.5 text-sm">Salvar status</SubmitButton>
       </form>
     </div>
+
+    <!-- compradores (base Murano) + documentos de entrega -->
+    {#if u.compradores.length > 0 || u.tipologia}
+      <div class="card p-6 flex flex-col gap-4">
+        <div class="text-sm font-bold text-calper-dark">Compradores e entrega de chaves</div>
+        <div class="flex flex-wrap gap-2 text-xs font-bold">
+          {#if u.tipologia}<span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">{u.tipologia}</span>{/if}
+          {#if u.grupo}<span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">Grupo {u.grupo}</span>{/if}
+          {#if u.statusQuitacao}
+            <span
+              class="px-2.5 py-1 rounded-full {u.statusQuitacao === 'quitada'
+                ? 'bg-green-50 text-green-700'
+                : 'bg-amber-50 text-amber-700'}"
+            >
+              {u.statusQuitacao === 'quitada' ? 'Quitada' : 'A vencer'}
+            </span>
+          {/if}
+        </div>
+        {#each u.compradores as c}
+          <div class="text-sm text-calper-dark">
+            {c.nome}
+            {#if c.principal}<span class="text-[11px] font-bold text-calper-red ml-1">principal</span>{/if}
+          </div>
+        {:else}
+          <p class="text-sm text-gray-400">Sem comprador cadastrado.</p>
+        {/each}
+        <div class="flex gap-4 text-sm font-bold text-calper-red">
+          <a href="/admin/unidades/{u.id}/termo-entrega">Termo de entrega</a>
+          <a href="/admin/unidades/{u.id}/checklist">Checklist</a>
+        </div>
+      </div>
+    {:else}
+      <div class="card p-6 flex gap-4 text-sm font-bold text-calper-red items-start">
+        <a href="/admin/unidades/{u.id}/termo-entrega">Termo de entrega</a>
+        <a href="/admin/unidades/{u.id}/checklist">Checklist</a>
+      </div>
+    {/if}
 
     <!-- investidores -->
     <div class="card p-6">
@@ -254,14 +299,41 @@
               <div>
                 <div class="text-sm font-bold text-calper-dark">{a.tipoNome}</div>
                 <div class="text-xs text-gray-500 mt-0.5">{formatarData(a.dataHora)}</div>
-                {#each a.documentosAssinados as tipo}
-                  <a
-                    href="/admin/entrega-chaves/{a.id}/documento/{tipo}"
-                    class="text-xs font-bold text-calper-red mr-3"
-                  >
-                    Baixar {tipo === 'termo' ? 'termo' : 'checklist'}
-                  </a>
-                {/each}
+                {#if a.ehEntregaChaves}
+                  <div class="text-xs text-gray-600 mt-1.5">
+                    <span class="font-bold text-gray-500">Agendado por:</span> {a.agendadoPor ?? '—'}
+                    {#if a.retirante}
+                      · <span class="font-bold text-gray-500">Retirou:</span> {a.retirante.nome}
+                      {#if a.retirante.vinculo}({vinculoRotulo[a.retirante.vinculo] ?? a.retirante.vinculo}){/if}
+                    {/if}
+                  </div>
+                  <div class="flex flex-wrap gap-1.5 mt-2 text-[11px] font-bold">
+                    {#each [['termo', 'Termo'], ['checklist', 'Checklist']] as [tipo, rotulo]}
+                      {@const doc = a.documentos.find((d) => d.tipo === tipo)}
+                      <span
+                        class="px-2 py-0.5 rounded-full {doc?.status === 'assinado'
+                          ? 'bg-green-50 text-green-700'
+                          : doc?.status === 'pendente'
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-gray-100 text-gray-500'}"
+                      >
+                        {rotulo}: {doc?.status === 'assinado' ? 'assinado' : doc?.status === 'pendente' ? 'pendente' : 'não enviado'}
+                      </span>
+                      {#if doc?.status === 'assinado'}
+                        <a href="/admin/entrega-chaves/{a.id}/documento/{tipo}" class="text-calper-red">baixar</a>
+                      {/if}
+                    {/each}
+                  </div>
+                  {#if a.presencas.length > 0}
+                    <div class="mt-2 text-xs text-gray-600">
+                      <span class="font-bold text-gray-500">Presentes:</span>
+                      {#each a.presencas as p, i}
+                        {p.nome} ({vinculoRotulo[p.vinculo] ?? p.vinculo}, {new Date(p.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}){i < a.presencas.length - 1 ? '; ' : ''}
+                      {/each}
+                    </div>
+                  {/if}
+                  <a href="/admin/entrega-chaves/{a.id}" class="text-xs font-bold text-calper-red mt-2 inline-block">Abrir fluxo de entrega →</a>
+                {/if}
               </div>
               <span class="text-xs font-bold px-2 py-0.5 rounded-full {tipoCor[a.status] ?? tipoCor.outro}">
                 {a.status}

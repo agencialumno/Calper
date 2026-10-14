@@ -36,9 +36,12 @@ model Unidade {
   bloco            String
   numero           String
   status           String               @default("regularizado") // regularizado | troca_titularidade | distrato
+  tipologia        String?              // ex: "2 QUARTOS", "3 QUARTOS" — vem da base de entrega de chaves
+  grupo            String?              // A | B — grupo de entrega de chaves (base Murano)
+  statusQuitacao   String?              // quitada | a_vencer — status de pagamento (base Murano)
+  compradores      Json?                // [{ nome: String, principal: Boolean }] — fonte dos documentos de entrega
   observacoes      String?              // anotações livres do dossiê
   // Entrega de chaves — status financeiro/jurídico (editado pela equipe no dossiê)
-  statusPagamento     String            @default("pendente") // quitado | pendente
   financiado          Boolean           @default(false)
   grupoFinanciamento  String?           // A | B (nulo se não financiado)
   vistoriaAprovada    Boolean           @default(false)
@@ -47,6 +50,7 @@ model Unidade {
   investidores     UnidadeInvestidor[]
   historico        HistoricoUnidade[]
   agendamentos     Agendamento[]
+  presencas        PresencaEntrega[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -163,9 +167,15 @@ model Agendamento {
   telefoneCompareceu String?
   emailCompareceu    String?
   ehProprietario     Boolean?
+  // Quem agendou fica nos campos *Compareceu acima (intactos). Quem retira as chaves de fato é
+  // confirmado no dia, no passo 2 do fluxo de entrega, e gravado aqui.
+  retiranteNome      String?
+  retiranteEmail     String?
+  retiranteCpf       String?
   procuracaoBase64   String?
   acompanhantes   Acompanhante[]
   documentosAssinados DocumentoAssinado[]
+  presencas           PresencaEntrega[]
   pesquisa        PesquisaSatisfacao?
   createdAt       DateTime       @default(now())
 
@@ -317,5 +327,23 @@ model LogAcesso {
   @@index([investidorId, createdAt])
   @@index([funcionarioId, createdAt])
   @@index([acao, createdAt])
+  @@index([createdAt])
+}
+
+// Lista de presença da entrega de chaves: quem compareceu, com qual vínculo e a que horas.
+model PresencaEntrega {
+  id             String      @id @default(cuid())
+  agendamentoId  String
+  agendamento    Agendamento @relation(fields: [agendamentoId], references: [id])
+  unidadeId      String
+  unidade        Unidade     @relation(fields: [unidadeId], references: [id])
+  nome           String
+  vinculo        String      // comprador_principal | comprador | procurador | acompanhante
+  cpf            String?
+  registradoPorId String?    // Funcionario.id
+  createdAt      DateTime    @default(now()) // horário em que a presença foi registrada
+
+  @@index([agendamentoId])
+  @@index([unidadeId])
   @@index([createdAt])
 }

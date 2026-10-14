@@ -45,8 +45,20 @@
       >
         {#each data.variaveis as v (v.chave)}
           <div>
-            <label for={v.chave} class="block text-xs font-semibold text-gray-500 mb-1">{v.rotulo}</label>
-            <input id={v.chave} name={v.chave} class="input !py-2 text-sm" value={v.valor} />
+            <label for={v.chave} class="flex items-center gap-2 text-xs font-semibold text-gray-500 mb-1">
+              {v.rotulo}
+              {#if v.ficticio}
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                  fictício — revisar antes de usar
+                </span>
+              {/if}
+            </label>
+            <input
+              id={v.chave}
+              name={v.chave}
+              class="input !py-2 text-sm {v.ficticio ? '!border-amber-400 bg-amber-50' : ''}"
+              value={v.valor}
+            />
           </div>
         {/each}
         <div class="sm:col-span-2 sm:w-48">
@@ -69,7 +81,7 @@
         <label for={t.tipo} class="text-sm font-bold text-calper-dark">{t.titulo}</label>
         <textarea id={t.tipo} name="conteudo" rows="18" class="input text-sm font-mono" required>{t.doc.conteudo}</textarea>
         <p class="text-xs text-gray-400">
-          Variáveis: {'{{bloco}} {{unidade}} {{proprietarios}} {{dataAssinatura}}'}
+          Variáveis: {'{{bloco}} {{unidade}} {{proprietarios}} {{assinante}} {{dataAssinatura}}'}
           {#if t.tipo === 'checklist'}{'{{chavesInterior}}'} · cada item é uma linha "N. descrição — Qtde. valor"{/if}
         </p>
         <div class="sm:w-48">
