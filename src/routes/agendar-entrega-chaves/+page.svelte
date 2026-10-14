@@ -6,18 +6,9 @@
   let { data, form } = $props();
 
   let ehProprietario = $state(form?.valores?.ehProprietario ?? '');
-  let arquivo = $state(null);
   let enviando = $state(false);
-  let tentouEnviar = $state(false);
 
-  const faltaProcuracao = $derived(tentouEnviar && ehProprietario === 'nao' && !arquivo);
-
-  function aoSubmeter({ cancel }) {
-    tentouEnviar = true;
-    if (ehProprietario === 'nao' && !arquivo) {
-      cancel();
-      return;
-    }
+  function aoSubmeter() {
     enviando = true;
     return async ({ update }) => {
       await update({ reset: false });
@@ -52,7 +43,6 @@
   {:else}
     <form
       method="POST"
-      enctype="multipart/form-data"
       use:enhance={aoSubmeter}
       class="card p-6 md:p-8 flex flex-col gap-5"
     >
@@ -140,24 +130,9 @@
       </fieldset>
 
       {#if ehProprietario === 'nao'}
-        <div>
-          <label for="procuracao" class="block text-sm font-semibold text-calper-dark mb-1.5">
-            Procuração (JPG, PNG ou PDF, até 4 MB)
-          </label>
-          <input
-            id="procuracao"
-            name="procuracao"
-            type="file"
-            accept="image/jpeg,image/png,application/pdf"
-            class="input"
-            onchange={(e) => (arquivo = e.currentTarget.files?.[0] ?? null)}
-          />
-          {#if faltaProcuracao}
-            <div class="mt-2.5">
-              <AvisoSutil>Envie a procuração — obrigatória para quem não é o proprietário.</AvisoSutil>
-            </div>
-          {/if}
-        </div>
+        <p class="text-xs text-gray-500 -mt-2">
+          Leve a procuração no dia da entrega — ela será conferida pela equipe Calper no atendimento.
+        </p>
       {/if}
 
       <SubmitButton loading={enviando}>Confirmar agendamento</SubmitButton>

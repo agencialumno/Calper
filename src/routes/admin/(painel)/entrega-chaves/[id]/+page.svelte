@@ -8,15 +8,16 @@
   let u = $derived(data.unidade);
   let a = $derived(data.agendamento);
   let enviando = $state(false);
-  let quemEscolhido = $state('');
-  $effect(() => {
-    quemEscolhido = data.quem;
-  });
+
+  // passo 2
+  let quem = $state('');
+  let arquivo = $state(null);
+  let tentouConfirmar = $state(false);
+  const exigeProcuracao = $derived(quem === 'outro' && !arquivo && !a.temProcuracao);
+  const faltaProcuracao = $derived(tentouConfirmar && exigeProcuracao);
 
   const passos = ['Unidade', 'Quem retira', 'Termo', 'Checklist', 'Concluído'];
-
-  const href = (passo, quem = data.quem) =>
-    `?passo=${passo}${quem ? `&quem=${encodeURIComponent(quem)}` : ''}`;
+  const href = (passo) => `?passo=${passo}`;
 
   function aoEnviar() {
     enviando = true;
@@ -24,6 +25,15 @@
       await update({ reset: false });
       enviando = false;
     };
+  }
+
+  function aoConfirmarRetirante({ cancel }) {
+    tentouConfirmar = true;
+    if (exigeProcuracao) {
+      cancel();
+      return;
+    }
+    return aoEnviar();
   }
 
   function formatarDataHora(iso) {
@@ -34,6 +44,10 @@
       hour: '2-digit',
       minute: '2-digit'
     });
+  }
+
+  function formatarHora(iso) {
+    return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
   const ok = 'bg-green-50 text-green-700';
@@ -47,7 +61,13 @@
 <div class="p-5 md:p-8 max-w-3xl">
   <a href="/admin/entrega-chaves" class="text-sm text-gray-500 hover:text-calper-dark">← Entrega de chaves</a>
   <h1 class="text-xl font-bold text-calper-dark mt-3 mb-1">Bloco {u.bloco} - nº {u.numero}</h1>
-  <p class="text-sm text-gray-500 mb-5">Agendado para {formatarDataHora(a.dataHora)}</p>
+  <p class="text-sm text-gray-500">Agendado para {formatarDataHora(a.dataHora)}</p>
+  <p class="text-xs text-gray-500 mb-5">
+    Agendamento feito por <strong>{a.nome ?? '—'}</strong>{a.email ? ` (${a.email})` : ''}
+    {#if data.retirante}
+      · Retira as chaves: <strong>{data.retirante.nome}</strong> ({data.presencas.find((p) => p.vinculo !== 'acompanhante')?.vinculoRotulo ?? ''})
+    {/if}
+  </p>
 
   <ol class="flex flex-wrap gap-1.5 mb-6 text-[11px] font-bold">
     {#each passos as nome, i}
@@ -73,8 +93,8 @@
     <div class="card p-6 flex flex-col gap-4">
       <div class="text-sm font-bold text-calper-dark">Situação da unidade (somente consulta)</div>
       <div class="flex flex-wrap gap-2 text-xs font-bold">
-        <span class="px-2.5 py-1 rounded-full {u.statusPagamento === 'quitado' ? ok : alerta}">
-          Pagamento: {u.statusPagamento}
+        <span class="px-2.5 py-1 rounded-full {u.statusQuitacao === 'quitada' ? ok : alerta}">
+          Pagamento: {u.statusQuitacao === 'quitada' ? 'quitada' : u.statusQuitacao === 'a_vencer' ? 'a vencer' : 'não informado'}
         </span>
         <span class="px-2.5 py-1 rounded-full {u.vistoriaAprovada ? ok : alerta}">
           Vistoria: {u.vistoriaAprovada ? 'aprovada' : 'pendente'}
@@ -89,58 +109,128 @@
       <a href={href(2)} class="btn-primary text-center">Continuar</a>
     </div>
 
-    <!-- PASSO 2 — quem retira -->
+    <!-- PASSO 2 — quem retira + lista de presença -->
   {:else if data.passo === 2}
-    <form method="GET" class="card p-6 flex flex-col gap-4">
-      <input type="hidden" name="passo" value="3" />
+    <form
+      method="POST"
+      action="?/confirmarRetirante"
+      enctype="multipart/form-data"
+      use:enhance={aoConfirmarRetirante}
+      class="card p-6 flex flex-col gap-4"
+    >
       <div class="text-sm font-bold text-calper-dark">Quem está retirando as chaves?</div>
 
-      {#each data.titulares as t (t.investidorId)}
+      {#if data.titulares.length === 0}
+        <div class="border border-amber-200 bg-amber-50 text-amber-800 text-sm rounded-xl p-3">
+          Nenhum comprador cadastrado para esta unidade (Bloco {u.bloco} - nº {u.numero}). Quem retira as chaves
+          precisa apresentar procuração.
+        </div>
+      {/if}
+
+      {#each data.titulares as t (t.id)}
         <label class="flex items-center gap-2.5 text-sm text-calper-dark border border-gray-100 rounded-xl p-3">
-          <input type="radio" name="quem" value={t.investidorId} bind:group={quemEscolhido} required />
-          <span>{t.nome} <span class="text-gray-400">· CPF {t.cpf}</span></span>
+          <input type="radio" name="quem" value={t.id} bind:group={quem} required />
+          <span>
+            {t.nome}
+            {#if t.principal}<span class="text-[11px] font-bold text-calper-red ml-1">principal</span>{/if}
+            {#if t.cpf}<span class="text-gray-400"> · CPF {t.cpf}</span>{/if}
+          </span>
         </label>
       {/each}
 
-      {#if a.ehProprietario === false}
-        <label class="flex items-start gap-2.5 text-sm text-calper-dark border border-gray-100 rounded-xl p-3">
-          <input type="radio" name="quem" value="procurador" bind:group={quemEscolhido} class="mt-1" required />
-          <span>
-            Procurador: <strong>{a.nome}</strong>
-            <span class="text-gray-400">· CPF {a.cpf}</span>
-          </span>
-        </label>
+      <label class="flex items-center gap-2.5 text-sm text-calper-dark border border-gray-100 rounded-xl p-3">
+        <input type="radio" name="quem" value="outro" bind:group={quem} required />
+        <span>Outra pessoa (procurador) — exige procuração</span>
+      </label>
 
-        <div class="border border-gray-200 rounded-xl p-3">
-          <div class="text-xs font-bold text-gray-500 mb-2">Procuração enviada no agendamento</div>
+      {#if quem === 'outro'}
+        <div class="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="nome" class="block text-xs font-semibold text-gray-500 mb-1">Nome completo</label>
+              <input id="nome" name="nome" class="input !py-2 text-sm" value={data.retirante?.vinculo === 'procurador' ? (a.retiranteNome ?? '') : ''} required />
+            </div>
+            <div>
+              <label for="cpf" class="block text-xs font-semibold text-gray-500 mb-1">CPF</label>
+              <input id="cpf" name="cpf" inputmode="numeric" class="input !py-2 text-sm" value={data.retirante?.vinculo === 'procurador' ? (a.retiranteCpf ?? '') : ''} required />
+            </div>
+          </div>
+
           {#if a.temProcuracao}
-            {#if a.procuracaoTipo?.startsWith('image/')}
-              <img src="/admin/entrega-chaves/{a.id}/procuracao" alt="Procuração" class="max-h-96 rounded-lg" />
-            {:else}
-              <iframe
-                src="/admin/entrega-chaves/{a.id}/procuracao"
-                title="Procuração"
-                class="w-full h-96 rounded-lg border border-gray-100"
-              ></iframe>
-            {/if}
-            <a
-              href="/admin/entrega-chaves/{a.id}/procuracao"
-              target="_blank"
-              class="text-xs font-semibold text-calper-red mt-2 inline-block">Abrir em nova aba</a
-            >
-          {:else}
-            <p class="text-sm text-calper-red">Procuração não encontrada.</p>
+            <div>
+              <div class="text-xs font-bold text-gray-500 mb-2">Procuração já anexada</div>
+              {#if a.procuracaoTipo?.startsWith('image/')}
+                <img src="/admin/entrega-chaves/{a.id}/procuracao" alt="Procuração" class="max-h-80 rounded-lg" />
+              {:else}
+                <iframe
+                  src="/admin/entrega-chaves/{a.id}/procuracao"
+                  title="Procuração"
+                  class="w-full h-80 rounded-lg border border-gray-100"
+                ></iframe>
+              {/if}
+              <a href="/admin/entrega-chaves/{a.id}/procuracao" target="_blank" class="text-xs font-semibold text-calper-red mt-2 inline-block">Abrir em nova aba</a>
+            </div>
           {/if}
+
+          <div>
+            <label for="procuracao" class="block text-xs font-semibold text-gray-500 mb-1">
+              {a.temProcuracao ? 'Substituir procuração (opcional)' : 'Procuração (JPG, PNG ou PDF, até 4 MB) — obrigatória'}
+            </label>
+            <input
+              id="procuracao"
+              name="procuracao"
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              class="input"
+              onchange={(e) => (arquivo = e.currentTarget.files?.[0] ?? null)}
+            />
+            {#if faltaProcuracao}
+              <div class="mt-2.5">
+                <AvisoSutil>Quem retira não é comprador desta unidade: envie a procuração para continuar.</AvisoSutil>
+              </div>
+            {/if}
+          </div>
         </div>
-      {:else}
-        <p class="text-xs text-gray-400">Agendamento feito pelo proprietário: {a.nome} · {a.email}</p>
       {/if}
+
+      <div>
+        <label for="email" class="block text-xs font-semibold text-gray-500 mb-1">
+          E-mail de quem retira (usado na assinatura)
+        </label>
+        <input id="email" name="email" type="email" class="input !py-2 text-sm" value={a.retiranteEmail ?? a.email ?? ''} required />
+      </div>
 
       <div class="flex gap-2">
         <a href={href(1)} class="btn-outline text-center flex-1">Voltar</a>
-        <button type="submit" class="btn-primary flex-1">Continuar</button>
+        <div class="flex-1"><SubmitButton loading={enviando}>Confirmar e continuar</SubmitButton></div>
       </div>
     </form>
+
+    <!-- lista de presença -->
+    <div class="card p-6 mt-5 flex flex-col gap-3">
+      <div class="text-sm font-bold text-calper-dark">Lista de presença</div>
+      {#each data.presencas as p (p.id)}
+        <div class="flex items-center justify-between gap-3 text-sm border border-gray-100 rounded-xl p-3">
+          <div>
+            <div class="text-calper-dark font-semibold">{p.nome}</div>
+            <div class="text-xs text-gray-500">{p.vinculoRotulo} · {formatarHora(p.createdAt)}</div>
+          </div>
+          {#if p.vinculo === 'acompanhante'}
+            <form method="POST" action="?/removerPresente" use:enhance>
+              <input type="hidden" name="id" value={p.id} />
+              <button type="submit" class="text-xs font-semibold text-gray-400 hover:text-calper-red">remover</button>
+            </form>
+          {/if}
+        </div>
+      {:else}
+        <p class="text-sm text-gray-400">Ninguém registrado ainda. Quem retira as chaves entra na lista ao confirmar.</p>
+      {/each}
+
+      <form method="POST" action="?/adicionarPresente" use:enhance={() => async ({ update }) => update()} class="flex gap-2">
+        <input name="nome" class="input !py-2 text-sm" placeholder="Outra pessoa presente (acompanhante)" required />
+        <button type="submit" class="btn-outline !py-2 text-sm shrink-0">Adicionar</button>
+      </form>
+    </div>
 
     <!-- PASSO 3 — termo -->
   {:else if data.passo === 3}
@@ -152,9 +242,11 @@
     {:else}
       <form method="POST" action="?/enviar" use:enhance={aoEnviar} class="card p-6 flex flex-col gap-3">
         <input type="hidden" name="tipo" value="termo" />
-        <input type="hidden" name="quem" value={data.quem} />
         <div class="text-sm text-gray-600">
           Assina: <strong>{data.signatario.nome ?? '—'}</strong> ({data.signatario.email ?? 'sem e-mail'})
+          {#if data.documentos.termo === 'pendente'}
+            <span class="ml-2 text-xs font-bold px-2 py-0.5 rounded-full {alerta}">assinatura pendente</span>
+          {/if}
         </div>
         <textarea name="texto" rows="26" class="input text-sm font-mono" required>{data.texto}</textarea>
         <p class="text-xs text-gray-400">
@@ -175,12 +267,14 @@
     {:else}
       <form method="POST" action="?/enviar" use:enhance={aoEnviar} class="card p-6 flex flex-col gap-4">
         <input type="hidden" name="tipo" value="checklist" />
-        <input type="hidden" name="quem" value={data.quem} />
         <input type="hidden" name="cabecalho" value={data.checklist.cabecalho} />
         <input type="hidden" name="rodape" value={data.checklist.rodape} />
 
         <div class="text-sm text-gray-600">
           Assina: <strong>{data.signatario.nome ?? '—'}</strong> ({data.signatario.email ?? 'sem e-mail'})
+          {#if data.documentos.checklist === 'pendente'}
+            <span class="ml-2 text-xs font-bold px-2 py-0.5 rounded-full {alerta}">assinatura pendente</span>
+          {/if}
         </div>
         {#if !u.quartos}
           <AvisoSutil>Tipologia não informada: preencha a quantidade de chaves de porta interior.</AvisoSutil>
@@ -225,7 +319,7 @@
           <div>
             <div class="text-sm font-semibold text-calper-dark">{rotulo}</div>
             <div class="text-xs {data.documentos[tipo] === 'assinado' ? 'text-green-700' : 'text-amber-700'}">
-              {data.documentos[tipo] === 'assinado' ? 'Assinado' : 'Pendente'}
+              {data.documentos[tipo] === 'assinado' ? 'Assinado' : data.documentos[tipo] === 'pendente' ? 'Aguardando assinatura' : 'Não enviado'}
             </div>
           </div>
           {#if data.documentos[tipo] === 'assinado'}
@@ -238,6 +332,18 @@
           {/if}
         </div>
       {/each}
+
+      <div class="text-sm font-bold text-calper-dark mt-3">Lista de presença</div>
+      {#each data.presencas as p (p.id)}
+        <div class="text-sm text-calper-dark">
+          {p.nome} <span class="text-xs text-gray-500">— {p.vinculoRotulo}, {formatarHora(p.createdAt)}</span>
+        </div>
+      {:else}
+        <p class="text-sm text-gray-400">Ninguém registrado.</p>
+      {/each}
+      {#if a.status === 'realizado'}
+        <div class="text-xs font-bold text-green-700 mt-2">Entrega concluída — agendamento marcado como realizado.</div>
+      {/if}
     </div>
   {/if}
 </div>

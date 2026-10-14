@@ -4,7 +4,6 @@ import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
 import { gerarSenhaTemporaria, hashSenha } from '$lib/server/auth.js';
 import {
   HORARIOS_DISPONIVEIS,
-  arquivoParaBase64,
   faixaDeDatasPermitida,
   gerarQrToken
 } from '$lib/server/agendamento.js';
@@ -79,15 +78,7 @@ export const actions = {
     }
     const ehProprietario = valores.ehProprietario === 'sim';
 
-    let procuracaoBase64 = null;
-    if (!ehProprietario) {
-      try {
-        procuracaoBase64 = await arquivoParaBase64(form.get('procuracao'));
-      } catch (err) {
-        return erro(err.message);
-      }
-      if (!procuracaoBase64) return erro('Envie a procuração — obrigatória para quem não é o proprietário.');
-    }
+    // a procuração (quando quem retira não é o proprietário) é conferida só no dia da entrega, no fluxo interno
 
     const [murano, tipoEvento] = await Promise.all([
       buscarMurano(),
@@ -143,8 +134,7 @@ export const actions = {
         cpfCompareceu: cpf,
         telefoneCompareceu: valores.telefone,
         emailCompareceu: valores.email,
-        ehProprietario,
-        procuracaoBase64
+        ehProprietario
       }
     });
 
@@ -164,17 +154,6 @@ export const actions = {
       entidadeTipo: 'Agendamento',
       entidadeId: agendamento.id
     });
-    if (procuracaoBase64) {
-      await registrarLog({
-        event,
-        atorTipo: 'investidor',
-        investidorId: investidor.id,
-        acao: 'documento_enviado',
-        descricao: `${valores.nome} (CPF ${formatarCpf(cpf)}) enviou procuração no agendamento de entrega de chaves — Unidade ${unidade.numero}, Bloco ${unidade.bloco}`,
-        entidadeTipo: 'Agendamento',
-        entidadeId: agendamento.id
-      });
-    }
     await notificarFuncionarios({
       titulo: 'Nova entrega de chaves agendada',
       mensagem: `${valores.nome} agendou para ${valores.data} às ${valores.horario} (Unidade ${unidade.numero} — Bloco ${unidade.bloco}).`,
