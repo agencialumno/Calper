@@ -3,6 +3,16 @@
 // Reexecutável: cada execução faz um reset limpo e reimporta (não duplica nada).
 // NÃO apaga: Funcionario, SessaoFuncionario, TipoEvento, ImportacaoLote, LogAcesso.
 // Uso: bun scripts/resetar-e-importar-murano.js
+//
+// ATENÇÃO — scripts/murano-dados.json NÃO está no git (está no .gitignore): ele traz nomes de
+// clientes, ou seja, dados pessoais. Quem for rodar este script precisa ter o arquivo localmente:
+//   1. peça uma cópia a quem já tem, ou
+//   2. gere de novo a partir da planilha MURANO_BL2_base_entrega_chaves.xlsx (também fora do git,
+//      guardada em docs-referencia/): agrupe as linhas por (BLOCO, UNIDADE) num JSON assim:
+//      [{ "bloco": "2", "numero": "101", "tipologia": "3 QUARTOS", "grupo": "A",
+//         "statusQuitacao": "A VENCER", "compradores": [{ "nome": "FULANO", "principal": true }] }]
+//      (compradores: [] quando o nome na planilha é "N/A"; "grupo" e "statusQuitacao" ficam null
+//      nessas unidades). Sem o arquivo o script falha ANTES de apagar qualquer dado.
 import { readFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
 import { CHECKLIST_PADRAO, TERMO_PADRAO, TIPO_CHECKLIST, TIPO_TERMO } from '../src/lib/documentosPadrao.js';
