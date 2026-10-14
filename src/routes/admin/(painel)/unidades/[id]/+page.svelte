@@ -5,6 +5,29 @@
   let { data } = $props();
   let u = $derived(data.unidade);
   let adicionando = $state(false);
+  let financiado = $state(false);
+  let salvandoFin = $state(false);
+  let salvandoTipologia = $state(false);
+  $effect(() => {
+    financiado = data.unidade.financiado;
+  });
+
+  function aoSubmeterFin() {
+    salvandoFin = true;
+    return async ({ update }) => {
+      await update({ reset: false });
+      salvandoFin = false;
+    };
+  }
+
+  function aoSubmeterTipologia() {
+    salvandoTipologia = true;
+    return async ({ update }) => {
+      await update({ reset: false });
+      salvandoTipologia = false;
+    };
+  }
+
   let editandoEmailDe = $state(null); // investidorId em edição, ou null
   let salvandoEmail = $state(false);
 
@@ -72,6 +95,81 @@
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-[1.1fr_1.4fr] gap-5">
+    <!-- tipologia + status financeiro/jurídico -->
+    <div class="card p-6 flex flex-col gap-5">
+      <form
+        method="POST"
+        action="?/atualizarTipologia"
+        use:enhance={aoSubmeterTipologia}
+        class="flex items-end gap-2"
+      >
+        <div class="flex-1">
+          <label for="quartos" class="block text-sm font-bold text-calper-dark mb-1.5">Tipologia (quartos)</label>
+          <input
+            id="quartos"
+            name="quartos"
+            type="number"
+            min="1"
+            max="10"
+            value={u.quartos ?? ''}
+            class="input !py-2 text-sm"
+            placeholder="ex: 2 ou 3"
+          />
+        </div>
+        <div class="w-28 shrink-0">
+          <SubmitButton loading={salvandoTipologia} variant="outline" class="!py-2.5 text-sm">Salvar</SubmitButton>
+        </div>
+      </form>
+
+      <div class="h-px bg-gray-100"></div>
+
+      <form
+        method="POST"
+        action="?/atualizarFinanceiroJuridico"
+        use:enhance={aoSubmeterFin}
+        class="flex flex-col gap-3.5"
+      >
+        <div class="text-sm font-bold text-calper-dark">Status financeiro e jurídico</div>
+
+        <div>
+          <label for="statusPagamento" class="block text-xs font-semibold text-gray-500 mb-1">Pagamento</label>
+          <select id="statusPagamento" name="statusPagamento" class="input !py-2 text-sm">
+            <option value="pendente" selected={u.statusPagamento === 'pendente'}>Pendente</option>
+            <option value="quitado" selected={u.statusPagamento === 'quitado'}>Quitado</option>
+          </select>
+        </div>
+
+        <label class="flex items-center gap-2 text-sm text-calper-dark">
+          <input type="checkbox" name="financiado" bind:checked={financiado} />
+          Financiado
+        </label>
+
+        {#if financiado}
+          <div>
+            <label for="grupoFinanciamento" class="block text-xs font-semibold text-gray-500 mb-1">
+              Grupo de financiamento
+            </label>
+            <select id="grupoFinanciamento" name="grupoFinanciamento" class="input !py-2 text-sm" required>
+              <option value="">selecione</option>
+              <option value="A" selected={u.grupoFinanciamento === 'A'}>Grupo A</option>
+              <option value="B" selected={u.grupoFinanciamento === 'B'}>Grupo B</option>
+            </select>
+          </div>
+        {/if}
+
+        <label class="flex items-center gap-2 text-sm text-calper-dark">
+          <input type="checkbox" name="vistoriaAprovada" checked={u.vistoriaAprovada} />
+          Vistoria aprovada
+        </label>
+        <label class="flex items-center gap-2 text-sm text-calper-dark">
+          <input type="checkbox" name="escrituraRegistrada" checked={u.escrituraRegistrada} />
+          Escritura registrada
+        </label>
+
+        <SubmitButton loading={salvandoFin} variant="outline" class="!py-2.5 text-sm">Salvar status</SubmitButton>
+      </form>
+    </div>
+
     <!-- investidores -->
     <div class="card p-6">
       <div class="text-sm font-bold text-calper-dark mb-4">Investidores vinculados</div>
@@ -156,6 +254,14 @@
               <div>
                 <div class="text-sm font-bold text-calper-dark">{a.tipoNome}</div>
                 <div class="text-xs text-gray-500 mt-0.5">{formatarData(a.dataHora)}</div>
+                {#each a.documentosAssinados as tipo}
+                  <a
+                    href="/admin/entrega-chaves/{a.id}/documento/{tipo}"
+                    class="text-xs font-bold text-calper-red mr-3"
+                  >
+                    Baixar {tipo === 'termo' ? 'termo' : 'checklist'}
+                  </a>
+                {/each}
               </div>
               <span class="text-xs font-bold px-2 py-0.5 rounded-full {tipoCor[a.status] ?? tipoCor.outro}">
                 {a.status}

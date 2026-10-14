@@ -18,13 +18,14 @@
 </script>
 
 <svelte:head>
-  <title>Pesquisa de satisfação — Calper</title>
+  <title>Questionário de encerramento — Calper</title>
 </svelte:head>
 
 <div class="max-w-2xl mx-auto p-5 md:p-10">
   <BackLink href="/painel" label="Painel" />
 
   <div class="mt-3 mb-6 md:mb-8">
+    <div class="text-xs font-bold text-calper-red tracking-wide uppercase mb-1.5">Questionário de encerramento</div>
     <h1 class="text-xl md:text-2xl font-bold text-calper-dark mb-1">Como foi sua visita?</h1>
     <p class="text-sm text-gray-500">{data.tipoNome} — sua opinião ajuda a melhorar a jornada.</p>
   </div>
@@ -94,6 +95,6 @@
       <textarea id="oportunidadesMelhoria" name="oportunidadesMelhoria" class="input min-h-[80px]"></textarea>
     </div>
 
-    <SubmitButton loading={enviando}>Enviar pesquisa</SubmitButton>
+    <SubmitButton loading={enviando}>Enviar questionário de encerramento</SubmitButton>
   </form>
 </div>

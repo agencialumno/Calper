@@ -11,6 +11,7 @@ import { tipoLiberadoNaEtapa } from '$lib/etapas.js';
 import { horarioOcupado, criarEvento } from '$lib/server/googleCalendar.js';
 import { notificarInvestidor, notificarFuncionarios, emailDoInvestidorNaUnidade } from '$lib/server/notificacao.js';
 import { templateAgendamentoConfirmado } from '$lib/server/email.js';
+import { registrarLog, rotuloInvestidor } from '$lib/server/log.js';
 
 async function etapaLiberaTipo(unidadeId, slug) {
   const unidade = await db.unidade.findUnique({
@@ -47,7 +48,8 @@ export async function load({ params, locals }) {
 }
 
 export const actions = {
-  default: async ({ request, params, locals }) => {
+  default: async (event) => {
+    const { request, params, locals } = event;
     const tipoEvento = await db.tipoEvento.findUnique({ where: { slug: params.tipo } });
     if (!tipoEvento || !tipoEvento.ativo) return fail(404, { erro: 'Tipo de evento inválido.' });
 
@@ -160,6 +162,26 @@ export const actions = {
     });
     if (googleEventId) {
       await db.agendamento.update({ where: { id: agendamento.id }, data: { googleEventId } });
+    }
+
+    const enviouDocumento = Boolean(documentoBase64) || acompanhantesParaCriar.some((a) => a.documentoBase64);
+    await registrarLog({
+      event,
+      atorTipo: 'investidor',
+      acao: 'agendamento_criado',
+      descricao: `${rotuloInvestidor(locals.investidor)} agendou ${tipoEvento.nome} para ${data} às ${horario} — Unidade ${unidade?.numero}, Bloco ${unidade?.bloco}`,
+      entidadeTipo: 'Agendamento',
+      entidadeId: agendamento.id
+    });
+    if (enviouDocumento) {
+      await registrarLog({
+        event,
+        atorTipo: 'investidor',
+        acao: 'documento_enviado',
+        descricao: `${rotuloInvestidor(locals.investidor)} enviou documento de identificação no agendamento de ${tipoEvento.nome}${acompanhantesParaCriar.some((a) => a.documentoBase64) ? ' (inclui documento de acompanhante)' : ''}`,
+        entidadeTipo: 'Agendamento',
+        entidadeId: agendamento.id
+      });
     }
 
     // notifica o investidor (sino + e-mail, se tivermos um e-mail cadastrado

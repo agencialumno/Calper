@@ -38,9 +38,9 @@
         'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
     },
     {
-      titulo: 'Pesquisa de satisfação',
+      titulo: 'Questionário de encerramento',
       texto:
-        'Depois de cada visita realizada, a gente pede uma avaliação rápida — leva menos de um minuto e ajuda a melhorar a experiência da Calper.',
+        'Depois de cada visita realizada, a gente pede que você responda ao questionário de encerramento — leva menos de um minuto e ajuda a melhorar a experiência da Calper.',
       icone:
         'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
     }

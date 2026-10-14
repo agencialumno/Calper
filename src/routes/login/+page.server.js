@@ -7,6 +7,8 @@ import {
   definirUnidadeNaSessao,
   verificarSenha
 } from '$lib/server/auth.js';
+import { registrarLog, rotuloInvestidor } from '$lib/server/log.js';
+import { formatarCpf } from '$lib/cpf.js';
 
 export function load({ locals }) {
   // já autenticado: manda direto pro destino certo
@@ -14,7 +16,8 @@ export function load({ locals }) {
 }
 
 export const actions = {
-  default: async ({ request, cookies }) => {
+  default: async (event) => {
+    const { request, cookies } = event;
     const form = await request.formData();
     const cpfBruto = String(form.get('cpf') ?? '');
     const senha = String(form.get('senha') ?? '');
@@ -31,6 +34,17 @@ export const actions = {
 
     // mesma mensagem pra CPF inexistente ou senha errada — evita confirmar se o CPF existe
     if (!investidor || !verificarSenha(senha, investidor.senhaHash)) {
+      await registrarLog({
+        event,
+        atorTipo: 'investidor',
+        investidorId: investidor?.id,
+        acao: 'login_falhou',
+        descricao: investidor
+          ? `Senha incorreta no login de ${rotuloInvestidor(investidor)}`
+          : `Tentativa de login com CPF não cadastrado: ${formatarCpf(cpf)}`,
+        entidadeTipo: investidor ? 'Investidor' : null,
+        entidadeId: investidor?.id
+      });
       return fail(400, { erro: 'CPF ou senha incorretos.', cpf: cpfBruto });
     }
 
@@ -41,6 +55,15 @@ export const actions = {
       secure: true,
       sameSite: 'lax',
       expires: expiresAt
+    });
+    await registrarLog({
+      event,
+      atorTipo: 'investidor',
+      investidorId: investidor.id,
+      acao: 'login',
+      descricao: `${rotuloInvestidor(investidor)} fez login`,
+      entidadeTipo: 'Investidor',
+      entidadeId: investidor.id
     });
 
     if (investidor.primeiroAcesso) {

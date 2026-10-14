@@ -15,9 +15,17 @@ model Empreendimento {
   id          String    @id @default(cuid())
   nome        String
   estagioAtual String   @default("Início da Jornada")
+  // Banner do painel do investidor + página "Conheça sua jornada" (editados pela equipe)
+  bannerImagemBase64  String?
+  dataLancamento      DateTime?
+  dataEntregaPrevista DateTime?
+  progressoPercentual Int       @default(0) // 0-100, atualizado manualmente pela equipe
+  jornadaTitulo       String?
+  jornadaConteudo     String?
   etapa        String   @default("construcao") // lancamento | assinatura | construcao | entrega_chaves
   unidades    Unidade[]
   atualizacoes AtualizacaoEstagio[]
+  documentoTemplates DocumentoTemplate[]
   createdAt   DateTime  @default(now())
 }
 
@@ -29,6 +37,13 @@ model Unidade {
   numero           String
   status           String               @default("regularizado") // regularizado | troca_titularidade | distrato
   observacoes      String?              // anotações livres do dossiê
+  // Entrega de chaves — status financeiro/jurídico (editado pela equipe no dossiê)
+  statusPagamento     String            @default("pendente") // quitado | pendente
+  financiado          Boolean           @default(false)
+  grupoFinanciamento  String?           // A | B (nulo se não financiado)
+  vistoriaAprovada    Boolean           @default(false)
+  escrituraRegistrada Boolean           @default(false) // apenas consulta/exibição por enquanto
+  quartos             Int?              // tipologia (2 ou 3) — define chaves de porta interior no checklist
   investidores     UnidadeInvestidor[]
   historico        HistoricoUnidade[]
   agendamentos     Agendamento[]
@@ -141,7 +156,16 @@ model Agendamento {
   googleEventId   String?
   // Evita mandar o lembrete da véspera mais de uma vez caso o cron rode de novo.
   lembreteEnviado Boolean        @default(false)
+  // Entrega de chaves (agendamento público, sem login): quem vai comparecer.
+  // Nulos nos demais tipos de evento.
+  nomeCompareceu     String?
+  cpfCompareceu      String?
+  telefoneCompareceu String?
+  emailCompareceu    String?
+  ehProprietario     Boolean?
+  procuracaoBase64   String?
   acompanhantes   Acompanhante[]
+  documentosAssinados DocumentoAssinado[]
   pesquisa        PesquisaSatisfacao?
   createdAt       DateTime       @default(now())
 
@@ -241,3 +265,57 @@ model ImportacaoLote {
   createdAt     DateTime    @default(now())
 }
 
+
+// --- Entrega de chaves: documentos ---
+
+// Texto editável pela equipe (variáveis entre {{ }}). Um por tipo e empreendimento.
+model DocumentoTemplate {
+  id               String         @id @default(cuid())
+  tipo             String         // checklist | termo_entrega_chaves
+  empreendimentoId String
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id])
+  conteudo         String
+  // valores fixos do empreendimento usados nas variáveis (ex: numeroCertidao, dataAssembleia)
+  variaveis        Json?
+  atualizadoEm     DateTime       @updatedAt
+
+  @@unique([empreendimentoId, tipo])
+}
+
+// Documento enviado ao DocuSign. Fica "pendente" até a assinatura ser concluída e o PDF baixado.
+model DocumentoAssinado {
+  id                 String      @id @default(cuid())
+  agendamentoId      String
+  agendamento        Agendamento @relation(fields: [agendamentoId], references: [id])
+  tipo               String      // checklist | termo
+  status             String      @default("pendente") // pendente | assinado
+  pdfBase64          String?     // PDF assinado (data URL); nulo enquanto pendente
+  docusignEnvelopeId String
+  assinadoEm         DateTime?
+  createdAt          DateTime    @default(now())
+
+  @@unique([agendamentoId, tipo])
+}
+
+// --- Auditoria ---
+
+// Quem fez o quê no sistema. Sem FK de propósito: o log sobrevive à remoção do ator/entidade.
+// Retenção: índices por data prontos pra uma limpeza futura (deleteMany where createdAt < X).
+model LogAcesso {
+  id            String   @id @default(cuid())
+  atorTipo      String   // investidor | funcionario
+  investidorId  String?
+  funcionarioId String?
+  acao          String   // login | logout | login_falhou | agendamento_criado | ...
+  descricao     String   // frase legível
+  entidadeTipo  String?  // Agendamento | Unidade | DocumentoAssinado ...
+  entidadeId    String?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([investidorId, createdAt])
+  @@index([funcionarioId, createdAt])
+  @@index([acao, createdAt])
+  @@index([createdAt])
+}

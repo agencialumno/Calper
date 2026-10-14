@@ -2,9 +2,11 @@ import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { hashSenha, gerarSenhaTemporaria } from '$lib/server/auth.js';
 import { cpfValido, somenteDigitos, emailValido } from '$lib/cpf.js';
+import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 
 export const actions = {
-  confirmar: async ({ request, locals }) => {
+  confirmar: async (event) => {
+    const { request, locals } = event;
     const form = await request.formData();
     const nomeArquivo = String(form.get('nomeArquivo') ?? 'planilha.csv');
 
@@ -143,6 +145,15 @@ export const actions = {
         credenciais: credenciaisGeradas,
         criadoPorId: locals.funcionario.id
       }
+    });
+
+    await registrarLog({
+      event,
+      atorTipo: 'funcionario',
+      acao: 'importacao_realizada',
+      descricao: `${rotuloFuncionario(locals.funcionario)} importou "${nomeArquivo}": ${unidadesCriadas} unidade(s) e ${investidoresCriados} investidor(es) criados, ${erros.length} erro(s)`,
+      entidadeTipo: 'ImportacaoLote',
+      entidadeId: lote.id
     });
 
     return {

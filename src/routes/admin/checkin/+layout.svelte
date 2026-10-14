@@ -22,7 +22,7 @@
 <div class="min-h-screen bg-[#f6f6f7]">
   <header class="bg-calper-dark px-5 py-4 flex items-center justify-between gap-4">
     <div class="flex items-center gap-4">
-      <img src="/logo-branca.png" alt="Calper" class="h-6" />
+      <img src="/logo-branca.png" alt="Calper" class="h-8" />
       <span class="text-sm font-semibold text-gray-300 hidden sm:inline">Check-in</span>
     </div>
     <div class="flex items-center gap-4">

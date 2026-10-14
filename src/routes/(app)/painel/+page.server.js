@@ -36,6 +36,8 @@ export async function load({ locals }) {
     empreendimento: unidade.empreendimento.nome,
     estagioAtual: unidade.empreendimento.estagioAtual,
     etapa: unidade.empreendimento.etapa,
+    temBanner: Boolean(unidade.empreendimento.bannerImagemBase64),
+    progresso: unidade.empreendimento.progressoPercentual,
     pesquisasPendentes,
     agendamentos: agendamentos.map((a) => ({
       id: a.id,

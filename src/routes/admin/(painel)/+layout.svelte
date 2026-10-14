@@ -7,10 +7,17 @@
   const nav = [
     { href: '/admin/dashboard', label: 'Dashboard' },
     { href: '/admin/unidades', label: 'Unidades' },
+    { href: '/admin/empreendimentos', label: 'Empreend.' },
     { href: '/admin/checkin', label: 'Check-in', soMobile: true },
-    { href: '/admin/atualizacoes', label: 'Atualizações' }
+    { href: '/admin/atualizacoes', label: 'Atualizações' },
+    { href: '/admin/entrega-chaves', label: 'Chaves' },
+    { href: '/admin/questionarios', label: 'Questionários' },
+    { href: '/admin/documentos', label: 'Documentos' },
+    { href: '/admin/logs', label: 'Logs', soAdmin: true }
     // Agenda entra em um próximo módulo.
   ];
+
+  let menu = $derived(nav.filter((i) => !i.soAdmin || data.funcionario.perfil === 'admin'));
 
   const rotuloPerfil = { admin: 'Admin', gestao: 'Gestão', atendimento: 'Atendimento' };
 </script>
@@ -21,7 +28,7 @@
     class="md:basis-[240px] md:min-w-[240px] md:h-screen md:sticky md:top-0 md:flex-col md:overflow-y-auto bg-calper-dark flex items-center md:items-stretch justify-between md:justify-start gap-1 px-4 md:px-4 py-3 md:py-6"
   >
     <div class="px-0 md:px-3 md:pb-7 shrink-0 md:flex md:items-center md:justify-between">
-      <img src="/logo-branca.png" alt="Calper" class="h-5 md:h-6" />
+      <img src="/logo-branca.png" alt="Calper" class="h-7 md:h-8" />
       <div class="hidden md:block text-white">
         <NotificationBell notificacoes={data.notificacoes} />
       </div>
@@ -29,7 +36,7 @@
 
     <!-- navegação: só no desktop fica aqui na sidebar -->
     <nav class="hidden md:flex md:flex-col gap-1 flex-1">
-      {#each nav.filter((i) => !i.soMobile) as item}
+      {#each menu.filter((i) => !i.soMobile) as item}
         <a
           href={item.href}
           class="flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-semibold whitespace-nowrap"
@@ -80,7 +87,7 @@
 
   <!-- navegação mobile: fora do header escuro, bem visível logo acima do conteúdo -->
   <nav class="md:hidden grid grid-cols-4 gap-2 px-4 py-3 bg-white border-b border-gray-100">
-    {#each nav as item}
+    {#each menu as item}
       {@const ativo = $page.url.pathname.startsWith(item.href)}
       <a
         href={item.href}

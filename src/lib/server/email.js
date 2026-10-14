@@ -147,10 +147,10 @@ export function templatePesquisaDisponivel({ nomeInvestidor, tipoNome, agendamen
     nomeInvestidor,
     titulo: 'Como foi sua visita?',
     corpo: `
-      Seu check-in de "${tipoNome}" foi realizado. Conta pra gente como foi —
-      leva menos de um minuto e ajuda a melhorar a experiência da Calper.
+      Seu check-in de "${tipoNome}" foi realizado. Responda ao questionário de encerramento
+      e conte como foi — leva menos de um minuto e ajuda a melhorar a experiência da Calper.
     `,
     linkHref: agendamentoId ? `${APP_URL}/pesquisa/${agendamentoId}` : undefined,
-    linkTexto: 'Responder pesquisa'
+    linkTexto: 'Responder questionário de encerramento'
   });
 }

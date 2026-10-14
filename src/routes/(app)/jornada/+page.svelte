@@ -23,6 +23,33 @@
     </p>
   </div>
 
+  <section class="card overflow-hidden mb-10 md:mb-12">
+    {#if data.temBanner}
+      <img src="/banner" alt={data.empreendimento} class="w-full max-h-64 object-cover" />
+    {/if}
+    <div class="p-5 md:p-8">
+      <div class="text-xs font-bold text-calper-red tracking-wide uppercase mb-1.5">Conheça sua jornada</div>
+      <h2 class="text-lg md:text-2xl font-bold text-calper-dark mb-3">
+        {data.jornadaTitulo ?? `A história do ${data.empreendimento}`}
+      </h2>
+      {#if data.dataLancamento || data.dataEntregaPrevista}
+        <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500 mb-4">
+          {#if data.dataLancamento}<span>Lançamento: <strong class="text-calper-dark">{formatarData(data.dataLancamento)}</strong></span>{/if}
+          {#if data.dataEntregaPrevista}<span>Entrega prevista: <strong class="text-calper-dark">{formatarData(data.dataEntregaPrevista)}</strong></span>{/if}
+        </div>
+      {/if}
+      {#if data.jornadaConteudo}
+        <div class="flex flex-col gap-3 text-sm md:text-[15px] text-gray-600 leading-relaxed">
+          {#each data.jornadaConteudo.split(/\n{2,}/) as paragrafo}
+            <p class="whitespace-pre-line">{paragrafo}</p>
+          {/each}
+        </div>
+      {:else}
+        <p class="text-sm text-gray-400">A equipe Calper ainda vai publicar a história deste empreendimento.</p>
+      {/if}
+    </div>
+  </section>
+
   <section class="card p-5 md:p-8 mb-10 md:mb-12">
     <h2 class="text-lg md:text-xl font-bold text-calper-dark mb-6 md:mb-8">Etapas do empreendimento</h2>
     <EtapasTimeline etapa={data.etapa} detalhado />

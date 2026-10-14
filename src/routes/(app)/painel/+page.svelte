@@ -1,6 +1,5 @@
 <script>
   import { page } from '$app/stores';
-  import EtapasTimeline from '$lib/components/EtapasTimeline.svelte';
   import TutorialOnboarding from '$lib/components/TutorialOnboarding.svelte';
 
   let { data } = $props();
@@ -33,40 +32,84 @@
 <div class="max-w-5xl mx-auto px-5 md:px-8 py-6 md:py-10 flex flex-col gap-6 md:gap-10">
   {#if mostrarObrigado}
     <div class="bg-green-50 border border-green-100 text-green-700 text-sm rounded-xl px-4 py-3">
-      Obrigado por responder a pesquisa! Sua opinião ajuda a melhorar a jornada.
+      Obrigado por responder ao questionário de encerramento! Sua opinião ajuda a melhorar a jornada.
     </div>
   {/if}
 
   {#if data.pesquisasPendentes.length > 0}
-    <div class="rounded-2xl bg-[#fdeceb] border border-[#f5c9cb] p-4 md:p-5 flex items-center justify-between gap-4 flex-wrap">
-      <div>
-        <div class="text-sm font-bold text-calper-dark">Como foi sua visita?</div>
-        <div class="text-xs text-gray-600 mt-0.5">
-          {data.pesquisasPendentes.length === 1
-            ? `Deixe sua avaliação sobre "${data.pesquisasPendentes[0].tipoNome}"`
-            : `Você tem ${data.pesquisasPendentes.length} pesquisas de satisfação pendentes`}
+    <div
+      class="rounded-2xl p-5 md:p-7 flex items-center justify-between gap-5 flex-wrap text-white shadow-lg"
+      style="background: linear-gradient(135deg, #ef2334, #b80311)"
+    >
+      <div class="flex items-start gap-4 min-w-0">
+        <div class="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4" />
+            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <div class="text-lg md:text-xl font-extrabold leading-tight">
+            {data.pesquisasPendentes.length === 1
+              ? 'Você tem 1 questionário de encerramento pendente'
+              : `Você tem ${data.pesquisasPendentes.length} questionários de encerramento pendentes`}
+          </div>
+          <div class="text-sm text-white/90 mt-1">
+            {data.pesquisasPendentes.length === 1
+              ? `Como foi "${data.pesquisasPendentes[0].tipoNome}"? Leva menos de um minuto.`
+              : `Responda um por vez — o primeiro é sobre "${data.pesquisasPendentes[0].tipoNome}". Leva menos de um minuto cada.`}
+          </div>
         </div>
       </div>
-      <a href={`/pesquisa/${data.pesquisasPendentes[0].id}`} class="btn-primary text-sm !py-2.5 shrink-0">
-        Responder agora
+      <a
+        href={`/pesquisa/${data.pesquisasPendentes[0].id}`}
+        class="bg-white text-calper-red font-bold text-sm md:text-base rounded-xl px-5 py-3 shrink-0 hover:bg-gray-50 active:scale-95 transition"
+      >
+        Responder questionário de encerramento
       </a>
     </div>
   {/if}
 
-  <!-- estágio da obra + linha do tempo -->
-  <section class="card p-5 md:p-8">
-    <div class="flex items-start justify-between gap-4 mb-6 md:mb-8">
-      <div class="min-w-0">
-        <div class="text-xs font-bold text-calper-red tracking-wide uppercase mb-1.5">Andamento do empreendimento</div>
-        <h1 class="text-xl md:text-3xl font-extrabold text-calper-dark leading-tight">{data.empreendimento}</h1>
-        <p class="text-sm md:text-base text-gray-500 mt-1">Último marco: {data.estagioAtual}</p>
+  <!-- banner do empreendimento + progresso da obra -->
+  <a
+    href="/jornada"
+    class="relative block overflow-hidden rounded-2xl text-white shadow-md hover:shadow-lg transition-shadow min-h-[200px] md:min-h-[260px]"
+    style="background: #282e35"
+  >
+    {#if data.temBanner}
+      <img src="/banner" alt="" class="absolute inset-0 w-full h-full object-cover" />
+    {/if}
+    <div
+      class="absolute inset-0"
+      style="background: linear-gradient(165deg, rgba(40,46,53,.88) 10%, rgba(40,46,53,.55) 60%, rgba(40,46,53,.8) 100%)"
+    ></div>
+
+    <div class="relative p-5 md:p-8 h-full min-h-[200px] md:min-h-[260px] flex flex-col justify-between gap-8">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="text-xs font-bold tracking-wide uppercase text-white/70 mb-1.5">Andamento do empreendimento</div>
+          <h1 class="text-2xl md:text-4xl font-extrabold leading-tight">{data.empreendimento}</h1>
+        </div>
+        <span class="text-sm font-semibold text-white/90 shrink-0 mt-1">conheça sua jornada →</span>
       </div>
-      <a href="/jornada" class="text-sm font-semibold text-calper-red hover:underline shrink-0 mt-1">
-        ver jornada →
-      </a>
+
+      <div>
+        <div
+          class="h-3 md:h-4 rounded-full bg-white/25 overflow-hidden"
+          role="progressbar"
+          aria-label="Progresso da obra"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={data.progresso}
+        >
+          <div
+            class="h-full rounded-full bg-calper-red transition-all"
+            style="width: {Math.min(100, Math.max(0, data.progresso))}%"
+          ></div>
+        </div>
+      </div>
     </div>
-    <EtapasTimeline etapa={data.etapa} detalhado />
-  </section>
+  </a>
 
   <div class="grid grid-cols-1 md:grid-cols-[1.1fr_1.4fr] gap-8 md:gap-10 items-start">
     <!-- agendamentos existentes -->

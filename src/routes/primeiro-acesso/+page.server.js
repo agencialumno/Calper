@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { definirUnidadeNaSessao, hashSenha } from '$lib/server/auth.js';
 import { senhaAceitavel } from '$lib/password.js';
+import { registrarLog, rotuloInvestidor } from '$lib/server/log.js';
 
 export async function load({ locals }) {
   if (!locals.investidor) throw redirect(303, '/login');
@@ -14,7 +15,8 @@ export async function load({ locals }) {
 }
 
 export const actions = {
-  default: async ({ request, locals }) => {
+  default: async (event) => {
+    const { request, locals } = event;
     if (!locals.investidor) throw redirect(303, '/login');
 
     const form = await request.formData();
@@ -53,6 +55,15 @@ export const actions = {
     await db.unidadeInvestidor.updateMany({
       where: { investidorId: locals.investidor.id },
       data: { email }
+    });
+
+    await registrarLog({
+      event,
+      atorTipo: 'investidor',
+      acao: 'senha_alterada',
+      descricao: `${rotuloInvestidor(locals.investidor)} definiu a senha no primeiro acesso e aceitou o termo de consentimento`,
+      entidadeTipo: 'Investidor',
+      entidadeId: locals.investidor.id
     });
 
     if (vinculos.length === 1 && locals.sessionToken) {

@@ -2,6 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { notificarInvestidor, emailDoInvestidorNaUnidade } from '$lib/server/notificacao.js';
 import { templatePesquisaDisponivel } from '$lib/server/email.js';
+import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 
 export async function load({ params }) {
   const agendamento = await db.agendamento.findUnique({
@@ -47,10 +48,11 @@ export async function load({ params }) {
 }
 
 export const actions = {
-  confirmar: async ({ params, locals }) => {
+  confirmar: async (event) => {
+    const { params, locals } = event;
     const agendamento = await db.agendamento.findUnique({
       where: { id: params.id },
-      include: { tipoEvento: true, investidor: true }
+      include: { tipoEvento: true, investidor: true, unidade: true }
     });
     if (!agendamento) return fail(404, { erro: 'Agendamento não encontrado.' });
     if (agendamento.status !== 'confirmado') {
@@ -67,12 +69,21 @@ export const actions = {
       }
     });
 
-    // avisa o investidor que a pesquisa de satisfação já está liberada
+    await registrarLog({
+      event,
+      atorTipo: 'funcionario',
+      acao: 'checkin_confirmado',
+      descricao: `${rotuloFuncionario(locals.funcionario)} confirmou check-in do agendamento de ${agendamento.tipoEvento.nome} — Unidade ${agendamento.unidade.numero}, Bloco ${agendamento.unidade.bloco}`,
+      entidadeTipo: 'Agendamento',
+      entidadeId: agendamento.id
+    });
+
+    // avisa o investidor que o questionário de encerramento já está liberado
     const emailInvestidor = await emailDoInvestidorNaUnidade(agendamento.investidorId, agendamento.unidadeId);
     await notificarInvestidor({
       investidorId: agendamento.investidorId,
       titulo: 'Como foi sua visita?',
-      mensagem: `Conta pra gente como foi o(a) "${agendamento.tipoEvento.nome}".`,
+      mensagem: `Responda ao questionário de encerramento sobre "${agendamento.tipoEvento.nome}".`,
       link: `/agendamentos/${agendamento.id}`,
       email: emailInvestidor
         ? {

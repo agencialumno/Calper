@@ -24,7 +24,7 @@
 <header class="border-b border-gray-100 bg-white md:sticky md:top-0 md:z-20">
   <div class="max-w-5xl mx-auto px-5 md:px-8 py-3.5 md:py-4 flex items-center justify-between gap-4 md:gap-6">
     <div class="flex items-center gap-3 md:gap-8 min-w-0">
-      <img src="/logo.png" alt="Calper" class="h-6 shrink-0" />
+      <img src="/logo.png" alt="Calper" class="h-8 shrink-0" />
       <div class="min-w-0 border-l border-gray-100 pl-3 md:pl-6">
         <UnitSwitcher unidade={data.unidade} unidades={data.unidades} />
       </div>

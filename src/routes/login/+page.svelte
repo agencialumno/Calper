@@ -34,7 +34,7 @@
     ></div>
 
     <div class="relative">
-      <img src="/logo-branca.png" alt="Calper" class="h-8" />
+      <img src="/logo-branca.png" alt="Calper" class="h-11" />
     </div>
     <div class="relative max-w-sm">
       <p class="text-3xl font-bold leading-snug mb-4">

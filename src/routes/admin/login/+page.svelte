@@ -20,7 +20,7 @@
 
 <div class="min-h-screen flex items-center justify-center bg-[#f6f6f7] px-6 py-12">
   <div class="card w-full max-w-sm p-8">
-    <img src="/logo.png" alt="Calper" class="h-8 mb-7" />
+    <img src="/logo.png" alt="Calper" class="h-11 mb-7" />
     <h1 class="text-xl font-bold text-calper-dark mb-1">Painel da equipe</h1>
     <p class="text-sm text-gray-500 mb-7">Acesso restrito ao time Calper</p>
 

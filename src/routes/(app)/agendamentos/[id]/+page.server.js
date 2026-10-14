@@ -4,6 +4,7 @@ import { db } from '$lib/server/db.js';
 import { removerEvento } from '$lib/server/googleCalendar.js';
 import { notificarInvestidor, notificarFuncionarios, emailDoInvestidorNaUnidade } from '$lib/server/notificacao.js';
 import { templateAgendamentoCancelado } from '$lib/server/email.js';
+import { registrarLog, rotuloInvestidor } from '$lib/server/log.js';
 
 export async function load({ params, locals }) {
   const agendamento = await db.agendamento.findUnique({
@@ -32,7 +33,8 @@ export async function load({ params, locals }) {
 }
 
 export const actions = {
-  cancelar: async ({ params, locals }) => {
+  cancelar: async (event) => {
+    const { params, locals } = event;
     const agendamento = await db.agendamento.findUnique({
       where: { id: params.id },
       include: { tipoEvento: true, unidade: true }
@@ -48,6 +50,15 @@ export const actions = {
         tipo: 'outro',
         descricao: 'Agendamento cancelado pelo investidor'
       }
+    });
+
+    await registrarLog({
+      event,
+      atorTipo: 'investidor',
+      acao: 'agendamento_cancelado',
+      descricao: `${rotuloInvestidor(locals.investidor)} cancelou o agendamento de ${agendamento.tipoEvento.nome} — Unidade ${agendamento.unidade.numero}, Bloco ${agendamento.unidade.bloco}`,
+      entidadeTipo: 'Agendamento',
+      entidadeId: agendamento.id
     });
 
     // libera o horário na agenda real da Calper (best-effort — se o Calendar

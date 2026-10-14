@@ -15,6 +15,11 @@ export async function load({ locals }) {
     empreendimento: unidade.empreendimento.nome,
     estagioAtual: unidade.empreendimento.estagioAtual,
     etapa: unidade.empreendimento.etapa,
+    temBanner: Boolean(unidade.empreendimento.bannerImagemBase64),
+    dataLancamento: unidade.empreendimento.dataLancamento,
+    dataEntregaPrevista: unidade.empreendimento.dataEntregaPrevista,
+    jornadaTitulo: unidade.empreendimento.jornadaTitulo,
+    jornadaConteudo: unidade.empreendimento.jornadaConteudo,
     atualizacoes: atualizacoes.map((a) => ({
       id: a.id,
       titulo: a.titulo,

@@ -78,7 +78,7 @@
 
       {#if a.pesquisaPendente}
         <a href={`/pesquisa/${a.id}`} class="btn-primary inline-block text-sm md:max-w-xs text-center">
-          Avaliar esta visita
+          Responder questionário de encerramento
         </a>
       {/if}
 

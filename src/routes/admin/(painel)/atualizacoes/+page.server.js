@@ -3,6 +3,7 @@ import { db } from '$lib/server/db.js';
 import { arquivoParaBase64 } from '$lib/server/agendamento.js';
 import { ETAPAS } from '$lib/etapas.js';
 import { enviarEmail, templateAtualizacaoObra } from '$lib/server/email.js';
+import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 
 export async function load() {
   const [empreendimentos, atualizacoes] = await Promise.all([
@@ -33,7 +34,8 @@ export async function load() {
 }
 
 export const actions = {
-  default: async ({ request, locals }) => {
+  default: async (event) => {
+    const { request, locals } = event;
     const form = await request.formData();
     const empreendimentoId = String(form.get('empreendimentoId') ?? '');
     const titulo = String(form.get('titulo') ?? '').trim();
@@ -128,6 +130,15 @@ export const actions = {
         mensagem: titulo,
         link: '/jornada'
       }))
+    });
+
+    await registrarLog({
+      event,
+      atorTipo: 'funcionario',
+      acao: 'atualizacao_publicada',
+      descricao: `${rotuloFuncionario(locals.funcionario)} publicou a atualização "${titulo}" em ${empreendimento.nome} (${vinculos.length} investidor(es) notificado(s))`,
+      entidadeTipo: 'AtualizacaoEstagio',
+      entidadeId: atualizacao.id
     });
 
     return { sucesso: true, totalEnviados: vinculos.length };

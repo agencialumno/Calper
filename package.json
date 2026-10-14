@@ -33,7 +33,9 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "docusign-esign": "^10.0.0",
     "papaparse": "^5.4.1",
+    "pdf-lib": "^1.17.1",
     "prisma": "^5.22.0",
     "qrcode": "^1.5.4"
   }

@@ -28,3 +28,11 @@ export function mediaPesquisa(pesquisa) {
   const pontos = PERGUNTAS_ESCALA.map((p) => PONTOS_POR_VALOR[pesquisa[p.campo]] ?? 0);
   return pontos.reduce((a, b) => a + b, 0) / pontos.length;
 }
+/** Pontos (1–5) de uma resposta de escala; 0 se inválida. */
+export function pontosEscala(valor) {
+  return PONTOS_POR_VALOR[valor] ?? 0;
+}
+
+export function rotuloEscala(valor) {
+  return ESCALA.find((e) => e.valor === valor)?.rotulo ?? valor;
+}
