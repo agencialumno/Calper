@@ -1,5 +1,6 @@
 import docusign from 'docusign-esign';
 import { env } from '$env/dynamic/private';
+import { normalizarChavePrivada } from './chavePrivada.js';
 
 // Integração DocuSign (JWT Grant + embedded signing).
 // Env: DOCUSIGN_INTEGRATION_KEY, DOCUSIGN_USER_ID, DOCUSIGN_ACCOUNT_ID,
@@ -33,7 +34,7 @@ export async function obterAccessToken() {
   const apiClient = new docusign.ApiClient();
   apiClient.setOAuthBasePath(hostOAuth());
 
-  const chavePrivada = Buffer.from(env.DOCUSIGN_RSA_PRIVATE_KEY.replace(/\\n/g, '\n'));
+  const chavePrivada = Buffer.from(normalizarChavePrivada(env.DOCUSIGN_RSA_PRIVATE_KEY));
   const resposta = await apiClient.requestJWTUserToken(
     env.DOCUSIGN_INTEGRATION_KEY,
     env.DOCUSIGN_USER_ID,
