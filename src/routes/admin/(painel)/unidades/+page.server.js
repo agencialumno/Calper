@@ -1,37 +1,30 @@
 import { db } from '$lib/server/db.js';
 
+// A listagem é agrupada (bloco → andar) e filtrada no navegador, então carrega
+// todas as unidades de uma vez (centenas de linhas leves, sem anexos).
 export async function load({ url }) {
-  const q = url.searchParams.get('q')?.trim() ?? '';
-
-  const where = q
-    ? {
-        OR: [
-          { numero: { contains: q, mode: 'insensitive' } },
-          { bloco: { contains: q, mode: 'insensitive' } },
-          { empreendimento: { nome: { contains: q, mode: 'insensitive' } } }
-        ]
-      }
-    : {};
-
   const unidades = await db.unidade.findMany({
-    where,
     include: { empreendimento: true, investidores: { include: { investidor: true } } },
-    orderBy: { createdAt: 'desc' },
-    take: 50
+    orderBy: [{ bloco: 'asc' }, { numero: 'asc' }]
   });
 
-  const total = await db.unidade.count();
-
   return {
-    q,
-    total,
-    unidades: unidades.map((u) => ({
-      id: u.id,
-      numero: u.numero,
-      bloco: u.bloco,
-      empreendimento: u.empreendimento.nome,
-      status: u.status,
-      investidores: u.investidores.map((vi) => vi.investidor.nome)
-    }))
+    q: url.searchParams.get('q')?.trim() ?? '',
+    total: unidades.length,
+    unidades: unidades.map((u) => {
+      const compradores = Array.isArray(u.compradores) ? u.compradores : [];
+      return {
+        id: u.id,
+        numero: u.numero,
+        bloco: u.bloco,
+        empreendimento: u.empreendimento.nome,
+        status: u.status,
+        tipologia: u.tipologia,
+        grupo: u.grupo,
+        statusQuitacao: u.statusQuitacao,
+        compradores: compradores.map((c) => ({ nome: c.nome, principal: Boolean(c.principal) })),
+        investidores: u.investidores.map((vi) => vi.investidor.nome)
+      };
+    })
   };
 }
