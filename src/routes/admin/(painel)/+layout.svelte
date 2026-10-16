@@ -28,7 +28,7 @@
     class="md:basis-[240px] md:min-w-[240px] md:h-screen md:sticky md:top-0 md:flex-col md:overflow-y-auto bg-calper-dark flex items-center md:items-stretch justify-between md:justify-start gap-1 px-4 md:px-4 py-3 md:py-6"
   >
     <div class="px-0 md:px-3 md:pb-7 shrink-0 md:flex md:items-center md:justify-between">
-      <img src="/logo-branca.png" alt="Calper" class="h-7 md:h-8" />
+      <img src="/logo-branca.png" alt="Calper" class="h-10 md:h-14 w-auto" />
       <div class="hidden md:block text-white">
         <NotificationBell notificacoes={data.notificacoes} />
       </div>

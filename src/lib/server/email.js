@@ -31,13 +31,13 @@ export async function enviarEmail({ to, subject, html }) {
   return { enviado: true, modo: 'resend' };
 }
 
-// Cabeçalho com a logo, reaproveitado em todos os templates. Imagem pequena
-// (só a wordmark) — nada de banner grande, pra não parecer spam nem pesar o
-// carregamento.
+// Cabeçalho com a logo, reaproveitado em todos os templates. Só a wordmark, sem banner
+// (pra não parecer spam nem pesar o carregamento), mas com 56 px de altura pra o slogan
+// "gestão compartilhada" ficar legível.
 function cabecalho() {
   return `
     <div style="margin-bottom:28px">
-      <img src="${LOGO_URL}" alt="Calper" height="22" style="display:block;height:22px;width:auto" />
+      <img src="${LOGO_URL}" alt="Calper" height="56" style="display:block;height:56px;width:auto" />
     </div>
   `;
 }

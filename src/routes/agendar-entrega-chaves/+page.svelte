@@ -41,7 +41,7 @@
 </svelte:head>
 
 <div class="max-w-xl mx-auto p-5 md:p-10">
-  <img src="/logo.png" alt="Calper" class="h-8 mb-6" />
+  <img src="/logo.png" alt="Calper" class="h-14 w-auto mb-6" />
   <h1 class="text-xl md:text-2xl font-bold text-calper-dark mb-1">Agendar entrega de chaves</h1>
   <p class="text-sm text-gray-500 mb-6">Murano Residencial</p>
 

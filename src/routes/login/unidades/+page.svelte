@@ -34,7 +34,7 @@
 
   <div class="relative w-full max-w-md">
     <div class="flex justify-center mb-6">
-      <img src="/logo-branca.png" alt="Calper" class="h-10" />
+      <img src="/logo-branca.png" alt="Calper" class="h-14 w-auto" />
     </div>
 
     <div class="card w-full p-7 shadow-2xl">

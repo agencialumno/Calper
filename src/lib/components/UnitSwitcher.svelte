@@ -13,7 +13,7 @@
     onclick={() => (aberto = !aberto)}
     aria-haspopup="listbox"
     aria-expanded={aberto}
-    class="flex items-center gap-2 text-left rounded-xl px-2.5 py-1.5 -mx-2.5 max-w-full enabled:hover:bg-gray-50 transition-colors"
+    class="flex items-center gap-2 text-left rounded-xl px-2.5 py-1.5 -ml-2.5 enabled:hover:bg-gray-50 transition-colors"
   >
     <span class="min-w-0">
       <span class="block text-[11px] font-semibold text-gray-400 tracking-wide uppercase">Unidade</span>
