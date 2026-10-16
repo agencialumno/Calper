@@ -56,16 +56,21 @@ async function clienteAutenticado() {
   return apiClient;
 }
 
+/** Host das páginas de assinatura do DocuSign (origem das mensagens postadas ao iframe). */
+function origemApps() {
+  return env.DOCUSIGN_BASE_URI.includes('demo') ? 'https://apps-d.docusign.com' : 'https://apps.docusign.com';
+}
+
 /**
- * Cria um envelope com 1 signatário embutido (clientUserId preenchido = sem e-mail do DocuSign)
- * e devolve a URL de assinatura.
+ * Cria um envelope com 1 signatário embutido (clientUserId preenchido = sem e-mail do DocuSign
+ * para assinar) e devolve o id. A URL de assinatura é gerada à parte (gerarUrlAssinatura), a cada
+ * abertura da tela, porque ela é de uso único e expira em minutos.
  * A assinatura é posicionada pela âncora de texto `ancora` presente no PDF.
  */
 export async function criarEnvelopeEmbedded({
   pdfBase64,
   nomeDocumento,
   signatario,
-  retornoUrl,
   ancora = '[ASSINATURA DO INVESTIDOR'
 }) {
   const apiClient = await clienteAutenticado();
@@ -103,19 +108,33 @@ export async function criarEnvelopeEmbedded({
   });
 
   const criado = await envelopesApi.createEnvelope(accountId, { envelopeDefinition: envelope });
+  return { envelopeId: criado.envelopeId };
+}
+
+/**
+ * Gera a URL (uso único, ~5 min) da cerimônia de assinatura de um envelope já criado.
+ * `origemApp` é a origem do Calper (ex: https://calper-mocha.vercel.app): é ela que o DocuSign
+ * autoriza a embutir a cerimônia em iframe (frameAncestors) e a receber as mensagens (messageOrigins).
+ * O clientUserId/e-mail/nome precisam ser exatamente os do signatário na criação do envelope.
+ */
+export async function gerarUrlAssinatura({ envelopeId, signatario, retornoUrl, origemApp }) {
+  const apiClient = await clienteAutenticado();
+  const envelopesApi = new docusign.EnvelopesApi(apiClient);
 
   const view = docusign.RecipientViewRequest.constructFromObject({
     returnUrl: retornoUrl,
     authenticationMethod: 'none',
     email: signatario.email,
     userName: signatario.nome,
-    clientUserId: signatario.clientUserId
+    clientUserId: signatario.clientUserId,
+    // o DocuSign exige que cada messageOrigin também esteja listado em frameAncestors
+    frameAncestors: [...new Set([origemApp, 'http://localhost:5173', origemApps()])],
+    messageOrigins: [origemApps()]
   });
-  const vista = await envelopesApi.createRecipientView(accountId, criado.envelopeId, {
+  const vista = await envelopesApi.createRecipientView(env.DOCUSIGN_ACCOUNT_ID, envelopeId, {
     recipientViewRequest: view
   });
-
-  return { envelopeId: criado.envelopeId, urlAssinatura: vista.url };
+  return vista.url;
 }
 
 /** Status do envelope no DocuSign (ex: "sent", "completed"). */

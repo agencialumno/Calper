@@ -72,12 +72,12 @@ export function retiranteDoAgendamento(agendamento) {
 }
 
 /**
- * Cria o envelope no DocuSign pro texto final e redireciona o atendente pra tela de assinatura.
+ * Cria o envelope no DocuSign pro texto final e leva o atendente pra tela de assinatura (iframe) do admin.
  * Devolve { erro } quando algo impede o envio (nada é lançado nesse caso).
  * `origem`: 'fluxo' (passo a passo da entrega) ou 'unidade' (rotas /admin/unidades/[id]/...).
  */
 export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo, texto, origem }) {
-  const { locals, url } = event;
+  const { locals } = event;
   if (!NOME_DOCUMENTO[tipo]) return { erro: 'Documento inválido.' };
 
   const agendamento = await db.agendamento.findUnique({
@@ -106,14 +106,12 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
   if (pendente) return { erro: `Preencha antes de enviar: ${[...new Set(pendente)].join(', ')}` };
 
   let envelopeId;
-  let urlAssinatura;
   try {
     const pdfBase64 = await gerarPdfBase64(textoFinal, NOME_DOCUMENTO[tipo], tipo);
-    ({ envelopeId, urlAssinatura } = await criarEnvelopeEmbedded({
+    ({ envelopeId } = await criarEnvelopeEmbedded({
       pdfBase64,
       nomeDocumento: NOME_DOCUMENTO[tipo],
-      signatario: { nome: retirante.nome, email: retirante.email, clientUserId: agendamento.id },
-      retornoUrl: `${url.origin}/admin/entrega-chaves/${agendamento.id}/assinatura-concluida?tipo=${tipo}&origem=${origem}`
+      signatario: { nome: retirante.nome, email: retirante.email, clientUserId: agendamento.id }
     }));
   } catch (err) {
     console.error('DocuSign:', err?.response?.body ?? err);
@@ -136,5 +134,6 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
     entidadeId: envelopeId
   });
 
-  throw redirect(303, urlAssinatura);
+  // a cerimônia de assinatura roda num iframe dentro do admin (tela /assinar), sem sair do Calper
+  throw redirect(303, `/admin/entrega-chaves/${agendamento.id}/assinar?tipo=${tipo}&origem=${origem}`);
 }
