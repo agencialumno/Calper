@@ -2,6 +2,7 @@
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
+  import { formatarCpf } from '$lib/cpf.js';
 
   let { data, form } = $props();
 
@@ -117,6 +118,43 @@
 
     <!-- PASSO 2 — quem retira + lista de presença -->
   {:else if data.passo === 2}
+    <!-- contexto de quem agendou: aparece sempre que não é o proprietário, antes de escolher quem retira -->
+    {#if a.ehProprietario === false}
+      <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 mb-5 flex flex-col gap-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <div class="text-xs font-bold text-amber-800 tracking-wide uppercase mb-1">
+              Agendado por quem não é o proprietário
+            </div>
+            <div class="text-base font-bold text-calper-dark">{a.nome ?? '—'}</div>
+            <div class="text-sm text-gray-600">CPF {a.cpf ? formatarCpf(a.cpf) : '—'}</div>
+          </div>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-white text-amber-800 border border-amber-200">
+            Não é o proprietário
+          </span>
+        </div>
+
+        {#if a.temProcuracao}
+          <div class="flex items-center justify-between gap-3 flex-wrap rounded-xl bg-white border border-amber-100 px-4 py-3">
+            <div class="text-sm text-calper-dark">
+              <span class="font-bold">Procuração anexada no agendamento</span>
+              {#if a.procuracaoCpf && a.procuracaoCpf !== a.cpf}
+                <span class="block text-xs text-gray-500">em nome do CPF {formatarCpf(a.procuracaoCpf)}</span>
+              {/if}
+            </div>
+            <div class="flex gap-4 text-sm font-bold text-calper-red">
+              <a href="/admin/entrega-chaves/{a.id}/procuracao" target="_blank" rel="noopener">Abrir</a>
+              <a href="/admin/entrega-chaves/{a.id}/procuracao" download="procuracao-bloco-{u.bloco}-{u.numero}">Baixar</a>
+            </div>
+          </div>
+        {:else}
+          <div class="text-sm font-semibold text-red-700 bg-white border border-red-100 rounded-xl px-4 py-3">
+            Este agendamento não tem procuração anexada. Peça o documento antes de seguir.
+          </div>
+        {/if}
+      </div>
+    {/if}
+
     <form
       method="POST"
       action="?/confirmarRetirante"
