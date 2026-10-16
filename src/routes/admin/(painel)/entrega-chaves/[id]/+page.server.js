@@ -6,6 +6,7 @@ import {
   ROTULO_VINCULO,
   SLUG_ENTREGA_CHAVES,
   enviarDocumentoParaAssinatura,
+  procuracaoValidaParaRetirante,
   retiranteDoAgendamento
 } from '$lib/server/entregaChaves.js';
 import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
@@ -39,7 +40,7 @@ export async function load({ params, url }) {
 
   const retirante = retiranteDoAgendamento(agendamento);
   // termo e checklist só depois de confirmar quem retira (e, sendo procurador, com procuração)
-  const procuradorSemProcuracao = retirante?.vinculo === 'procurador' && !agendamento.procuracaoBase64;
+  const procuradorSemProcuracao = retirante?.vinculo === 'procurador' && !procuracaoValidaParaRetirante(agendamento, retirante.cpf);
   if ((passo === 3 || passo === 4) && (!retirante || procuradorSemProcuracao)) {
     throw redirect(303, irPara(agendamento.id, 2));
   }
@@ -69,6 +70,13 @@ export async function load({ params, url }) {
       retiranteCpf: agendamento.retiranteCpf,
       retiranteEmail: agendamento.retiranteEmail,
       temProcuracao: Boolean(agendamento.procuracaoBase64),
+      // CPF de quem a procuração anexada representa (nulo em registros antigos) e o nome, quando
+      // foi a própria pessoa que agendou — o passo 2 só dispensa novo upload se o retirante for ela
+      procuracaoCpf: agendamento.procuracaoCpf,
+      procuracaoNome:
+        agendamento.procuracaoCpf && agendamento.procuracaoCpf === agendamento.cpfCompareceu
+          ? agendamento.nomeCompareceu
+          : null,
       procuracaoTipo: agendamento.procuracaoBase64
         ? agendamento.procuracaoBase64.slice(5, agendamento.procuracaoBase64.indexOf(';'))
         : null
@@ -140,9 +148,13 @@ export const actions = {
       } catch (err) {
         return fail(400, { erro: err.message });
       }
-      if (!procuracaoNova && !agendamento.procuracaoBase64) {
+      // a procuração do agendamento só vale se for da mesma pessoa que está retirando; se mudou
+      // o procurador, exige novo upload
+      if (!procuracaoNova && !procuracaoValidaParaRetirante(agendamento, cpf)) {
         return fail(400, {
-          erro: 'Quem retira não é comprador desta unidade: envie a procuração para continuar.'
+          erro: agendamento.procuracaoBase64
+            ? 'A procuração anexada no agendamento é de outra pessoa: envie a procuração de quem está retirando as chaves.'
+            : 'Quem retira não é comprador desta unidade: envie a procuração para continuar.'
         });
       }
       vinculo = 'procurador';
@@ -158,9 +170,23 @@ export const actions = {
           retiranteNome: nome,
           retiranteCpf: cpf,
           retiranteEmail: email,
-          ...(procuracaoNova ? { procuracaoBase64: procuracaoNova } : {})
+          ...(procuracaoNova ? { procuracaoBase64: procuracaoNova, procuracaoCpf: cpf } : {})
         }
       }),
+      ...(procuracaoNova
+        ? [
+            db.procuracaoUnidade.create({
+              data: {
+                unidadeId: agendamento.unidadeId,
+                agendamentoId: agendamento.id,
+                nome,
+                cpf,
+                origem: 'atendimento',
+                arquivoBase64: procuracaoNova
+              }
+            })
+          ]
+        : []),
       // só um retirante por entrega; acompanhantes registrados não são afetados
       db.presencaEntrega.deleteMany({
         where: { agendamentoId: agendamento.id, vinculo: { not: 'acompanhante' } }

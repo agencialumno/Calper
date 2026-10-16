@@ -287,6 +287,34 @@
       </div>
     </div>
 
+    <!-- procurações enviadas pra unidade (no agendamento ou no atendimento) -->
+    {#if u.procuracoes.length > 0}
+      <div class="card p-6">
+        <div class="text-sm font-bold text-calper-dark mb-1">Procurações</div>
+        <p class="text-xs text-gray-500 mb-4">A mais recente aparece primeiro.</p>
+        <div class="flex flex-col gap-2.5">
+          {#each u.procuracoes as p, i (p.id)}
+            <div class="border border-gray-100 rounded-xl p-3 flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-sm font-bold text-calper-dark truncate">
+                  {p.nome}
+                  {#if i === 0}<span class="text-[11px] font-bold text-calper-red ml-1">atual</span>{/if}
+                </div>
+                <div class="text-xs text-gray-500 mt-0.5">
+                  CPF {p.cpf} · enviada {p.origem === 'agendamento' ? 'no agendamento' : 'no atendimento'} em {formatarData(p.createdAt)}
+                </div>
+              </div>
+              <a
+                href="/admin/unidades/{u.id}/procuracoes/{p.id}"
+                target="_blank"
+                class="text-xs font-bold text-calper-red shrink-0">abrir</a
+              >
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <!-- agendamentos -->
     <div class="card p-6">
       <div class="text-sm font-bold text-calper-dark mb-4">Agendamentos</div>

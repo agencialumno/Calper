@@ -13,7 +13,13 @@
   let quem = $state('');
   let arquivo = $state(null);
   let tentouConfirmar = $state(false);
-  const exigeProcuracao = $derived(quem === 'outro' && !arquivo && !a.temProcuracao);
+  // CPF digitado em "outra pessoa": a procuração do agendamento só dispensa novo upload se for da mesma pessoa
+  let cpfDigitado = $state(null);
+  const cpfRetirante = $derived(
+    (cpfDigitado ?? (data.retirante?.vinculo === 'procurador' ? a.retiranteCpf : a.procuracaoCpf) ?? '').replace(/\D/g, '')
+  );
+  const procuracaoVale = $derived(a.temProcuracao && (!a.procuracaoCpf || a.procuracaoCpf === cpfRetirante));
+  const exigeProcuracao = $derived(quem === 'outro' && !arquivo && !procuracaoVale);
   const faltaProcuracao = $derived(tentouConfirmar && exigeProcuracao);
 
   const passos = ['Unidade', 'Quem retira', 'Termo', 'Checklist', 'Concluído'];
@@ -148,17 +154,32 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label for="nome" class="block text-xs font-semibold text-gray-500 mb-1">Nome completo</label>
-              <input id="nome" name="nome" class="input !py-2 text-sm" value={data.retirante?.vinculo === 'procurador' ? (a.retiranteNome ?? '') : ''} required />
+              <input id="nome" name="nome" class="input !py-2 text-sm" value={data.retirante?.vinculo === 'procurador' ? (a.retiranteNome ?? '') : (a.procuracaoNome ?? '')} required />
             </div>
             <div>
               <label for="cpf" class="block text-xs font-semibold text-gray-500 mb-1">CPF</label>
-              <input id="cpf" name="cpf" inputmode="numeric" class="input !py-2 text-sm" value={data.retirante?.vinculo === 'procurador' ? (a.retiranteCpf ?? '') : ''} required />
+              <input
+                id="cpf"
+                name="cpf"
+                inputmode="numeric"
+                class="input !py-2 text-sm"
+                value={data.retirante?.vinculo === 'procurador' ? (a.retiranteCpf ?? '') : (a.procuracaoCpf ?? '')}
+                oninput={(e) => (cpfDigitado = e.currentTarget.value)}
+                required
+              />
             </div>
           </div>
 
           {#if a.temProcuracao}
             <div>
-              <div class="text-xs font-bold text-gray-500 mb-2">Procuração já anexada</div>
+              {#if !procuracaoVale}
+                <div class="mb-3">
+                  <AvisoSutil>
+                    A procuração anexada no agendamento é de{a.procuracaoNome ? ` ${a.procuracaoNome}` : ' outra pessoa'} (CPF {a.procuracaoCpf}). Como quem retira é outra pessoa, anexe a procuração dela abaixo.
+                  </AvisoSutil>
+                </div>
+              {/if}
+              <div class="text-xs font-bold text-gray-500 mb-2">{procuracaoVale ? 'Procuração já anexada no agendamento' : 'Procuração anexada no agendamento (de outra pessoa)'}</div>
               {#if a.procuracaoTipo?.startsWith('image/')}
                 <img src="/admin/entrega-chaves/{a.id}/procuracao" alt="Procuração" class="max-h-80 rounded-lg" />
               {:else}
@@ -174,7 +195,7 @@
 
           <div>
             <label for="procuracao" class="block text-xs font-semibold text-gray-500 mb-1">
-              {a.temProcuracao ? 'Substituir procuração (opcional)' : 'Procuração (JPG, PNG ou PDF, até 4 MB) — obrigatória'}
+              {procuracaoVale ? 'Substituir procuração (opcional)' : 'Procuração (JPG, PNG ou PDF, até 4 MB) — obrigatória'}
             </label>
             <input
               id="procuracao"
@@ -186,7 +207,7 @@
             />
             {#if faltaProcuracao}
               <div class="mt-2.5">
-                <AvisoSutil>Quem retira não é comprador desta unidade: envie a procuração para continuar.</AvisoSutil>
+                <AvisoSutil>{a.temProcuracao ? 'Envie a procuração da pessoa que está retirando as chaves para continuar.' : 'Quem retira não é comprador desta unidade: envie a procuração para continuar.'}</AvisoSutil>
               </div>
             {/if}
           </div>

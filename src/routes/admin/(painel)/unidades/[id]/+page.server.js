@@ -28,6 +28,13 @@ export async function load({ params }) {
 
   if (!unidade) throw error(404, 'Unidade não encontrada');
 
+  // sem o arquivo (base64 pesado): ele só é lido na rota de download
+  const procuracoes = await db.procuracaoUnidade.findMany({
+    where: { unidadeId: params.id },
+    select: { id: true, nome: true, cpf: true, origem: true, createdAt: true },
+    orderBy: { createdAt: 'desc' }
+  });
+
   return {
     unidade: {
       id: unidade.id,
@@ -46,6 +53,7 @@ export async function load({ params }) {
       escrituraRegistrada: unidade.escrituraRegistrada,
       empreendimento: unidade.empreendimento.nome,
       createdAt: unidade.createdAt,
+      procuracoes,
       investidores: unidade.investidores.map((vi) => ({
         investidorId: vi.investidorId,
         nome: vi.investidor.nome,

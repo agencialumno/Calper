@@ -7,8 +7,16 @@
 
   let ehProprietario = $state(form?.valores?.ehProprietario ?? '');
   let enviando = $state(false);
+  let arquivoProcuracao = $state(null);
+  let tentouEnviar = $state(false);
+  const faltaProcuracao = $derived(ehProprietario === 'nao' && !arquivoProcuracao);
 
-  function aoSubmeter() {
+  function aoSubmeter({ cancel }) {
+    tentouEnviar = true;
+    if (faltaProcuracao) {
+      cancel();
+      return;
+    }
     enviando = true;
     return async ({ update }) => {
       await update({ reset: false });
@@ -43,6 +51,7 @@
   {:else}
     <form
       method="POST"
+      enctype="multipart/form-data"
       use:enhance={aoSubmeter}
       class="card p-6 md:p-8 flex flex-col gap-5"
     >
@@ -130,9 +139,25 @@
       </fieldset>
 
       {#if ehProprietario === 'nao'}
-        <p class="text-xs text-gray-500 -mt-2">
-          Leve a procuração no dia da entrega — ela será conferida pela equipe Calper no atendimento.
-        </p>
+        <div class="rounded-xl border border-gray-200 p-4 flex flex-col gap-2.5 -mt-1">
+          <label for="procuracao" class="block text-sm font-semibold text-calper-dark">
+            Procuração (JPG, PNG ou PDF, até 4 MB) <span class="text-calper-red">*</span>
+          </label>
+          <p class="text-xs text-gray-500">
+            Anexe a procuração — a equipe Calper vai conferir no dossiê da unidade antes do atendimento.
+          </p>
+          <input
+            id="procuracao"
+            name="procuracao"
+            type="file"
+            accept="image/jpeg,image/png,application/pdf"
+            class="input"
+            onchange={(e) => (arquivoProcuracao = e.currentTarget.files?.[0] ?? null)}
+          />
+          {#if tentouEnviar && faltaProcuracao}
+            <AvisoSutil>Anexe a procuração para confirmar o agendamento.</AvisoSutil>
+          {/if}
+        </div>
       {/if}
 
       <SubmitButton loading={enviando}>Confirmar agendamento</SubmitButton>

@@ -1,6 +1,11 @@
 import { error, fail } from '@sveltejs/kit';
 import { montarDocumento } from './documentos.js';
-import { agendamentoAtivoDaUnidade, enviarDocumentoParaAssinatura, retiranteDoAgendamento } from './entregaChaves.js';
+import {
+  agendamentoAtivoDaUnidade,
+  enviarDocumentoParaAssinatura,
+  procuracaoValidaParaRetirante,
+  retiranteDoAgendamento
+} from './entregaChaves.js';
 
 // Lógica compartilhada das rotas /admin/unidades/[id]/termo-entrega e /checklist:
 // texto preenchido + estado da assinatura (DocuSign) vinculado ao agendamento de entrega da unidade.
@@ -21,7 +26,7 @@ export async function carregarDocumentoUnidade(unidadeId, tipo, url) {
     bloqueio = 'Esta unidade não tem agendamento de entrega de chaves em aberto — agende pelo formulário de entrega de chaves.';
   } else if (!retirante) {
     bloqueio = 'Confirme quem retira as chaves (passo 2 do fluxo de entrega) antes de enviar para assinatura.';
-  } else if (retirante.vinculo === 'procurador' && !agendamento.procuracaoBase64) {
+  } else if (retirante.vinculo === 'procurador' && !procuracaoValidaParaRetirante(agendamento, retirante.cpf)) {
     bloqueio = 'Quem retira é procurador: anexe a procuração no passo 2 do fluxo de entrega.';
   }
 

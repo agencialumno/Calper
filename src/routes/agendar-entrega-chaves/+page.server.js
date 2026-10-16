@@ -4,6 +4,7 @@ import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
 import { gerarSenhaTemporaria, hashSenha } from '$lib/server/auth.js';
 import {
   HORARIOS_DISPONIVEIS,
+  arquivoParaBase64,
   faixaDeDatasPermitida,
   gerarQrToken
 } from '$lib/server/agendamento.js';
@@ -78,7 +79,16 @@ export const actions = {
     }
     const ehProprietario = valores.ehProprietario === 'sim';
 
-    // a procuração (quando quem retira não é o proprietário) é conferida só no dia da entrega, no fluxo interno
+    // quem não é o proprietário precisa anexar a procuração já no agendamento — a equipe confere no dossiê da unidade
+    let procuracaoBase64 = null;
+    if (!ehProprietario) {
+      try {
+        procuracaoBase64 = await arquivoParaBase64(form.get('procuracao'));
+      } catch (err) {
+        return erro(err.message);
+      }
+      if (!procuracaoBase64) return erro('Anexe a procuração para confirmar o agendamento.');
+    }
 
     const [murano, tipoEvento] = await Promise.all([
       buscarMurano(),
@@ -134,15 +144,30 @@ export const actions = {
         cpfCompareceu: cpf,
         telefoneCompareceu: valores.telefone,
         emailCompareceu: valores.email,
-        ehProprietario
+        ehProprietario,
+        procuracaoBase64,
+        procuracaoCpf: procuracaoBase64 ? cpf : null
       }
     });
+
+    if (procuracaoBase64) {
+      await db.procuracaoUnidade.create({
+        data: {
+          unidadeId: unidade.id,
+          agendamentoId: agendamento.id,
+          nome: valores.nome,
+          cpf,
+          origem: 'agendamento',
+          arquivoBase64: procuracaoBase64
+        }
+      });
+    }
 
     await db.historicoUnidade.create({
       data: {
         unidadeId: unidade.id,
         tipo: 'outro',
-        descricao: `Entrega de chaves agendada para ${valores.data} às ${valores.horario} (${valores.nome})`
+        descricao: `Entrega de chaves agendada para ${valores.data} às ${valores.horario} (${valores.nome})${procuracaoBase64 ? ' — procuração anexada' : ''}`
       }
     });
     await registrarLog({

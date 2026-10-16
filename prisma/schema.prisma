@@ -51,6 +51,7 @@ model Unidade {
   historico        HistoricoUnidade[]
   agendamentos     Agendamento[]
   presencas        PresencaEntrega[]
+  procuracoes      ProcuracaoUnidade[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -173,6 +174,9 @@ model Agendamento {
   retiranteEmail     String?
   retiranteCpf       String?
   procuracaoBase64   String?
+  // CPF (só dígitos) do procurador a quem o arquivo acima se refere. Nulo em registros antigos
+  // (nesse caso a procuração vale pra quem foi confirmado como retirante).
+  procuracaoCpf      String?
   acompanhantes   Acompanhante[]
   documentosAssinados DocumentoAssinado[]
   presencas           PresencaEntrega[]
@@ -346,4 +350,21 @@ model PresencaEntrega {
   @@index([agendamentoId])
   @@index([unidadeId])
   @@index([createdAt])
+}
+
+// Procurações enviadas pra unidade (no agendamento público ou no atendimento) — ficam no dossiê
+// pra equipe conferir antes do dia. Arquivo em base64 como os demais documentos (sem storage ainda);
+// por isso as listagens nunca devem selecionar `arquivoBase64`.
+model ProcuracaoUnidade {
+  id            String   @id @default(cuid())
+  unidadeId     String
+  unidade       Unidade  @relation(fields: [unidadeId], references: [id])
+  agendamentoId String?
+  nome          String   // procurador
+  cpf           String   // procurador, só dígitos
+  origem        String   // agendamento | atendimento
+  arquivoBase64 String
+  createdAt     DateTime @default(now())
+
+  @@index([unidadeId, createdAt])
 }

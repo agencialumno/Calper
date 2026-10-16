@@ -41,6 +41,16 @@ export function agendamentoAtivoDaUnidade(unidadeId) {
   });
 }
 
+/**
+ * A procuração anexada vale pra quem está retirando? Vale quando há arquivo e ele foi enviado
+ * pra essa mesma pessoa (mesmo CPF). Registros antigos sem CPF registrado valem pra quem foi confirmado.
+ */
+export function procuracaoValidaParaRetirante(agendamento, cpfRetirante) {
+  if (!agendamento.procuracaoBase64) return false;
+  if (!agendamento.procuracaoCpf) return true;
+  return agendamento.procuracaoCpf === String(cpfRetirante ?? '').replace(/\D/g, '');
+}
+
 /** Quem retira as chaves já foi confirmado (passo 2)? Retorna a presença do retirante ou null. */
 export function retiranteConfirmado(agendamento) {
   return agendamento.presencas?.find((p) => VINCULOS_RETIRANTE.includes(p.vinculo)) ?? null;
@@ -83,7 +93,7 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
 
   const retirante = retiranteDoAgendamento(agendamento);
   if (!retirante) return { erro: 'Confirme quem está retirando as chaves antes de enviar para assinatura.' };
-  if (retirante.vinculo === 'procurador' && !agendamento.procuracaoBase64) {
+  if (retirante.vinculo === 'procurador' && !procuracaoValidaParaRetirante(agendamento, retirante.cpf)) {
     return { erro: 'Quem retira é procurador: a procuração é obrigatória antes de enviar para assinatura.' };
   }
   if (!retirante.nome || !retirante.email) {
