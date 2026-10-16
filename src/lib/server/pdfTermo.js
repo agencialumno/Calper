@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { LOGO_DOCUMENTOS_BASE64 } from './assets/logoDocumentos.js';
+import { COR_LINK, REGRAS_TERMO, desenharLinhaRica, quebrarRico, tokenizar } from './pdfRico.js';
 
 // PDF do Termo de Entrega de Chaves recriando o layout do documento de referência
 // (docs-referencia/TERMO DE ENTREGA DE CHAVES - MURANO - rev.DOCX). As medidas vêm do próprio DOCX
@@ -30,7 +31,7 @@ function aspasTipograficas(texto) {
   return texto.replace(/"([^"]*)"/g, '“$1”');
 }
 
-function textoSeguro(fonte, texto) {
+export function textoSeguro(fonte, texto) {
   texto = aspasTipograficas(texto);
   // fontes padrão do PDF só codificam WinAnsi; troca o que não cabe por "?"
   let saida = '';
@@ -47,12 +48,12 @@ function textoSeguro(fonte, texto) {
 
 // O Word aperta os espaços de linhas justificadas além do que as métricas puras permitem, então a
 // quebra "gulosa" exata produz linhas diferentes das dele. Os três parâmetros foram ajustados contra o
-// PDF que o Word gera do documento de referência (reproduz a quebra de 9 dos 11 itens do termo).
-const FOLGA_BASE = 7; // pt a menos que a largura útil
-const ENCOLHIMENTO_POR_ESPACO = 1.2; // pt que cada espaço da linha pode encolher
-const FOLGA_PRIMEIRA_LINHA_ITEM = 4; // pt a menos na primeira linha de item numerado
+// PDF que o Word gera do documento de referência (reproduz a quebra de 8 dos 11 itens do termo, já com os trechos em negrito).
+const FOLGA_BASE = 0; // pt a menos que a largura útil
+const ENCOLHIMENTO_POR_ESPACO = 0.7; // pt que cada espaço da linha pode encolher
+const FOLGA_PRIMEIRA_LINHA_ITEM = 0; // pt a menos na primeira linha de item numerado
 
-function quebrarLinhas(fonte, texto, tamanho, larguraMax, { primeiraFolga = 0 } = {}) {
+export function quebrarLinhas(fonte, texto, tamanho, larguraMax, { primeiraFolga = 0 } = {}) {
   const palavras = texto.split(/ +/).filter(Boolean);
   const linhas = [];
   let atual = '';
@@ -202,8 +203,8 @@ export async function gerarPdfTermo(texto, titulo) {
       desenhar(b.ancora, xTraco, yLinha, { tamanho: 1, cor: rgb(1, 1, 1) });
       const nome = b.nome.replace(/^\(|\)$/g, '');
       if (nome) {
-        const wNome = fonte.widthOfTextAtSize(nome, TAMANHO);
-        desenhar(nome, centro - wNome / 2, yLinha + PASSO);
+        const wNome = negrito.widthOfTextAtSize(nome, TAMANHO);
+        desenhar(nome, centro - wNome / 2, yLinha + PASSO, { fonteUsada: negrito });
       }
       y = yLinha + PASSO;
       continue;
@@ -212,7 +213,18 @@ export async function gerarPdfTermo(texto, titulo) {
     const recuoEsquerda = b.tipo === 'item' ? RECUO_TEXTO : 0;
     const xTexto = MARGEM.esquerda + recuoEsquerda;
     const largura = DIREITA - xTexto;
-    const linhasTexto = b.tipo === 'direita' ? [b.texto] : quebrarLinhas(fonte, b.texto, TAMANHO, largura, {
+    // cabeçalho: 1ª linha toda em negrito; nas demais só o rótulo até ":"; corpo: destaques fixos do termo
+    const palavras = tokenizar(b.texto, {
+      regras: b.tipo === 'cabecalho' ? [] : REGRAS_TERMO,
+      negritoTotal: b.tipo === 'cabecalho' && primeiroCabecalho,
+      negritoAte: b.tipo === 'cabecalho' ? b.texto.indexOf(':') + 1 : 0
+    });
+    const linhasTexto =
+      b.tipo === 'direita'
+        ? [palavras]
+        : quebrarRico(palavras, fonte, negrito, TAMANHO, largura, {
+            folgaBase: FOLGA_BASE,
+            encolhimento: ENCOLHIMENTO_POR_ESPACO,
             primeiraFolga: b.tipo === 'item' ? FOLGA_PRIMEIRA_LINHA_ITEM : 0
           });
 
@@ -221,7 +233,6 @@ export async function gerarPdfTermo(texto, titulo) {
     let passo;
     if (b.tipo === 'cabecalho') {
       passo = primeiroCabecalho ? CABECALHO_Y - y : PASSO;
-      primeiroCabecalho = false;
     } else if (b.tipo === 'item' && anterior?.tipo === 'item') {
       // os itens vêm colados no texto, mas no documento há uma linha em branco entre eles
       // (a dos itens 1 e 7 tem entrelinha cheia; as demais, simples)
@@ -241,16 +252,25 @@ export async function gerarPdfTermo(texto, titulo) {
       yAtual = primeiraLinhaDaPagina;
     }
 
+    const desenharTexto = (str, x, f, cor) => desenhar(str, x, yLinhaAtual, { fonteUsada: f, cor });
+    let yLinhaAtual = 0;
     linhasTexto.forEach((linha, i) => {
-      const yLinha = yAtual + i * PASSO;
+      yLinhaAtual = yAtual + i * PASSO;
+      const sublinhar = (x, w) =>
+        pagina.drawRectangle({ x, y: PAGINA.altura - yLinhaAtual - 1.3, width: w, height: 0.6, color: COR_LINK });
       if (b.tipo === 'direita') {
-        const w = fonte.widthOfTextAtSize(linha, TAMANHO);
-        desenhar(linha, DIREITA - w, yLinha);
+        const w = fonte.widthOfTextAtSize(b.texto, TAMANHO);
+        desenhar(b.texto, DIREITA - w, yLinhaAtual);
       } else {
-        linhaJustificada(linha, xTexto, yLinha, largura, i < linhasTexto.length - 1);
+        desenharLinhaRica(linha, xTexto, fonte, negrito, TAMANHO, {
+          largura: i < linhasTexto.length - 1 ? largura : null,
+          desenharTexto,
+          sublinhar
+        });
       }
-      if (b.tipo === 'item' && i === 0) desenhar(b.numero, MARGEM.esquerda + RECUO_NUMERO, yLinha);
+      if (b.tipo === 'item' && i === 0) desenhar(b.numero, MARGEM.esquerda + RECUO_NUMERO, yLinhaAtual);
     });
+    if (b.tipo === 'cabecalho') primeiroCabecalho = false;
     y = yAtual + (linhasTexto.length - 1) * PASSO;
   }
 
