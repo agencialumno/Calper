@@ -28,6 +28,7 @@ async function main() {
   // ordem respeita as chaves estrangeiras (filhos antes dos pais)
   await db.$transaction([
     db.presencaEntrega.deleteMany(),
+    db.procuracaoUnidade.deleteMany(),
     db.documentoAssinado.deleteMany(),
     db.pesquisaSatisfacao.deleteMany(),
     db.acompanhante.deleteMany(),
@@ -45,7 +46,7 @@ async function main() {
   ]);
 
   const empreendimento = await db.empreendimento.create({
-    data: { nome: 'Murano', estagioAtual: 'Entrega das Chaves' }
+    data: { nome: 'Murano', estagioAtual: 'Entrega das Chaves', etapa: 'entrega_chaves' }
   });
 
   // textos dos documentos + dados fixos já conhecidos do termo do Murano (docs-referencia).
