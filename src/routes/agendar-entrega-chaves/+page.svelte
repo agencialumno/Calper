@@ -7,6 +7,13 @@
 
   let ehProprietario = $state(form?.valores?.ehProprietario ?? '');
   let enviando = $state(false);
+  let modalEl = $state(null);
+  let modalFechado = $state(false);
+
+  // abre o modal assim que o servidor confirma o agendamento
+  $effect(() => {
+    if (form?.sucesso && modalEl && !modalFechado && !modalEl.open) modalEl.showModal();
+  });
   let arquivoProcuracao = $state(null);
   let tentouEnviar = $state(false);
   const faltaProcuracao = $derived(ehProprietario === 'nao' && !arquivoProcuracao);
@@ -39,13 +46,65 @@
   <p class="text-sm text-gray-500 mb-6">Murano Residencial</p>
 
   {#if form?.sucesso}
-    <div class="card p-6 md:p-8">
-      <div class="text-lg font-bold text-calper-dark mb-2">Agendamento confirmado</div>
-      <p class="text-sm text-gray-600">
-        {form.resumo.unidade} — {formatarDataBr(form.resumo.data)} às {form.resumo.horario}.
-      </p>
-      <p class="text-xs text-gray-400 mt-3">Apresente seu documento com foto à equipe Calper no dia.</p>
-    </div>
+    <dialog
+      bind:this={modalEl}
+      oncancel={(e) => e.preventDefault()}
+      class="rounded-2xl p-0 w-[calc(100%-2rem)] max-w-md backdrop:bg-black/50 m-auto"
+      aria-labelledby="titulo-confirmacao"
+    >
+      <div class="p-6 md:p-8">
+        <div class="w-12 h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center mb-4">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <path d="M5 12l5 5 9-10" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <h2 id="titulo-confirmacao" class="text-xl font-extrabold text-calper-dark mb-1">
+          Agendamento realizado com sucesso
+        </h2>
+        <p class="text-sm text-gray-500 mb-5">Guarde os dados abaixo.</p>
+
+        <dl class="flex flex-col gap-3 text-sm mb-5">
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Unidade</dt>
+            <dd class="font-bold text-calper-dark text-right">{form.resumo.unidade}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Data</dt>
+            <dd class="font-bold text-calper-dark text-right">{formatarDataBr(form.resumo.data)}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Horário</dt>
+            <dd class="font-bold text-calper-dark text-right">{form.resumo.horario}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-gray-500">Agendado por</dt>
+            <dd class="font-bold text-calper-dark text-right">{form.resumo.nome}</dd>
+          </div>
+        </dl>
+
+        <p class="text-xs text-gray-500 mb-6">Apresente seu documento com foto à equipe Calper no dia.</p>
+        <button
+          type="button"
+          class="btn-primary w-full"
+          onclick={() => {
+            modalFechado = true;
+            modalEl.close();
+          }}
+        >
+          Entendi
+        </button>
+      </div>
+    </dialog>
+
+    {#if modalFechado}
+      <div class="card p-6 md:p-8">
+        <div class="text-lg font-bold text-calper-dark mb-2">Agendamento confirmado</div>
+        <p class="text-sm text-gray-600">
+          {form.resumo.unidade} — {formatarDataBr(form.resumo.data)} às {form.resumo.horario} ({form.resumo.nome}).
+        </p>
+        <p class="text-xs text-gray-400 mt-3">Apresente seu documento com foto à equipe Calper no dia.</p>
+      </div>
+    {/if}
   {:else if !data.disponivel}
     <AvisoSutil>Agendamento indisponível no momento.</AvisoSutil>
   {:else}

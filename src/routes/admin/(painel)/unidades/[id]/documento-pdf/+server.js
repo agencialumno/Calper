@@ -22,7 +22,7 @@ export async function POST({ request, params, locals }) {
   });
   if (!unidade) throw error(404, 'Unidade não encontrada');
 
-  const pdf = Buffer.from(await gerarPdfBase64(texto, NOMES[tipo].titulo), 'base64');
+  const pdf = Buffer.from(await gerarPdfBase64(texto, NOMES[tipo].titulo, tipo), 'base64');
   return new Response(pdf, {
     headers: {
       'content-type': 'application/pdf',

@@ -14,6 +14,6 @@ precacheAndRoute(self.__WB_MANIFEST);
 self.addEventListener('fetch', (event) => {
   if (event.request.mode !== 'navigate') return;
   event.respondWith(
-    fetch(event.request).catch(async () => (await matchPrecache('/offline.html')) ?? Response.error())
+    fetch(event.request).catch(async () => (await matchPrecache('/offline')) ?? Response.error())
   );
 });

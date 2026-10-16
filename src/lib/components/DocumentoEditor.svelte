@@ -13,6 +13,28 @@
   let enviando = $state(false);
   const pendentes = $derived([...new Set(editado.match(/\{\{\s*\w+\s*\}\}/g) ?? [])]);
 
+  // O download é um POST nativo (formulário criado na hora e enviado com .submit(), que não dispara o
+  // evento "submit"). Dentro do <form use:enhance> o SvelteKit interceptaria o envio, leria o PDF como
+  // se fosse JSON de action e mostraria a página de erro, mesmo com o servidor respondendo 200.
+  function baixarPdf() {
+    const nativo = document.createElement('form');
+    nativo.method = 'POST';
+    nativo.action = `/admin/unidades/${unidadeId}/documento-pdf`;
+    nativo.style.display = 'none';
+    for (const [nome, valor] of [
+      ['tipo', tipo],
+      ['texto', editado]
+    ]) {
+      const campo = document.createElement(nome === 'texto' ? 'textarea' : 'input');
+      campo.name = nome;
+      campo.value = valor;
+      nativo.append(campo);
+    }
+    document.body.append(nativo);
+    nativo.submit();
+    nativo.remove();
+  }
+
   const rotuloStatus = { pendente: 'Assinatura pendente', assinado: 'Assinado' };
   const corStatus = { pendente: 'bg-amber-50 text-amber-700', assinado: 'bg-green-50 text-green-700' };
 </script>
@@ -75,16 +97,7 @@
       >
         {assinatura.status === 'pendente' ? 'Reenviar para assinatura' : 'Enviar para assinatura'}
       </button>
-      <button
-        type="submit"
-        formaction="/admin/unidades/{unidadeId}/documento-pdf"
-        formmethod="POST"
-        name="tipo"
-        value={tipo}
-        class="btn-outline text-sm !py-2.5"
-      >
-        Baixar PDF
-      </button>
+      <button type="button" onclick={baixarPdf} class="btn-outline text-sm !py-2.5">Baixar PDF</button>
       {#if assinatura.status === 'assinado' && assinatura.agendamentoId}
         <a
           href="/admin/entrega-chaves/{assinatura.agendamentoId}/documento/{tipo === 'termo' ? 'termo' : 'checklist'}"

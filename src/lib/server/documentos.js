@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { db } from './db.js';
 import { PADROES } from '../documentosPadrao.js';
+import { gerarPdfTermo } from './pdfTermo.js';
 
 /** Template do empreendimento; cria com o texto padrão na primeira vez. */
 export async function obterTemplate(empreendimentoId, tipo) {
@@ -165,7 +166,8 @@ function quebrarLinhas(fonte, texto, tamanho, larguraMax) {
 }
 
 /** Gera o PDF (A4) a partir do texto final e devolve em base64 puro. As 2 primeiras linhas viram título. */
-export async function gerarPdfBase64(texto, titulo) {
+export async function gerarPdfBase64(texto, titulo, tipo = null) {
+  if (tipo === 'termo') return gerarPdfTermo(texto, titulo);
   const pdf = await PDFDocument.create();
   pdf.setTitle(titulo);
   const normal = await pdf.embedFont(StandardFonts.Helvetica);

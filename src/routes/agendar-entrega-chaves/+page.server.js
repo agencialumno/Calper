@@ -188,6 +188,7 @@ export const actions = {
     return {
       sucesso: true,
       resumo: {
+        nome: valores.nome,
         unidade: `Bloco ${unidade.bloco} - nº ${unidade.numero}`,
         data: valores.data,
         horario: valores.horario,

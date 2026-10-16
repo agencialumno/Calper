@@ -108,7 +108,7 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
   let envelopeId;
   let urlAssinatura;
   try {
-    const pdfBase64 = await gerarPdfBase64(textoFinal, NOME_DOCUMENTO[tipo]);
+    const pdfBase64 = await gerarPdfBase64(textoFinal, NOME_DOCUMENTO[tipo], tipo);
     ({ envelopeId, urlAssinatura } = await criarEnvelopeEmbedded({
       pdfBase64,
       nomeDocumento: NOME_DOCUMENTO[tipo],
