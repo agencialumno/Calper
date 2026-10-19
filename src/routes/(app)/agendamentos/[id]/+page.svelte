@@ -17,6 +17,7 @@
 
   function formatarDataHora(iso) {
     return new Date(iso).toLocaleString('pt-BR', {
+      timeZone: 'UTC',
       weekday: 'long',
       day: '2-digit',
       month: 'long',
