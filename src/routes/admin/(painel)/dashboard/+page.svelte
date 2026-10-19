@@ -19,8 +19,14 @@
 
 <div class="p-5 md:p-10 max-w-6xl">
   <div class="mb-6 md:mb-8">
-    <h1 class="text-xl md:text-2xl font-bold text-calper-dark">Dashboard</h1>
-    <p class="text-sm text-gray-500 mt-0.5 mb-4">Visão geral de agendamentos e engajamento</p>
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-xl md:text-2xl font-bold text-calper-dark">Dashboard</h1>
+        <p class="text-sm text-gray-500 mt-0.5 mb-4">Visão geral de agendamentos e engajamento</p>
+      </div>
+      <!-- CSV simples (texto puro) de todas as entregas de chaves: unidade, comprador, documentos, presença... -->
+      <a href="/admin/dashboard/exportar" download class="btn-outline text-sm !py-2.5 shrink-0">Exportar CSV das entregas</a>
+    </div>
 
     <!-- filtros: empilhados e com largura contida no mobile, pra não estourar a tela -->
     <form method="GET" class="flex flex-col sm:flex-row gap-2.5">

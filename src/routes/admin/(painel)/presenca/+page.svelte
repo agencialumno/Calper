@@ -40,7 +40,27 @@
     </div>
   </form>
 
-  <div class="flex justify-end mb-3">
+  <!-- unidades que já tiveram a chave entregue (termo e checklist assinados) -->
+  <section class="card p-4 md:p-5 mb-6">
+    <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+      <h2 class="text-base font-bold text-calper-dark">Unidades com chave entregue</h2>
+      <span class="text-sm font-bold text-green-700 bg-green-50 rounded-full px-3 py-1">
+        {data.totalEntregues} de {data.totalUnidades} unidades
+      </span>
+    </div>
+    {#each data.entregas as e (e.agendamentoId)}
+      <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 py-2.5 border-t border-gray-100">
+        <a href="/admin/unidades/{e.unidadeId}" class="text-sm font-bold text-calper-red md:w-40 shrink-0">{e.unidade}</a>
+        <div class="text-sm text-calper-dark flex-1 min-w-0">retirou: <strong>{e.retirante ?? '—'}</strong></div>
+        <div class="text-xs text-gray-500 md:w-40 shrink-0">{formatarDataHora(e.entregueEm)}</div>
+      </div>
+    {:else}
+      <p class="text-sm text-gray-400">Nenhuma entrega concluída no período.</p>
+    {/each}
+  </section>
+
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-base font-bold text-calper-dark">Quem compareceu</h2>
     <a href={data.exportarHref} class="text-sm font-bold text-calper-red">Exportar CSV</a>
   </div>
 
@@ -51,6 +71,9 @@
         <div class="text-sm font-semibold text-calper-dark flex-1 min-w-0">{p.nome}</div>
         <div class="text-xs text-gray-600 md:w-40 shrink-0">{p.vinculo}</div>
         <a href="/admin/unidades/{p.unidadeId}" class="text-sm font-bold text-calper-red md:w-36 shrink-0">{p.unidade}</a>
+        {#if p.chaveEntregue}
+          <span class="text-[11px] font-bold text-green-700 bg-green-50 rounded-full px-2.5 py-1 shrink-0">chave entregue</span>
+        {/if}
       </div>
     {:else}
       <p class="text-sm text-gray-400 p-6">Nenhuma presença registrada no período.</p>

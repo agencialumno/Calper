@@ -34,7 +34,10 @@
 <div class="p-5 md:p-8 max-w-6xl">
   <div class="flex items-center justify-between gap-3">
     <h1 class="text-xl font-bold text-calper-dark">Entrega de chaves</h1>
-    <a href="/admin/presenca" class="text-sm font-bold text-calper-red">Lista de presença →</a>
+    <div class="flex items-center gap-4 text-sm font-bold text-calper-red">
+      <a href="/admin/quem-agendou">Quem agendou →</a>
+      <a href="/admin/presenca">Lista de presença →</a>
+    </div>
   </div>
   <p class="text-sm text-gray-500 mt-0.5 mb-6">Murano Residencial — {data.agendamentos.length} agendamento(s)</p>
 
