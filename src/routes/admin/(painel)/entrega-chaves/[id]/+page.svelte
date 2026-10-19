@@ -3,6 +3,7 @@
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
   import { formatarCpf } from '$lib/cpf.js';
+  import { fotosParaPdf } from '$lib/fotoParaPdf.js';
 
   let { data, form } = $props();
 
@@ -13,6 +14,54 @@
   // passo 2
   let quem = $state('');
   let arquivo = $state(null);
+  let inputProcuracao = $state(null);
+  let fotos = $state([]); // fotos tiradas na câmera (cada uma vira uma página do PDF)
+  let convertendo = $state(false);
+  let erroProcuracao = $state('');
+
+  function colocarArquivo(file) {
+    const dt = new DataTransfer();
+    if (file) dt.items.add(file);
+    inputProcuracao.files = dt.files;
+    arquivo = file;
+  }
+
+  // a câmera devolve imagem: vira PDF (1 página por foto) antes de entrar no envio, que só aceita documento
+  async function aoTirarFoto(e) {
+    const nova = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!nova) return;
+    erroProcuracao = '';
+    convertendo = true;
+    try {
+      fotos = [...fotos, nova];
+      colocarArquivo(await fotosParaPdf(fotos));
+    } catch (err) {
+      fotos = fotos.slice(0, -1);
+      erroProcuracao = err?.message ?? 'Não foi possível converter a foto em PDF.';
+    } finally {
+      convertendo = false;
+    }
+  }
+
+  function limparFotos() {
+    fotos = [];
+    erroProcuracao = '';
+    colocarArquivo(null);
+  }
+
+  function aoEscolherArquivo(e) {
+    const f = e.currentTarget.files?.[0] ?? null;
+    erroProcuracao = '';
+    if (f && !/\.(pdf|docx?)$/i.test(f.name)) {
+      e.currentTarget.value = '';
+      arquivo = null;
+      erroProcuracao = 'A procuração precisa ser um documento: PDF, DOC ou DOCX. Para foto, use o botão "Tirar foto".';
+      return;
+    }
+    fotos = [];
+    arquivo = f;
+  }
   let tentouConfirmar = $state(false);
   // CPF digitado em "outra pessoa": a procuração do agendamento só dispensa novo upload se for da mesma pessoa
   let cpfDigitado = $state(null);
@@ -232,16 +281,50 @@
 
           <div>
             <label for="procuracao" class="block text-xs font-semibold text-gray-500 mb-1">
-              {procuracaoVale ? 'Substituir procuração (opcional)' : 'Procuração (JPG, PNG ou PDF, até 4 MB) — obrigatória'}
+              {procuracaoVale ? 'Substituir procuração (opcional)' : 'Procuração (PDF, DOC ou DOCX, até 4 MB) — obrigatória'}
             </label>
             <input
+              bind:this={inputProcuracao}
               id="procuracao"
               name="procuracao"
               type="file"
-              accept="image/jpeg,image/png,application/pdf"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               class="input"
-              onchange={(e) => (arquivo = e.currentTarget.files?.[0] ?? null)}
+              onchange={aoEscolherArquivo}
             />
+
+            <!-- procuração só em papel: foto pela câmera do iPad, convertida em PDF (1 página por foto) -->
+            <div class="mt-2.5 flex flex-wrap items-center gap-2">
+              <label
+                class="inline-flex items-center gap-2 text-sm font-bold text-calper-red border border-gray-200 rounded-xl px-3.5 py-2.5 cursor-pointer active:scale-95"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                {fotos.length ? 'Adicionar outra página' : 'Tirar foto da procuração'}
+                <!-- sem "name": não vai no envio; a foto entra como PDF pelo campo acima -->
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  class="hidden"
+                  data-converte-antes
+                  onchange={aoTirarFoto}
+                />
+              </label>
+              {#if convertendo}
+                <span class="text-xs text-gray-500">Convertendo em PDF…</span>
+              {:else if fotos.length}
+                <span class="text-xs text-gray-600">{fotos.length} foto(s) → PDF de {fotos.length} página(s)</span>
+                <button type="button" class="text-xs font-semibold text-gray-500 underline" onclick={limparFotos}>
+                  descartar fotos
+                </button>
+              {/if}
+            </div>
+            {#if erroProcuracao}
+              <div class="mt-2.5"><AvisoSutil>{erroProcuracao}</AvisoSutil></div>
+            {/if}
             {#if faltaProcuracao}
               <div class="mt-2.5">
                 <AvisoSutil>{a.temProcuracao ? 'Envie a procuração da pessoa que está retirando as chaves para continuar.' : 'Quem retira não é comprador desta unidade: envie a procuração para continuar.'}</AvisoSutil>

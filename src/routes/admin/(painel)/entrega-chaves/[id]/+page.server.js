@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
-import { arquivoParaBase64 } from '$lib/server/agendamento.js';
+import { TIPOS_PROCURACAO, arquivoParaBase64 } from '$lib/server/agendamento.js';
 import { montarDocumento, quartosDaUnidade, titularesDaUnidade } from '$lib/server/documentos.js';
 import {
   ROTULO_VINCULO,
@@ -145,7 +145,11 @@ export const actions = {
       if (nome.length < 3) return fail(400, { erro: 'Informe o nome completo de quem retira as chaves.' });
       if (!cpfValido(cpf)) return fail(400, { erro: 'Informe um CPF válido de quem retira as chaves.' });
       try {
-        procuracaoNova = await arquivoParaBase64(form.get('procuracao'));
+        procuracaoNova = await arquivoParaBase64(form.get('procuracao'), {
+          tipos: TIPOS_PROCURACAO,
+          mensagemTipo:
+            'A procuração precisa ser um documento: PDF, DOC ou DOCX. Para foto, use o botão "Tirar foto" (ela vira PDF).'
+        });
       } catch (err) {
         return fail(400, { erro: err.message });
       }

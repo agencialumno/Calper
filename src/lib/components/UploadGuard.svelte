@@ -16,6 +16,8 @@
     function aoEscolher(e) {
       const input = e.target;
       if (!(input instanceof HTMLInputElement) || input.type !== 'file') return;
+      // campos marcados são convertidos/reduzidos pela própria tela antes de entrar no envio
+      if (input.hasAttribute('data-converte-antes')) return;
       const grande = [...(input.files ?? [])].find((f) => f.size > LIMITE_ARQUIVO_BYTES);
       if (grande) {
         input.value = '';
