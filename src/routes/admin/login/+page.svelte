@@ -51,5 +51,9 @@
         <SubmitButton loading={entrando}>Entrar</SubmitButton>
       </div>
     </form>
+
+    <p class="text-sm text-gray-500 mt-6 text-center">
+      Primeiro acesso da equipe? <a href="/admin/cadastro" class="font-bold text-calper-red">Criar conta</a>
+    </p>
   </div>
 </div>
