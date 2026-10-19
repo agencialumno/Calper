@@ -1,5 +1,6 @@
 import { db } from '$lib/server/db.js';
 import { SLUG_ENTREGA_CHAVES, buscarMurano } from '$lib/server/entregaChaves.js';
+import { quartosDaUnidade } from '$lib/server/documentos.js';
 
 export async function load() {
   const murano = await buscarMurano();
@@ -31,7 +32,7 @@ export async function load() {
         id: a.unidade.id,
         bloco: a.unidade.bloco,
         numero: a.unidade.numero,
-        quartos: a.unidade.quartos,
+        quartos: quartosDaUnidade(a.unidade), // tipologia da base Murano ("3 QUARTOS") ou o campo quartos
         statusQuitacao: a.unidade.statusQuitacao,
         financiado: a.unidade.financiado,
         grupoFinanciamento: a.unidade.grupoFinanciamento,

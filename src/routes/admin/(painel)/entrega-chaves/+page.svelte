@@ -100,9 +100,9 @@
             >
               Escritura: {u.escrituraRegistrada ? 'registrada' : 'não registrada'}
             </span>
-            <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-              {u.quartos ? `${u.quartos} quarto(s)` : 'Tipologia —'}
-            </span>
+            {#if u.quartos}
+              <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{u.quartos} quartos</span>
+            {/if}
           </div>
         </div>
       {/each}
