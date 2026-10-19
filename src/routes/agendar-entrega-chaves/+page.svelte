@@ -16,6 +16,20 @@
   });
   let arquivoProcuracao = $state(null);
   let tentouEnviar = $state(false);
+  let erroTipoProcuracao = $state('');
+
+  // só documento de texto (PDF/Word): imagem é recusada na hora, antes de enviar
+  function aoEscolherProcuracao(e) {
+    const arq = e.currentTarget.files?.[0] ?? null;
+    erroTipoProcuracao = '';
+    if (arq && !/\.(pdf|docx?)$/i.test(arq.name)) {
+      e.currentTarget.value = '';
+      arquivoProcuracao = null;
+      erroTipoProcuracao = 'A procuração precisa ser um documento: PDF, DOC ou DOCX (não aceitamos imagem).';
+      return;
+    }
+    arquivoProcuracao = arq;
+  }
   const faltaProcuracao = $derived(ehProprietario === 'nao' && !arquivoProcuracao);
 
   function aoSubmeter({ cancel }) {
@@ -119,7 +133,7 @@
       {/if}
 
       <div>
-        <label for="nome" class="block text-sm font-semibold text-calper-dark mb-1.5">Nome completo</label>
+        <label for="nome" class="block text-sm font-semibold text-calper-dark mb-1.5">Nome do investidor</label>
         <input id="nome" name="nome" class="input" value={form?.valores?.nome ?? ''} required />
       </div>
 
@@ -198,9 +212,22 @@
       </fieldset>
 
       {#if ehProprietario === 'nao'}
-        <div class="rounded-xl border border-gray-200 p-4 flex flex-col gap-2.5 -mt-1">
+        <div class="rounded-xl border border-gray-200 p-4 flex flex-col gap-3 -mt-1">
+          <div>
+            <label for="proprietarioNome" class="block text-sm font-semibold text-calper-dark mb-1.5">
+              Nome do proprietário <span class="text-calper-red">*</span>
+            </label>
+            <input
+              id="proprietarioNome"
+              name="proprietarioNome"
+              class="input"
+              value={form?.valores?.proprietarioNome ?? ''}
+              placeholder="Nome de quem é o proprietário da unidade"
+              required
+            />
+          </div>
           <label for="procuracao" class="block text-sm font-semibold text-calper-dark">
-            Procuração (JPG, PNG ou PDF, até 4 MB) <span class="text-calper-red">*</span>
+            Procuração (PDF, DOC ou DOCX, até 4 MB) <span class="text-calper-red">*</span>
           </label>
           <p class="text-xs text-gray-500">
             Anexe a procuração — a equipe Calper vai conferir no dossiê da unidade antes do atendimento.
@@ -209,10 +236,13 @@
             id="procuracao"
             name="procuracao"
             type="file"
-            accept="image/jpeg,image/png,application/pdf"
+            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             class="input"
-            onchange={(e) => (arquivoProcuracao = e.currentTarget.files?.[0] ?? null)}
+            onchange={aoEscolherProcuracao}
           />
+          {#if erroTipoProcuracao}
+            <AvisoSutil>{erroTipoProcuracao}</AvisoSutil>
+          {/if}
           {#if tentouEnviar && faltaProcuracao}
             <AvisoSutil>Anexe a procuração para confirmar o agendamento.</AvisoSutil>
           {/if}

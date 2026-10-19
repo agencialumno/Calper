@@ -168,6 +168,8 @@ model Agendamento {
   telefoneCompareceu String?
   emailCompareceu    String?
   ehProprietario     Boolean?
+  // Nome do proprietário da unidade quando quem agendou não é ele (ehProprietario = false).
+  proprietarioNome   String?
   // Quem agendou fica nos campos *Compareceu acima (intactos). Quem retira as chaves de fato é
   // confirmado no dia, no passo 2 do fluxo de entrega, e gravado aqui.
   retiranteNome      String?

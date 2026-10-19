@@ -178,6 +178,11 @@
               </span>
               <strong>{a.nome ?? '—'}</strong>
               <span class="text-gray-600"> · CPF {a.cpf ? formatarCpf(a.cpf) : '—'}</span>
+              {#if a.proprietarioNome}
+                <span class="block mt-1 text-gray-600">
+                  Proprietário da unidade: <strong class="text-calper-dark">{a.proprietarioNome}</strong>
+                </span>
+              {/if}
             </div>
           {/if}
 
@@ -206,7 +211,7 @@
                   rel="noopener"
                   class="inline-block text-sm font-bold text-calper-red border border-gray-200 rounded-lg px-4 py-2.5"
                 >
-                  Abrir procuração (PDF) em nova aba
+                  Abrir procuração ({a.procuracaoTipo === 'application/pdf' ? 'PDF' : 'documento'}) em nova aba
                 </a>
               {/if}
               <div class="mt-2">

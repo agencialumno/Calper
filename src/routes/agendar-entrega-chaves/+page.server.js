@@ -4,6 +4,7 @@ import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
 import { gerarSenhaTemporaria, hashSenha } from '$lib/server/auth.js';
 import {
   HORARIOS_DISPONIVEIS,
+  TIPOS_PROCURACAO,
   arquivoParaBase64,
   faixaDeDatasPermitida,
   gerarQrToken
@@ -64,13 +65,14 @@ export const actions = {
       telefone: String(form.get('telefone') ?? '').trim(),
       email: String(form.get('email') ?? '').trim(),
       ehProprietario: String(form.get('ehProprietario') ?? ''),
+      proprietarioNome: String(form.get('proprietarioNome') ?? '').trim(),
       unidadeId: String(form.get('unidadeId') ?? ''),
       data: String(form.get('data') ?? ''),
       horario: String(form.get('horario') ?? '')
     };
     const erro = (msg) => fail(400, { erro: msg, valores });
 
-    if (valores.nome.length < 3) return erro('Informe o nome completo.');
+    if (valores.nome.length < 3) return erro('Informe o nome do investidor.');
     if (!cpfValido(valores.cpf)) return erro('CPF inválido.');
     if (somenteDigitos(valores.telefone).length < 10) return erro('Informe um telefone válido com DDD.');
     if (!emailValido(valores.email)) return erro('Informe um e-mail válido.');
@@ -82,8 +84,12 @@ export const actions = {
     // quem não é o proprietário precisa anexar a procuração já no agendamento — a equipe confere no dossiê da unidade
     let procuracaoBase64 = null;
     if (!ehProprietario) {
+      if (valores.proprietarioNome.length < 3) return erro('Informe o nome do proprietário da unidade.');
       try {
-        procuracaoBase64 = await arquivoParaBase64(form.get('procuracao'));
+        procuracaoBase64 = await arquivoParaBase64(form.get('procuracao'), {
+          tipos: TIPOS_PROCURACAO,
+          mensagemTipo: 'A procuração precisa ser um documento: PDF, DOC ou DOCX (não aceitamos imagem).'
+        });
       } catch (err) {
         return erro(err.message);
       }
@@ -145,6 +151,7 @@ export const actions = {
         telefoneCompareceu: valores.telefone,
         emailCompareceu: valores.email,
         ehProprietario,
+        proprietarioNome: ehProprietario ? null : valores.proprietarioNome,
         procuracaoBase64,
         procuracaoCpf: procuracaoBase64 ? cpf : null
       }
@@ -167,7 +174,7 @@ export const actions = {
       data: {
         unidadeId: unidade.id,
         tipo: 'outro',
-        descricao: `Entrega de chaves agendada para ${valores.data} às ${valores.horario} (${valores.nome})${procuracaoBase64 ? ' — procuração anexada' : ''}`
+        descricao: `Entrega de chaves agendada para ${valores.data} às ${valores.horario} (${valores.nome})${procuracaoBase64 ? ` — procuração anexada, proprietário: ${valores.proprietarioNome}` : ''}`
       }
     });
     await registrarLog({

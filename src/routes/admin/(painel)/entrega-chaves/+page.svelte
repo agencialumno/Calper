@@ -61,6 +61,7 @@
 
           <div class="text-xs text-gray-600 mt-2">
             Agendado por {a.nome ?? '—'} · {a.telefone ?? '—'} · {a.email ?? '—'}
+            {#if a.ehProprietario === false}· <strong>não é o proprietário</strong>{a.proprietarioNome ? ` (proprietário: ${a.proprietarioNome})` : ''}{/if}
             {#if a.retiranteNome}· Retira: <strong>{a.retiranteNome}</strong>{#if a.temProcuracao} (procuração anexada){/if}{:else}· retirante ainda não confirmado{/if}
           </div>
 

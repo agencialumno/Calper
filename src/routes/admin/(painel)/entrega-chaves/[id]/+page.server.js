@@ -65,6 +65,7 @@ export async function load({ params, url }) {
       cpf: agendamento.cpfCompareceu,
       email: agendamento.emailCompareceu,
       ehProprietario: agendamento.ehProprietario,
+      proprietarioNome: agendamento.proprietarioNome,
       // quem RETIRA as chaves (confirmado no passo 2)
       retiranteNome: agendamento.retiranteNome,
       retiranteCpf: agendamento.retiranteCpf,

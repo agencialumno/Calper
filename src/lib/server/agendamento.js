@@ -29,15 +29,35 @@ export function faixaDeDatasPermitida() {
 const MAX_TAMANHO_DOCUMENTO_BYTES = 4 * 1024 * 1024; // 4 MB
 const TIPOS_ACEITOS = ['image/jpeg', 'image/png', 'application/pdf'];
 
-/** Converte um File (upload) em data URL base64, com validação de tipo/tamanho. */
-export async function arquivoParaBase64(file) {
+/** Procuração do formulário público: só documento de texto (PDF ou Word), não imagem. */
+export const TIPOS_PROCURACAO = {
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx'
+};
+
+/**
+ * Converte um File (upload) em data URL base64, com validação de tipo/tamanho.
+ * `tipos` (mapa MIME → extensão) restringe os formatos aceitos; padrão: JPG, PNG ou PDF.
+ * Em tipos restritos, o MIME vazio (alguns navegadores com .doc) é aceito pela extensão do nome.
+ */
+export async function arquivoParaBase64(file, { tipos = null, mensagemTipo = null } = {}) {
   if (!file || typeof file === 'string' || file.size === 0) return null;
-  if (!TIPOS_ACEITOS.includes(file.type)) {
+  let tipoFinal = file.type;
+  if (tipos) {
+    const ext = String(file.name ?? '').toLowerCase().match(/\.(pdf|doc|docx)$/)?.[1];
+    const porExtensao = Object.entries(tipos).find(([, e]) => e === ext)?.[0];
+    // o tipo declarado precisa ser aceito; sem tipo declarado, vale a extensão
+    if (!tipos[file.type] && !(!file.type && porExtensao)) {
+      throw new Error(mensagemTipo ?? 'Formato de arquivo não aceito.');
+    }
+    tipoFinal = tipos[file.type] ? file.type : porExtensao;
+  } else if (!TIPOS_ACEITOS.includes(file.type)) {
     throw new Error('Documento precisa ser JPG, PNG ou PDF.');
   }
   if (file.size > MAX_TAMANHO_DOCUMENTO_BYTES) {
     throw new Error('Documento muito grande (máximo 4 MB).');
   }
   const buffer = Buffer.from(await file.arrayBuffer());
-  return `data:${file.type};base64,${buffer.toString('base64')}`;
+  return `data:${tipoFinal};base64,${buffer.toString('base64')}`;
 }

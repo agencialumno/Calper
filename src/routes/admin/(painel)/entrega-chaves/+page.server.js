@@ -26,6 +26,7 @@ export async function load() {
       telefone: a.telefoneCompareceu,
       email: a.emailCompareceu,
       ehProprietario: a.ehProprietario,
+      proprietarioNome: a.proprietarioNome,
       documentos: Object.fromEntries(a.documentosAssinados.map((d) => [d.tipo, d.status])),
       temProcuracao: Boolean(a.procuracaoBase64),
       unidade: {
