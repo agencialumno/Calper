@@ -2,13 +2,8 @@ import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
 import { gerarSenhaTemporaria, hashSenha } from '$lib/server/auth.js';
-import {
-  HORARIOS_DISPONIVEIS,
-  TIPOS_PROCURACAO,
-  arquivoParaBase64,
-  faixaDeDatasPermitida,
-  gerarQrToken
-} from '$lib/server/agendamento.js';
+import { TIPOS_PROCURACAO, arquivoParaBase64, gerarQrToken } from '$lib/server/agendamento.js';
+import { agendaPublica, conferirVaga, dataHoraDoSlot } from '$lib/server/agenda.js';
 import { SLUG_ENTREGA_CHAVES, buscarMurano } from '$lib/server/entregaChaves.js';
 import { notificarFuncionarios } from '$lib/server/notificacao.js';
 import { registrarLog } from '$lib/server/log.js';
@@ -31,7 +26,9 @@ async function carregarUnidades(empreendimentoId, tipoEventoId) {
     }
   });
   return unidades
-    .map((u) => ({ id: u.id, bloco: u.bloco, numero: u.numero, agendada: u.agendamentos.length > 0 }))
+    // unidade já agendada não aparece mais na lista (não dá pra agendar a mesma unidade duas vezes)
+    .filter((u) => u.agendamentos.length === 0)
+    .map((u) => ({ id: u.id, bloco: u.bloco, numero: u.numero }))
     .sort(
       (a, b) =>
         a.bloco.localeCompare(b.bloco, 'pt-BR', { numeric: true }) ||
@@ -44,14 +41,12 @@ export async function load() {
     buscarMurano(),
     db.tipoEvento.findUnique({ where: { slug: SLUG_ENTREGA_CHAVES } })
   ]);
-  const { minimo, maximo } = faixaDeDatasPermitida();
 
   return {
     disponivel: Boolean(murano && tipoEvento),
     unidades: murano && tipoEvento ? await carregarUnidades(murano.id, tipoEvento.id) : [],
-    horarios: HORARIOS_DISPONIVEIS,
-    dataMinima: minimo.toISOString().slice(0, 10),
-    dataMaxima: maximo.toISOString().slice(0, 10)
+    // dias abertos e horários com vaga, definidos pela equipe em /admin/agenda
+    agenda: await agendaPublica()
   };
 }
 
@@ -113,21 +108,9 @@ export const actions = {
     });
     if (jaAgendada) return erro('Esta unidade já tem entrega de chaves agendada. Escolha outra.');
 
-    const { minimo, maximo } = faixaDeDatasPermitida();
-    const dataEscolhida = new Date(`${valores.data}T00:00:00`);
-    if (
-      !valores.data ||
-      Number.isNaN(dataEscolhida.getTime()) ||
-      dataEscolhida < minimo ||
-      dataEscolhida > maximo
-    ) {
-      return erro('Escolha uma data válida dentro da janela disponível.');
-    }
-    if (!HORARIOS_DISPONIVEIS.includes(valores.horario)) return erro('Escolha um horário válido.');
-
-    const [hora, minuto] = valores.horario.split(':').map(Number);
-    const dataHora = new Date(dataEscolhida);
-    dataHora.setHours(hora, minuto, 0, 0);
+    const dataHora = dataHoraDoSlot(valores.data, valores.horario);
+    const vaga = await conferirVaga(db, valores.data, valores.horario);
+    if (!vaga.ok) return erro(vaga.motivo);
 
     // Investidor mínimo só pra satisfazer a relação obrigatória. Se o CPF já existe, reaproveita
     // sem alterar nada. Senha aleatória descartada: esse registro não acessa o app.
@@ -138,24 +121,43 @@ export const actions = {
         data: { nome: valores.nome, cpf, senhaHash: hashSenha(gerarSenhaTemporaria()), primeiroAcesso: true }
       }));
 
-    const agendamento = await db.agendamento.create({
-      data: {
-        unidadeId: unidade.id,
-        tipoEventoId: tipoEvento.id,
-        investidorId: investidor.id,
-        dataHora,
-        status: 'confirmado',
-        qrToken: gerarQrToken(),
-        nomeCompareceu: valores.nome,
-        cpfCompareceu: cpf,
-        telefoneCompareceu: valores.telefone,
-        emailCompareceu: valores.email,
-        ehProprietario,
-        proprietarioNome: ehProprietario ? null : valores.proprietarioNome,
-        procuracaoBase64,
-        procuracaoCpf: procuracaoBase64 ? cpf : null
-      }
-    });
+    // a vaga do horário e a unidade são conferidas de novo DENTRO da transação (serializável): duas
+    // pessoas enviando ao mesmo tempo não conseguem estourar o limite nem agendar a mesma unidade
+    let agendamento;
+    try {
+      agendamento = await db.$transaction(
+        async (tx) => {
+          const v = await conferirVaga(tx, valores.data, valores.horario);
+          if (!v.ok) throw new Error(v.motivo);
+          const ja = await tx.agendamento.findFirst({
+            where: { unidadeId: unidade.id, tipoEventoId: tipoEvento.id, status: { not: 'cancelado' } }
+          });
+          if (ja) throw new Error('Esta unidade já tem entrega de chaves agendada. Escolha outra.');
+          return tx.agendamento.create({
+            data: {
+              unidadeId: unidade.id,
+              tipoEventoId: tipoEvento.id,
+              investidorId: investidor.id,
+              dataHora,
+              status: 'confirmado',
+              qrToken: gerarQrToken(),
+              nomeCompareceu: valores.nome,
+              cpfCompareceu: cpf,
+              telefoneCompareceu: valores.telefone,
+              emailCompareceu: valores.email,
+              ehProprietario,
+              proprietarioNome: ehProprietario ? null : valores.proprietarioNome,
+              procuracaoBase64,
+              procuracaoCpf: procuracaoBase64 ? cpf : null
+            }
+          });
+        },
+        { isolationLevel: 'Serializable' }
+      );
+    } catch (err) {
+      if (err?.code === 'P2034') return erro('Muitas pessoas agendando ao mesmo tempo. Tente novamente.');
+      return erro(err?.message ?? 'Não foi possível agendar.');
+    }
 
     if (procuracaoBase64) {
       await db.procuracaoUnidade.create({

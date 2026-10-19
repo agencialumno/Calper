@@ -6,6 +6,19 @@
   let { data, form } = $props();
 
   let ehProprietario = $state(form?.valores?.ehProprietario ?? '');
+  // valores digitados (voltam preenchidos se o servidor devolver um erro)
+  let nomeV = $state(form?.valores?.nome ?? '');
+  let cpfV = $state(form?.valores?.cpf ?? '');
+  let telefoneV = $state(form?.valores?.telefone ?? '');
+  let emailV = $state(form?.valores?.email ?? '');
+  let proprietarioNomeV = $state(form?.valores?.proprietarioNome ?? '');
+  let dataEscolhida = $state(form?.valores?.data ?? '');
+  let horarioEscolhido = $state(form?.valores?.horario ?? '');
+  const horariosDoDia = $derived(data.agenda.find((d) => d.data === dataEscolhida)?.horarios ?? []);
+  // trocar de dia limpa o horário se ele não existir (ou estiver lotado) no novo dia
+  $effect(() => {
+    if (!horariosDoDia.some((h) => h.horario === horarioEscolhido && h.restantes > 0)) horarioEscolhido = '';
+  });
   let enviando = $state(false);
   let modalEl = $state(null);
   let modalFechado = $state(false);
@@ -134,13 +147,13 @@
 
       <div>
         <label for="nome" class="block text-sm font-semibold text-calper-dark mb-1.5">Nome do investidor</label>
-        <input id="nome" name="nome" class="input" value={form?.valores?.nome ?? ''} required />
+        <input id="nome" name="nome" class="input" bind:value={nomeV} required />
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label for="cpf" class="block text-sm font-semibold text-calper-dark mb-1.5">CPF</label>
-          <input id="cpf" name="cpf" inputmode="numeric" class="input" value={form?.valores?.cpf ?? ''} required />
+          <input id="cpf" name="cpf" inputmode="numeric" class="input" bind:value={cpfV} required />
         </div>
         <div>
           <label for="telefone" class="block text-sm font-semibold text-calper-dark mb-1.5">Telefone</label>
@@ -149,7 +162,7 @@
             name="telefone"
             type="tel"
             class="input"
-            value={form?.valores?.telefone ?? ''}
+            bind:value={telefoneV}
             required
           />
         </div>
@@ -157,7 +170,7 @@
 
       <div>
         <label for="email" class="block text-sm font-semibold text-calper-dark mb-1.5">E-mail</label>
-        <input id="email" name="email" type="email" class="input" value={form?.valores?.email ?? ''} required />
+        <input id="email" name="email" type="email" class="input" bind:value={emailV} required />
       </div>
 
       <div>
@@ -165,8 +178,8 @@
         <select id="unidadeId" name="unidadeId" class="input" required>
           <option value="">selecione</option>
           {#each data.unidades as u (u.id)}
-            <option value={u.id} disabled={u.agendada} selected={form?.valores?.unidadeId === u.id}>
-              Bloco {u.bloco} - nº {u.numero}{u.agendada ? ' (já agendado)' : ''}
+            <option value={u.id} selected={form?.valores?.unidadeId === u.id}>
+              Bloco {u.bloco} - nº {u.numero}
             </option>
           {/each}
         </select>
@@ -175,27 +188,28 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label for="data" class="block text-sm font-semibold text-calper-dark mb-1.5">Data</label>
-          <input
-            id="data"
-            name="data"
-            type="date"
-            class="input"
-            min={data.dataMinima}
-            max={data.dataMaxima}
-            value={form?.valores?.data ?? ''}
-            required
-          />
+          <select id="data" name="data" class="input" bind:value={dataEscolhida} required>
+            <option value="">selecione</option>
+            {#each data.agenda as d (d.data)}
+              <option value={d.data}>{formatarDataBr(d.data)}</option>
+            {/each}
+          </select>
         </div>
         <div>
           <label for="horario" class="block text-sm font-semibold text-calper-dark mb-1.5">Horário</label>
-          <select id="horario" name="horario" class="input" required>
-            <option value="">selecione</option>
-            {#each data.horarios as h}
-              <option value={h} selected={form?.valores?.horario === h}>{h}</option>
+          <select id="horario" name="horario" class="input" bind:value={horarioEscolhido} required disabled={!dataEscolhida}>
+            <option value="">{dataEscolhida ? 'selecione' : 'escolha a data primeiro'}</option>
+            {#each horariosDoDia as h (h.horario)}
+              <option value={h.horario} disabled={h.restantes === 0}>
+                {h.horario}{h.restantes === 0 ? ' (lotado)' : ''}
+              </option>
             {/each}
           </select>
         </div>
       </div>
+      {#if data.agenda.length === 0}
+        <AvisoSutil>No momento não há datas abertas para agendamento. Tente novamente mais tarde.</AvisoSutil>
+      {/if}
 
       <fieldset>
         <legend class="block text-sm font-semibold text-calper-dark mb-1.5">
@@ -221,7 +235,7 @@
               id="proprietarioNome"
               name="proprietarioNome"
               class="input"
-              value={form?.valores?.proprietarioNome ?? ''}
+              bind:value={proprietarioNomeV}
               placeholder="Nome de quem é o proprietário da unidade"
               required
             />

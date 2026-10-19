@@ -370,3 +370,23 @@ model ProcuracaoUnidade {
 
   @@index([unidadeId, createdAt])
 }
+
+// --- Agenda de entrega de chaves (configurável pela equipe em /admin/agenda) ---
+
+// Padrão geral: quantos agendamentos cabem por hora e quais horários existem.
+model AgendaConfig {
+  id            String   @id @default("padrao")
+  limitePorHora Int      @default(4)
+  horarios      Json     // ["09:00", "10:00", ...]
+  atualizadoEm  DateTime @updatedAt
+}
+
+// Cada dia aberto para agendamento. Dia sem linha (ou aberto = false) não aparece pro público.
+model AgendaDia {
+  id                String   @id @default(cuid())
+  data              String   @unique // "YYYY-MM-DD"
+  aberto            Boolean  @default(true)
+  limitePorHora     Int?     // sobrepõe o padrão geral neste dia
+  limitesPorHorario Json?    // { "09:00": 2, "10:00": 0 } — sobrepõe o limite do dia (0 = horário fechado)
+  atualizadoEm      DateTime @updatedAt
+}
