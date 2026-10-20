@@ -50,13 +50,15 @@ export async function load(event) {
   }
 
   // documento já aberto no DocuSign: confere lá se a Calper e o cliente já assinaram
+  const pendentesPorDocumento = {};
   for (const doc of await db.documentoAssinado.findMany({
     where: { agendamentoId: agendamento.id, status: { in: ['pendente', 'aguardando_cliente'] } }
   })) {
     try {
-      const novo = await sincronizarDocumento(doc, event);
+      const { status, clientesPendentes } = await sincronizarDocumento(doc, event);
+      pendentesPorDocumento[doc.tipo] = clientesPendentes;
       const registrado = agendamento.documentosAssinados.find((d) => d.tipo === doc.tipo);
-      if (registrado) registrado.status = novo;
+      if (registrado) registrado.status = status;
     } catch (err) {
       console.error('DocuSign (sincronizar):', err?.response?.body ?? err);
     }
@@ -78,6 +80,8 @@ export async function load(event) {
     passo,
     aviso: url.searchParams.get('aviso'),
     documentos,
+    // quem ainda não assinou (nome/e-mail), por documento — vem da consulta ao DocuSign feita acima
+    pendentes: pendentesPorDocumento,
     agendamento: {
       id: agendamento.id,
       status: agendamento.status,
@@ -322,6 +326,23 @@ export const actions = {
       entidadeId: params.id
     });
     return { sucesso: 'presenca' };
+  },
+
+  // "Verificar agora": consulta o DocuSign na hora (sem esperar o cron) e atualiza o status do documento.
+  verificar: async (event) => {
+    const form = await event.request.formData();
+    const tipo = String(form.get('tipo') ?? '');
+    const doc = await db.documentoAssinado.findUnique({
+      where: { agendamentoId_tipo: { agendamentoId: event.params.id, tipo } }
+    });
+    if (!doc) return fail(404, { erro: 'Documento não encontrado.' });
+    try {
+      const { status } = await sincronizarDocumento(doc, event);
+      return { verificado: { tipo, status, em: new Date().toISOString() } };
+    } catch (err) {
+      console.error('DocuSign (verificar):', err?.response?.body ?? err);
+      return fail(400, { erro: 'Não foi possível consultar o DocuSign agora. Tente novamente em instantes.' });
+    }
   },
 
   // Lê o documento como ele vai (PDF) antes de criar o envelope: o cliente confere na tela do atendimento.

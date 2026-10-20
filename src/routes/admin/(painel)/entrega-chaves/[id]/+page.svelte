@@ -171,9 +171,12 @@
   {/if}
   {#if data.aviso === 'nao-assinado'}
     <div class="mb-4"><AvisoSutil>A assinatura da Calper não foi concluída. Continue de onde parou para assinar.</AvisoSutil></div>
-  {:else if data.aviso === 'aguardando-cliente'}
-    <div class="mb-4 text-sm font-semibold text-green-700 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
-      A Calper assinou. O DocuSign já enviou o link por e-mail ao cliente{data.conjuge ? ' e ao cônjuge' : ''}, para assinarem no próprio dispositivo.
+  {/if}
+  {#if form?.verificado}
+    <div class="mb-4 text-sm font-semibold rounded-xl px-4 py-3 {form.verificado.status === 'assinado' ? 'text-green-700 bg-green-50 border border-green-100' : 'text-amber-700 bg-amber-50 border border-amber-100'}">
+      {form.verificado.status === 'assinado'
+        ? 'Verificado agora no DocuSign: todos assinaram.'
+        : `Verificado agora no DocuSign (${new Date(form.verificado.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}): ainda aguardando o cliente.`}
     </div>
   {/if}
 
@@ -425,7 +428,7 @@
     <!-- PASSO 3 — checklist (a Calper assina primeiro; o cliente depois, por e-mail) -->
   {:else if data.passo === 3}
     {#if ['aguardando_cliente', 'assinado'].includes(data.documentos.checklist)}
-      {@render andamento('checklist', 'Checklist', 4, 'Ir para o termo')}
+      {@render andamento('checklist', 'Checklist', 4, 'Seguir para o termo (o cliente assina em paralelo)')}
     {:else}
       <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-4">
         <input type="hidden" name="tipo" value="checklist" />
@@ -470,7 +473,7 @@
     <!-- PASSO 4 — termo -->
   {:else if data.passo === 4}
     {#if ['aguardando_cliente', 'assinado'].includes(data.documentos.termo)}
-      {@render andamento('termo', 'Termo', 5, 'Concluir')}
+      {@render andamento('termo', 'Termo', 5, 'Ver resumo da entrega')}
     {:else}
       <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-3">
         <input type="hidden" name="tipo" value="termo" />
@@ -571,16 +574,41 @@
 {/snippet}
 
 {#snippet andamento(tipo, rotulo, proximoPasso, rotuloProximo)}
-  <div class="card p-6 flex flex-col gap-3">
+  <div class="card p-6 flex flex-col gap-4">
     {#if data.documentos[tipo] === 'assinado'}
-      <div class="text-sm font-bold text-green-700">{rotulo} assinado por todos.</div>
+      <div class="text-sm font-bold text-green-700">{rotulo}: assinado por todos.</div>
+      <a href={href(proximoPasso)} class="btn-primary text-center">{rotuloProximo}</a>
     {:else}
-      <div class="text-sm font-bold text-green-700">{rotulo}: a Calper já assinou.</div>
-      <p class="text-sm text-gray-600">
-        O DocuSign enviou o link por e-mail para <strong>{data.signatario.nome}</strong>{data.conjuge ? ` e ${data.conjuge.nome}` : ''}
-        assinarem no próprio dispositivo. Esta tela se atualiza ao reabrir; o documento assinado fica disponível quando todos assinarem.
-      </p>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold px-2.5 py-1 rounded-full {alerta}">Calper assinou — aguardando o cliente</span>
+        <span class="text-sm font-bold text-calper-dark">{rotulo}</span>
+      </div>
+      <div class="text-sm text-gray-600 flex flex-col gap-2">
+        <div>
+          ✔ A Calper assinou. O DocuSign enviou o e-mail de assinatura para:
+        </div>
+        <ul class="flex flex-col gap-1.5">
+          {#each [{ nome: data.signatario.nome, email: data.signatario.email, papel: 'cliente' }, ...(data.conjuge ? [{ nome: data.conjuge.nome, email: data.conjuge.email, papel: 'cônjuge' }] : [])] as p (p.email)}
+            {@const falta = data.pendentes[tipo]?.some((c) => c.email?.toLowerCase() === p.email?.toLowerCase())}
+            <li class="flex flex-wrap items-center gap-x-2 border border-gray-100 rounded-xl px-3 py-2">
+              <span class="font-semibold text-calper-dark">{p.nome}</span>
+              <span class="text-xs text-gray-500">({p.papel}) · {p.email}</span>
+              <span class="ml-auto text-xs font-bold {falta === false ? 'text-green-700' : 'text-amber-700'}">
+                {falta === false ? 'assinou' : 'ainda não assinou'}
+              </span>
+            </li>
+          {/each}
+        </ul>
+        <p class="text-xs text-gray-400">
+          Cada um assina no próprio dispositivo, pelo link do e-mail. Se não chegou, peça para olhar o spam.
+        </p>
+      </div>
+
+      <form method="POST" action="?/verificar" use:enhance={aoEnviar} class="flex flex-col gap-2">
+        <input type="hidden" name="tipo" value={tipo} />
+        <SubmitButton loading={enviando}>Verificar agora no DocuSign</SubmitButton>
+      </form>
+      <a href={href(proximoPasso)} class="btn-outline text-center">{rotuloProximo}</a>
     {/if}
-    <a href={href(proximoPasso)} class="btn-primary text-center">{rotuloProximo}</a>
   </div>
 {/snippet}

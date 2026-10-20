@@ -187,10 +187,10 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
  *  - Calper assinou, cliente ainda não → "aguardando_cliente";
  *  - envelope concluído → baixa o PDF final, marca "assinado" e, com os dois documentos assinados, a entrega fica "realizada".
  * `event` (opcional) serve só para registrar IP/ator nos logs; sem ele (cron) os logs saem como sistema.
- * Devolve o status resultante do documento.
+ * Devolve { status, clientesPendentes }: o status resultante do documento e quem ainda não assinou.
  */
 export async function sincronizarDocumento(documento, event = null) {
-  if (documento.status === 'assinado') return 'assinado';
+  if (documento.status === 'assinado') return { status: 'assinado', clientesPendentes: [] };
 
   const situacao = await situacaoDoEnvelope(documento.docusignEnvelopeId);
   const log = (dados) => registrarLog({ event: event ?? { locals: {}, getClientAddress: () => null, request: { headers: new Headers() } }, atorTipo: 'funcionario', ...dados });
@@ -247,7 +247,7 @@ export async function sincronizarDocumento(documento, event = null) {
         entidadeId: agendamento.id
       });
     }
-    return 'assinado';
+    return { status: 'assinado', clientesPendentes: [] };
   }
 
   if (situacao.calperAssinou && documento.status === 'pendente') {
@@ -259,8 +259,8 @@ export async function sincronizarDocumento(documento, event = null) {
       entidadeTipo: 'DocumentoAssinado',
       entidadeId: documento.id
     });
-    return 'aguardando_cliente';
+    return { status: 'aguardando_cliente', clientesPendentes: situacao.clientesPendentes };
   }
 
-  return documento.status;
+  return { status: documento.status, clientesPendentes: situacao.clientesPendentes };
 }

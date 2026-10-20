@@ -20,7 +20,7 @@ export async function GET(event) {
 
   const unidadeId = doc.agendamento.unidadeId;
   const passoAtual = PASSO_DO_DOCUMENTO[tipo];
-  // volta pra tela de onde o envio partiu; com a Calper assinada o fluxo segue pro próximo passo
+  // volta pra tela do próprio documento: com a Calper assinada ela mostra "aguardando o cliente" e quem foi avisado
   const voltar = (avancou, aviso) => {
     if (origem === 'unidade') {
       return `/admin/unidades/${unidadeId}/${ROTA_UNIDADE[tipo]}${aviso ? `?aviso=${aviso}` : ''}`;
@@ -30,7 +30,7 @@ export async function GET(event) {
     return `/admin/entrega-chaves/${params.id}?${q}`;
   };
 
-  const status = await sincronizarDocumento(doc, event);
+  const { status } = await sincronizarDocumento(doc, event);
   if (status === 'pendente') throw redirect(303, voltar(false, 'nao-assinado'));
-  throw redirect(303, voltar(true, status === 'aguardando_cliente' ? 'aguardando-cliente' : undefined));
+  throw redirect(303, voltar(status === 'assinado', status === 'aguardando_cliente' ? 'aguardando-cliente' : undefined));
 }

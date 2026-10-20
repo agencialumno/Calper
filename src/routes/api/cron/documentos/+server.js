@@ -20,7 +20,7 @@ export async function GET({ request }) {
   let atualizados = 0;
   for (const doc of documentos) {
     try {
-      if ((await sincronizarDocumento(doc)) !== doc.status) atualizados++;
+      if ((await sincronizarDocumento(doc)).status !== doc.status) atualizados++;
     } catch (err) {
       console.error('Cron documentos:', doc.id, err?.response?.body ?? err);
     }
