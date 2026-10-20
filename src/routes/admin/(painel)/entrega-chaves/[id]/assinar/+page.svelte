@@ -28,7 +28,7 @@
   <a href={data.voltarPara} class="text-sm text-gray-500 hover:text-calper-dark">← Voltar</a>
   <h1 class="text-xl font-bold text-calper-dark mt-3 mb-1">{data.tituloDocumento}</h1>
   <p class="text-sm text-gray-500 mb-4">
-    {data.unidade} · assina: <strong>{data.signatario}</strong>
+    {data.unidade} · assina primeiro: <strong>{data.signatario}</strong> (Calper)
   </p>
 
   {#if data.erro}
@@ -45,7 +45,7 @@
       ></iframe>
     </div>
     <p class="text-xs text-gray-400 mt-3">
-      A assinatura acontece aqui mesmo, sem sair do Calper. Se a janela não carregar, recarregue esta página.
+      Depois que a Calper assinar, o cliente recebe o link por e-mail para assinar no próprio dispositivo. Se a janela não carregar, recarregue esta página.
     </p>
   {/if}
 </div>

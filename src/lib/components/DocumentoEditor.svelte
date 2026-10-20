@@ -35,8 +35,8 @@
     nativo.remove();
   }
 
-  const rotuloStatus = { pendente: 'Assinatura pendente', assinado: 'Assinado' };
-  const corStatus = { pendente: 'bg-amber-50 text-amber-700', assinado: 'bg-green-50 text-green-700' };
+  const rotuloStatus = { pendente: 'Assinatura pendente', aguardando_cliente: 'Aguardando o cliente', assinado: 'Assinado' };
+  const corStatus = { pendente: 'bg-amber-50 text-amber-700', aguardando_cliente: 'bg-amber-50 text-amber-700', assinado: 'bg-green-50 text-green-700' };
 </script>
 
 <div class="p-5 md:p-8 max-w-3xl">
@@ -92,7 +92,7 @@
     <div class="flex gap-3 items-center flex-wrap">
       <button
         type="submit"
-        disabled={enviando || Boolean(assinatura.bloqueio) || assinatura.status === 'assinado'}
+        disabled={enviando || Boolean(assinatura.bloqueio) || ['assinado', 'aguardando_cliente'].includes(assinatura.status)}
         class="btn-primary text-sm !py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {assinatura.status === 'pendente' ? 'Reenviar para assinatura' : 'Enviar para assinatura'}

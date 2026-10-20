@@ -76,7 +76,11 @@ export async function gerarPdfChecklist(texto, titulo) {
 
   const fecho = depois.map((l) => l.trim()).filter(Boolean);
   const dataLinha = fecho.find((l) => /^Rio de Janeiro,/.test(l));
-  const assinatura = fecho.find((l) => l.startsWith('[ASSINATURA'))?.match(/^\[ASSINATURA([^:\]]*)(?::\s*(.*?))?\]\s*$/);
+  // um bloco por linha [ASSINATURA...]: investidor, cônjuge (se houver) e a Calper (âncora "[ASSINATURA M1")
+  const assinaturas = fecho
+    .filter((l) => l.startsWith('[ASSINATURA'))
+    .map((l) => l.match(/^\[ASSINATURA([^:\]]*)(?::\s*(.*?))?\]\s*$/))
+    .filter(Boolean);
 
   // --- desenho ---
   const paginas = [];
@@ -199,7 +203,7 @@ export async function gerarPdfChecklist(texto, titulo) {
 
   // data à direita e bloco de assinatura (a âncora do DocuSign fica invisível sobre a linha)
   let yFecho = bordaTopo + 49.1;
-  if (yFecho + 120 > BASE_CORPO) {
+  if (yFecho + 120 + Math.max(0, assinaturas.length - 1) * 75 > BASE_CORPO) {
     novaPagina();
     yFecho = 56.7 + 14.75;
   }
@@ -207,15 +211,15 @@ export async function gerarPdfChecklist(texto, titulo) {
     const d = textoSeguro(fonte, dataLinha);
     desenhar(d, DIREITA - fonte.widthOfTextAtSize(d, TAMANHO), yFecho);
   }
-  if (assinatura) {
-    const yLinha = yFecho + 88.6;
+  assinaturas.forEach((assinatura, i) => {
+    const yLinha = yFecho + 88.6 + i * 75;
     const traco = '_'.repeat(72);
     const xTraco = centro(traco, fonte, ESQUERDA, DIREITA) + 0;
     desenhar(traco, xTraco, yLinha);
-    desenhar(`[ASSINATURA${assinatura[1]}`, xTraco, yLinha, { tamanho: 1, cor: rgb(1, 1, 1) });
+    desenhar(assinatura[1].trim() ? `[ASSINATURA${assinatura[1]}` : '[ASSINATURA M1', xTraco, yLinha, { tamanho: 1, cor: rgb(1, 1, 1) });
     const nome = textoSeguro(fonte, (assinatura[2] ?? '').replace(/^\(|\)$/g, ''));
     if (nome) desenhar(nome, centro(nome, negrito, ESQUERDA, DIREITA), yLinha + 14.5, { f: negrito });
-  }
+  });
 
   return Buffer.from(await pdf.save()).toString('base64');
 }

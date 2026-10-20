@@ -72,7 +72,7 @@
   const exigeProcuracao = $derived(quem === 'outro' && !arquivo && !procuracaoVale);
   const faltaProcuracao = $derived(tentouConfirmar && exigeProcuracao);
 
-  const passos = ['Unidade', 'Quem retira', 'Termo', 'Checklist', 'Concluído'];
+  const passos = ['Unidade', 'Quem retira', 'Checklist', 'Termo', 'Concluído'];
   const href = (passo) => `?passo=${passo}`;
 
   function aoEnviar() {
@@ -81,6 +81,29 @@
       await update({ reset: false });
       enviando = false;
     };
+  }
+
+  // leitura do documento (PDF) na tela do atendimento, antes de criar o envelope
+  let previa = $state(null); // { tipo, url }
+  let gerandoPrevia = $state(false);
+
+  function aoPedirDocumento({ action }) {
+    if (!action.search.includes('previa')) return aoEnviar();
+    gerandoPrevia = true;
+    return async ({ result, update }) => {
+      gerandoPrevia = false;
+      if (result.type === 'success' && result.data?.previa) {
+        const bytes = Uint8Array.from(atob(result.data.previa.pdfBase64), (c) => c.charCodeAt(0));
+        previa = { tipo: result.data.previa.tipo, url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })) };
+      } else {
+        await update({ reset: false });
+      }
+    };
+  }
+
+  function fecharPrevia() {
+    if (previa) URL.revokeObjectURL(previa.url);
+    previa = null;
   }
 
   function aoConfirmarRetirante({ cancel }) {
@@ -107,6 +130,11 @@
     return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
+  const rotuloStatus = {
+    pendente: 'Aguardando a assinatura da Calper',
+    aguardando_cliente: 'Calper assinou — aguardando o cliente',
+    assinado: 'Assinado por todos'
+  };
   const ok = 'bg-green-50 text-green-700';
   const alerta = 'bg-amber-50 text-amber-700';
 </script>
@@ -142,7 +170,11 @@
     <div class="mb-4"><AvisoSutil>{form.erro}</AvisoSutil></div>
   {/if}
   {#if data.aviso === 'nao-assinado'}
-    <div class="mb-4"><AvisoSutil>A assinatura não foi concluída. Envie novamente para assinar.</AvisoSutil></div>
+    <div class="mb-4"><AvisoSutil>A assinatura da Calper não foi concluída. Continue de onde parou para assinar.</AvisoSutil></div>
+  {:else if data.aviso === 'aguardando-cliente'}
+    <div class="mb-4 text-sm font-semibold text-green-700 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
+      A Calper assinou. O DocuSign já enviou o link por e-mail ao cliente{data.conjuge ? ' e ao cônjuge' : ''}, para assinarem no próprio dispositivo.
+    </div>
   {/if}
 
   <!-- PASSO 1 — consulta -->
@@ -342,6 +374,22 @@
         <input id="email" name="email" type="email" class="input !py-2 text-sm" value={a.retiranteEmail ?? a.email ?? ''} required />
       </div>
 
+      <div class="border border-gray-100 rounded-xl p-4 flex flex-col gap-3">
+        <div class="text-xs font-bold text-gray-500">
+          Cônjuge que também assina (opcional) — recebe o próprio link do DocuSign por e-mail
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="conjugeNome" class="block text-xs font-semibold text-gray-500 mb-1">Nome completo do cônjuge</label>
+            <input id="conjugeNome" name="conjugeNome" class="input !py-2 text-sm" value={a.conjugeNome ?? ''} />
+          </div>
+          <div>
+            <label for="conjugeEmail" class="block text-xs font-semibold text-gray-500 mb-1">E-mail do cônjuge</label>
+            <input id="conjugeEmail" name="conjugeEmail" type="email" class="input !py-2 text-sm" value={a.conjugeEmail ?? ''} />
+          </div>
+        </div>
+      </div>
+
       <div class="flex gap-2">
         <a href={href(1)} class="btn-outline text-center flex-1">Voltar</a>
         <div class="flex-1"><SubmitButton loading={enviando}>Confirmar e continuar</SubmitButton></div>
@@ -374,50 +422,17 @@
       </form>
     </div>
 
-    <!-- PASSO 3 — termo -->
+    <!-- PASSO 3 — checklist (a Calper assina primeiro; o cliente depois, por e-mail) -->
   {:else if data.passo === 3}
-    {#if data.documentos.termo === 'assinado'}
-      <div class="card p-6 flex flex-col gap-3">
-        <div class="text-sm font-bold text-green-700">Termo assinado.</div>
-        <a href={href(4)} class="btn-primary text-center">Ir para o checklist</a>
-      </div>
+    {#if ['aguardando_cliente', 'assinado'].includes(data.documentos.checklist)}
+      {@render andamento('checklist', 'Checklist', 4, 'Ir para o termo')}
     {:else}
-      <form method="POST" action="?/enviar" use:enhance={aoEnviar} class="card p-6 flex flex-col gap-3">
-        <input type="hidden" name="tipo" value="termo" />
-        <div class="text-sm text-gray-600">
-          Assina: <strong>{data.signatario.nome ?? '—'}</strong> ({data.signatario.email ?? 'sem e-mail'})
-          {#if data.documentos.termo === 'pendente'}
-            <span class="ml-2 text-xs font-bold px-2 py-0.5 rounded-full {alerta}">assinatura pendente</span>
-          {/if}
-        </div>
-        <textarea name="texto" rows="26" class="input text-sm font-mono" required>{data.texto}</textarea>
-        <p class="text-xs text-gray-400">
-          Revise e corrija o texto. Variáveis como {'{{numeroCertidao}}'} precisam ser preenchidas antes do envio.
-        </p>
-        <SubmitButton loading={enviando}>Enviar para assinatura</SubmitButton>
-        <a href={href(2)} class="text-center text-sm text-gray-500">Voltar</a>
-      </form>
-    {/if}
-
-    <!-- PASSO 4 — checklist -->
-  {:else if data.passo === 4}
-    {#if data.documentos.checklist === 'assinado'}
-      <div class="card p-6 flex flex-col gap-3">
-        <div class="text-sm font-bold text-green-700">Checklist assinado.</div>
-        <a href={href(5)} class="btn-primary text-center">Concluir</a>
-      </div>
-    {:else}
-      <form method="POST" action="?/enviar" use:enhance={aoEnviar} class="card p-6 flex flex-col gap-4">
+      <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-4">
         <input type="hidden" name="tipo" value="checklist" />
         <input type="hidden" name="cabecalho" value={data.checklist.cabecalho} />
         <input type="hidden" name="rodape" value={data.checklist.rodape} />
 
-        <div class="text-sm text-gray-600">
-          Assina: <strong>{data.signatario.nome ?? '—'}</strong> ({data.signatario.email ?? 'sem e-mail'})
-          {#if data.documentos.checklist === 'pendente'}
-            <span class="ml-2 text-xs font-bold px-2 py-0.5 rounded-full {alerta}">assinatura pendente</span>
-          {/if}
-        </div>
+        {@render quemAssina('checklist')}
         {#if !u.quartos}
           <AvisoSutil>Tipologia não informada: preencha a quantidade de chaves de porta interior.</AvisoSutil>
         {/if}
@@ -447,8 +462,25 @@
           </div>
         {/each}
 
-        <SubmitButton loading={enviando}>Enviar para assinatura</SubmitButton>
-        <a href={href(3)} class="text-center text-sm text-gray-500">Voltar</a>
+        {@render botoesDocumento('checklist', href(2))}
+        {@render leitura('checklist')}
+      </form>
+    {/if}
+
+    <!-- PASSO 4 — termo -->
+  {:else if data.passo === 4}
+    {#if ['aguardando_cliente', 'assinado'].includes(data.documentos.termo)}
+      {@render andamento('termo', 'Termo', 5, 'Concluir')}
+    {:else}
+      <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-3">
+        <input type="hidden" name="tipo" value="termo" />
+        {@render quemAssina('termo')}
+        <textarea name="texto" rows="26" class="input text-sm font-mono" required>{data.texto}</textarea>
+        <p class="text-xs text-gray-400">
+          Revise e corrija o texto. Variáveis como {'{{numeroCertidao}}'} precisam ser preenchidas antes do envio.
+        </p>
+        {@render botoesDocumento('termo', href(3))}
+        {@render leitura('termo')}
       </form>
     {/if}
 
@@ -456,12 +488,12 @@
   {:else}
     <div class="card p-6 flex flex-col gap-3">
       <div class="text-sm font-bold text-calper-dark">Documentos</div>
-      {#each [['termo', 'Termo de entrega de chaves', 3], ['checklist', 'Checklist', 4]] as [tipo, rotulo, passo]}
+      {#each [['checklist', 'Checklist', 3], ['termo', 'Termo de entrega de chaves', 4]] as [tipo, rotulo, passo]}
         <div class="flex items-center justify-between border border-gray-100 rounded-xl p-3">
           <div>
             <div class="text-sm font-semibold text-calper-dark">{rotulo}</div>
             <div class="text-xs {data.documentos[tipo] === 'assinado' ? 'text-green-700' : 'text-amber-700'}">
-              {data.documentos[tipo] === 'assinado' ? 'Assinado' : data.documentos[tipo] === 'pendente' ? 'Aguardando assinatura' : 'Não enviado'}
+              {rotuloStatus[data.documentos[tipo]] ?? 'Não enviado'}
             </div>
           </div>
           {#if data.documentos[tipo] === 'assinado'}
@@ -470,7 +502,7 @@
               class="text-xs font-bold text-white bg-calper-red px-3 py-2 rounded-lg">Baixar PDF</a
             >
           {:else}
-            <a href={href(passo)} class="text-xs font-bold text-calper-red">Assinar</a>
+            <a href={href(passo)} class="text-xs font-bold text-calper-red">Ver</a>
           {/if}
         </div>
       {/each}
@@ -489,3 +521,66 @@
     </div>
   {/if}
 </div>
+
+{#snippet quemAssina(tipo)}
+  <div class="text-sm text-gray-600">
+    Calper assina primeiro; depois recebem o link por e-mail:
+    <strong>{data.signatario.nome ?? '—'}</strong> ({data.signatario.email ?? 'sem e-mail'}){#if data.conjuge}{' '}
+      e <strong>{data.conjuge.nome}</strong> ({data.conjuge.email}){/if}
+    {#if data.documentos[tipo] === 'pendente'}
+      <span class="ml-2 text-xs font-bold px-2 py-0.5 rounded-full {alerta}">assinatura da Calper pendente</span>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet botoesDocumento(tipo, voltar)}
+  <div class="flex flex-col gap-2">
+    <button
+      type="submit"
+      formaction="?/previa"
+      disabled={gerandoPrevia}
+      class="btn-primary text-center disabled:opacity-60"
+    >
+      {gerandoPrevia ? 'Gerando o documento…' : 'Cliente: ler o documento'}
+    </button>
+    {#if data.documentos[tipo] === 'pendente'}
+      <a href="/admin/entrega-chaves/{a.id}/assinar?tipo={tipo}&origem=fluxo" class="btn-outline text-center">
+        Continuar a assinatura da Calper
+      </a>
+    {/if}
+    <a href={voltar} class="text-center text-sm text-gray-500">Voltar</a>
+  </div>
+{/snippet}
+
+<!-- tela de leitura (somente leitura): o cliente lê no iPad do atendimento; só depois a Calper assina -->
+{#snippet leitura(tipo)}
+  {#if previa?.tipo === tipo}
+    <div class="fixed inset-0 z-50 bg-white flex flex-col">
+      <div class="px-4 py-3 border-b border-gray-100 text-sm font-bold text-calper-dark">
+        Leitura — {tipo === 'termo' ? 'Termo de entrega de chaves' : 'Checklist'} (somente leitura)
+      </div>
+      <iframe src={previa.url} title="Leitura do documento" class="flex-1 w-full border-0"></iframe>
+      <div class="p-3 border-t border-gray-100 flex flex-col sm:flex-row gap-2">
+        <button type="button" class="btn-outline flex-1" onclick={fecharPrevia}>Voltar e corrigir</button>
+        <button type="submit" formaction="?/enviar" disabled={enviando} class="btn-primary flex-1 disabled:opacity-60">
+          {enviando ? 'Enviando…' : 'Cliente leu — assinar pela Calper'}
+        </button>
+      </div>
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet andamento(tipo, rotulo, proximoPasso, rotuloProximo)}
+  <div class="card p-6 flex flex-col gap-3">
+    {#if data.documentos[tipo] === 'assinado'}
+      <div class="text-sm font-bold text-green-700">{rotulo} assinado por todos.</div>
+    {:else}
+      <div class="text-sm font-bold text-green-700">{rotulo}: a Calper já assinou.</div>
+      <p class="text-sm text-gray-600">
+        O DocuSign enviou o link por e-mail para <strong>{data.signatario.nome}</strong>{data.conjuge ? ` e ${data.conjuge.nome}` : ''}
+        assinarem no próprio dispositivo. Esta tela se atualiza ao reabrir; o documento assinado fica disponível quando todos assinarem.
+      </p>
+    {/if}
+    <a href={href(proximoPasso)} class="btn-primary text-center">{rotuloProximo}</a>
+  </div>
+{/snippet}

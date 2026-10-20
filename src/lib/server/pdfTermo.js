@@ -102,7 +102,8 @@ function montarBlocos(texto, fonte, negrito) {
     if (assinatura) {
       blocos.push({
         tipo: 'assinatura',
-        ancora: `[ASSINATURA${assinatura[1]}`,
+        // a linha da Calper ("[ASSINATURA: M1 ...]") ganha âncora própria, que não é prefixo das do cliente
+        ancora: assinatura[1].trim() ? `[ASSINATURA${assinatura[1]}` : '[ASSINATURA M1',
         nome: textoSeguro(fonte, assinatura[2] ?? '')
       });
       continue;

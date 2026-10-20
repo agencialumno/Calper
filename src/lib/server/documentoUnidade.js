@@ -16,7 +16,10 @@ export async function carregarDocumentoUnidade(unidadeId, tipo, url) {
 
   let doc;
   try {
-    doc = await montarDocumento(unidadeId, tipo, { retirante });
+    doc = await montarDocumento(unidadeId, tipo, {
+      retirante,
+      conjuge: agendamento?.conjugeNome ? { nome: agendamento.conjugeNome } : null
+    });
   } catch {
     throw error(404, 'Unidade não encontrada');
   }

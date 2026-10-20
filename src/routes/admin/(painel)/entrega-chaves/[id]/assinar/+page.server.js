@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
-import { gerarUrlAssinatura } from '$lib/server/docusign.js';
-import { NOME_DOCUMENTO, SLUG_ENTREGA_CHAVES, retiranteDoAgendamento } from '$lib/server/entregaChaves.js';
+import { assinanteDaCalper, gerarUrlAssinatura } from '$lib/server/docusign.js';
+import { NOME_DOCUMENTO, PASSO_DO_DOCUMENTO, SLUG_ENTREGA_CHAVES } from '$lib/server/entregaChaves.js';
 
 // Tela que embute a cerimônia de assinatura do DocuSign num iframe, sem tirar o atendente do admin.
 // A URL do DocuSign é de uso único e expira em minutos, então é gerada a cada abertura da tela
@@ -18,16 +18,16 @@ export async function load({ params, url }) {
   if (!doc || doc.agendamento.tipoEvento.slug !== SLUG_ENTREGA_CHAVES) throw error(404, 'Documento não encontrado');
 
   const unidadeId = doc.agendamento.unidadeId;
-  const passoAtual = tipo === 'termo' ? 3 : 4;
+  const passoAtual = PASSO_DO_DOCUMENTO[tipo];
   const voltarPara =
     origem === 'unidade'
       ? `/admin/unidades/${unidadeId}/${tipo === 'termo' ? 'termo-entrega' : 'checklist'}`
       : `/admin/entrega-chaves/${params.id}?passo=${passoAtual}`;
 
-  if (doc.status === 'assinado') throw redirect(303, voltarPara);
+  if (doc.status !== 'pendente') throw redirect(303, `${voltarPara}${voltarPara.includes('?') ? '&' : '?'}aviso=${doc.status === 'assinado' ? 'ja-assinado' : 'calper-assinou'}`);
 
-  const retirante = retiranteDoAgendamento(doc.agendamento);
-  if (!retirante?.email) throw error(409, 'Quem retira as chaves não está confirmado.');
+  // quem assina aqui é a Calper; o cliente assina depois, no próprio dispositivo, pelo e-mail do DocuSign
+  const calper = await assinanteDaCalper();
 
   const destino = `/admin/entrega-chaves/${params.id}/assinatura-concluida?tipo=${tipo}&origem=${origem}`;
   let urlAssinatura = null;
@@ -35,7 +35,7 @@ export async function load({ params, url }) {
   try {
     urlAssinatura = await gerarUrlAssinatura({
       envelopeId: doc.docusignEnvelopeId,
-      signatario: { nome: retirante.nome, email: retirante.email, clientUserId: doc.agendamento.id },
+      signatario: { nome: calper.nome, email: calper.email, clientUserId: doc.agendamento.id },
       retornoUrl: `${url.origin}/admin/assinatura-retorno?destino=${encodeURIComponent(destino)}`,
       origemApp: url.origin
     });
@@ -49,7 +49,7 @@ export async function load({ params, url }) {
     erro,
     tituloDocumento: NOME_DOCUMENTO[tipo],
     unidade: `Bloco ${doc.agendamento.unidade.bloco} - nº ${doc.agendamento.unidade.numero}`,
-    signatario: retirante.nome,
+    signatario: calper.nome,
     voltarPara
   };
 }

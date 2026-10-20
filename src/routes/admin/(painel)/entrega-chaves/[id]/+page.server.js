@@ -1,13 +1,16 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { TIPOS_PROCURACAO, arquivoParaBase64 } from '$lib/server/agendamento.js';
-import { montarDocumento, quartosDaUnidade, titularesDaUnidade } from '$lib/server/documentos.js';
+import { gerarPdfBase64, montarDocumento, quartosDaUnidade, titularesDaUnidade } from '$lib/server/documentos.js';
 import {
+  NOME_DOCUMENTO,
   ROTULO_VINCULO,
   SLUG_ENTREGA_CHAVES,
   enviarDocumentoParaAssinatura,
   procuracaoValidaParaRetirante,
-  retiranteDoAgendamento
+  retiranteDoAgendamento,
+  signatariosDoCliente,
+  sincronizarDocumento
 } from '$lib/server/entregaChaves.js';
 import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
@@ -33,7 +36,8 @@ async function buscarAgendamento(id) {
 
 const irPara = (id, passo) => `/admin/entrega-chaves/${id}?passo=${passo}`;
 
-export async function load({ params, url }) {
+export async function load(event) {
+  const { params, url } = event;
   const agendamento = await buscarAgendamento(params.id);
   const u = agendamento.unidade;
   const passo = Math.min(5, Math.max(1, Number(url.searchParams.get('passo')) || 1));
@@ -45,12 +49,30 @@ export async function load({ params, url }) {
     throw redirect(303, irPara(agendamento.id, 2));
   }
 
+  // documento já aberto no DocuSign: confere lá se a Calper e o cliente já assinaram
+  for (const doc of await db.documentoAssinado.findMany({
+    where: { agendamentoId: agendamento.id, status: { in: ['pendente', 'aguardando_cliente'] } }
+  })) {
+    try {
+      const novo = await sincronizarDocumento(doc, event);
+      const registrado = agendamento.documentosAssinados.find((d) => d.tipo === doc.tipo);
+      if (registrado) registrado.status = novo;
+    } catch (err) {
+      console.error('DocuSign (sincronizar):', err?.response?.body ?? err);
+    }
+  }
+
   const documentos = Object.fromEntries(
     ['termo', 'checklist'].map((tipo) => [
       tipo,
       agendamento.documentosAssinados.find((d) => d.tipo === tipo)?.status ?? null
     ])
   );
+
+  // o termo vem depois do checklist: só abre quando a Calper já assinou o checklist
+  if (passo === 4 && !['aguardando_cliente', 'assinado'].includes(documentos.checklist)) {
+    throw redirect(303, irPara(agendamento.id, 3));
+  }
 
   const base = {
     passo,
@@ -70,6 +92,8 @@ export async function load({ params, url }) {
       retiranteNome: agendamento.retiranteNome,
       retiranteCpf: agendamento.retiranteCpf,
       retiranteEmail: agendamento.retiranteEmail,
+      conjugeNome: agendamento.conjugeNome,
+      conjugeEmail: agendamento.conjugeEmail,
       temProcuracao: Boolean(agendamento.procuracaoBase64),
       // CPF de quem a procuração anexada representa (nulo em registros antigos) e o nome, quando
       // foi a própria pessoa que agendou — o passo 2 só dispensa novo upload se o retirante for ela
@@ -100,18 +124,20 @@ export async function load({ params, url }) {
       vinculoRotulo: ROTULO_VINCULO[p.vinculo] ?? p.vinculo,
       createdAt: p.createdAt
     })),
-    signatario: { nome: retirante?.nome ?? null, email: retirante?.email ?? null }
+    signatario: { nome: retirante?.nome ?? null, email: retirante?.email ?? null },
+    conjuge: retirante ? signatariosDoCliente(agendamento, retirante).conjuge : null
   };
 
   // quem retira (e seu vínculo) define como as partes aparecem no texto (procurador = representação)
-  const opcoes = { retirante };
+  const opcoes = { retirante, conjuge: base.conjuge };
 
-  if (passo === 3 && documentos.termo !== 'assinado') {
-    return { ...base, texto: (await montarDocumento(u.id, 'termo', opcoes)).texto };
-  }
-  if (passo === 4 && documentos.checklist !== 'assinado') {
+  // passo 3 = checklist, passo 4 = termo; com a Calper já assinada o documento só mostra o andamento
+  if (passo === 3 && !['aguardando_cliente', 'assinado'].includes(documentos.checklist)) {
     const { texto } = await montarDocumento(u.id, 'checklist', opcoes);
     return { ...base, checklist: parseChecklist(texto) };
+  }
+  if (passo === 4 && !['aguardando_cliente', 'assinado'].includes(documentos.termo)) {
+    return { ...base, texto: (await montarDocumento(u.id, 'termo', opcoes)).texto };
   }
   return base;
 }
@@ -127,6 +153,19 @@ export const actions = {
     const email = String(form.get('email') ?? '').trim();
     if (!emailValido(email)) {
       return fail(400, { erro: 'Informe um e-mail válido de quem retira as chaves — ele é usado na assinatura.' });
+    }
+
+    // cônjuge (opcional): assina junto, recebendo o próprio link do DocuSign
+    const conjugeNome = String(form.get('conjugeNome') ?? '').trim();
+    const conjugeEmail = String(form.get('conjugeEmail') ?? '').trim();
+    if (conjugeNome || conjugeEmail) {
+      if (conjugeNome.length < 3) return fail(400, { erro: 'Informe o nome completo do cônjuge.' });
+      if (!emailValido(conjugeEmail)) return fail(400, { erro: 'Informe um e-mail válido do cônjuge.' });
+      if (conjugeEmail.toLowerCase() === email.toLowerCase()) {
+        return fail(400, {
+          erro: 'O e-mail do cônjuge precisa ser diferente do e-mail de quem retira: cada um recebe o próprio link.'
+        });
+      }
     }
 
     const titular = titularesDaUnidade(agendamento.unidade).find((t) => t.id === quem);
@@ -175,6 +214,8 @@ export const actions = {
           retiranteNome: nome,
           retiranteCpf: cpf,
           retiranteEmail: email,
+          conjugeNome: conjugeNome || null,
+          conjugeEmail: conjugeEmail || null,
           ...(procuracaoNova ? { procuracaoBase64: procuracaoNova, procuracaoCpf: cpf } : {})
         }
       }),
@@ -283,33 +324,26 @@ export const actions = {
     return { sucesso: 'presenca' };
   },
 
+  // Lê o documento como ele vai (PDF) antes de criar o envelope: o cliente confere na tela do atendimento.
+  previa: async ({ request }) => {
+    const form = await request.formData();
+    const tipo = String(form.get('tipo') ?? '');
+    const texto = textoDoFormulario(form, tipo);
+    if (texto === null) return fail(400, { erro: 'Documento inválido.' });
+    try {
+      return { previa: { tipo, pdfBase64: await gerarPdfBase64(texto, NOME_DOCUMENTO[tipo], tipo) } };
+    } catch (err) {
+      console.error('Prévia do documento:', err);
+      return fail(400, { erro: 'Não foi possível gerar a leitura do documento.' });
+    }
+  },
+
   enviar: async (event) => {
     const { request, params } = event;
     const form = await request.formData();
     const tipo = String(form.get('tipo') ?? '');
-
-    let texto;
-    if (tipo === 'termo') {
-      texto = String(form.get('texto') ?? '');
-    } else if (tipo === 'checklist') {
-      const numeros = form.getAll('numero').map(String);
-      const descricoes = form.getAll('descricao').map(String);
-      const temQtdes = form.getAll('temQtde').map(String);
-      const qtdes = form.getAll('qtde').map((q) => String(q).trim());
-      texto = montarChecklist({
-        cabecalho: String(form.get('cabecalho') ?? ''),
-        itens: numeros.map((numero, i) => ({
-          numero,
-          descricao: descricoes[i] ?? '',
-          temQtde: temQtdes[i] === '1',
-          qtde: qtdes[i] ?? '',
-          recebido: form.get(`recebido_${numero}`) === 'sim'
-        })),
-        rodape: String(form.get('rodape') ?? '')
-      });
-    } else {
-      return fail(400, { erro: 'Documento inválido.' });
-    }
+    const texto = textoDoFormulario(form, tipo);
+    if (texto === null) return fail(400, { erro: 'Documento inválido.' });
 
     // redireciona pro DocuSign em caso de sucesso; só volta aqui se algo impediu o envio
     const resultado = await enviarDocumentoParaAssinatura(event, {
@@ -321,3 +355,24 @@ export const actions = {
     return fail(400, { erro: resultado.erro });
   }
 };
+
+/** Texto final do documento a partir do formulário do passo (termo = textarea, checklist = campos). */
+function textoDoFormulario(form, tipo) {
+  if (tipo === 'termo') return String(form.get('texto') ?? '');
+  if (tipo !== 'checklist') return null;
+  const numeros = form.getAll('numero').map(String);
+  const descricoes = form.getAll('descricao').map(String);
+  const temQtdes = form.getAll('temQtde').map(String);
+  const qtdes = form.getAll('qtde').map((q) => String(q).trim());
+  return montarChecklist({
+    cabecalho: String(form.get('cabecalho') ?? ''),
+    itens: numeros.map((numero, i) => ({
+      numero,
+      descricao: descricoes[i] ?? '',
+      temQtde: temQtdes[i] === '1',
+      qtde: qtdes[i] ?? '',
+      recebido: form.get(`recebido_${numero}`) === 'sim'
+    })),
+    rodape: String(form.get('rodape') ?? '')
+  });
+}

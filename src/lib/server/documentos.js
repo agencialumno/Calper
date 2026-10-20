@@ -101,13 +101,32 @@ export function montarVariaveis({ unidade, partes, variaveisTemplate }) {
 
 const TIPO_TEMPLATE = { termo: 'termo_entrega_chaves', checklist: 'checklist' };
 
+const LINHA_M1 = '[ASSINATURA: M1 EMPREENDIMENTOS IMOBILIÁRIOS SPE LTDA]';
+
+/**
+ * Garante os blocos de assinatura do envelope: a linha da M1/Calper (que assina primeiro) em todo documento
+ * e, quando há cônjuge, a linha dele logo depois da do investidor. Vale também pra templates antigos já salvos.
+ */
+export function ajustarAssinaturas(texto, { conjuge = null } = {}) {
+  let linhas = texto.split('\n');
+  if (!linhas.some((l) => /^\[ASSINATURA:/.test(l.trim()))) {
+    while (linhas.length && linhas[linhas.length - 1].trim() === '') linhas.pop();
+    linhas.push('', LINHA_M1);
+  }
+  if (conjuge?.nome && !linhas.some((l) => l.startsWith('[ASSINATURA DO CÔNJUGE'))) {
+    const i = linhas.findIndex((l) => l.startsWith('[ASSINATURA DO INVESTIDOR'));
+    if (i >= 0) linhas.splice(i + 1, 0, '', `[ASSINATURA DO CÔNJUGE: ${conjuge.nome}]`);
+  }
+  return linhas.join('\n');
+}
+
 /**
  * Texto final de um documento pra uma unidade (termo ou checklist), com as variáveis preenchidas
  * a partir de Unidade (bloco, número, tipologia, compradores) e dos dados fixos do empreendimento.
  * Variáveis sem valor continuam como {{variavel}} pro atendente completar.
  * Mesmo texto que depois é convertido em PDF e mandado pro DocuSign.
  */
-export async function montarDocumento(unidadeId, tipo, { retirante = null } = {}) {
+export async function montarDocumento(unidadeId, tipo, { retirante = null, conjuge = null } = {}) {
   const unidade = await db.unidade.findUnique({
     where: { id: unidadeId },
     include: { investidores: { include: { investidor: true } } }
@@ -127,7 +146,7 @@ export async function montarDocumento(unidadeId, tipo, { retirante = null } = {}
     variaveisTemplate: termo.variaveis
   });
 
-  return { texto: preencher(template.conteudo, variaveis), unidade, titulares };
+  return { texto: ajustarAssinaturas(preencher(template.conteudo, variaveis), { conjuge }), unidade, titulares };
 }
 
 // --- PDF (pdf-lib, sem browser headless — roda no Vercel) ---

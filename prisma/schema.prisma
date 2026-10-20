@@ -170,6 +170,9 @@ model Agendamento {
   ehProprietario     Boolean?
   // Nome do proprietário da unidade quando quem agendou não é ele (ehProprietario = false).
   proprietarioNome   String?
+  // Cônjuge que assina junto com quem retira as chaves (informado no passo 2 do atendimento).
+  conjugeNome        String?
+  conjugeEmail       String?
   // Quem agendou fica nos campos *Compareceu acima (intactos). Quem retira as chaves de fato é
   // confirmado no dia, no passo 2 do fluxo de entrega, e gravado aqui.
   retiranteNome      String?
