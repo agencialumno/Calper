@@ -121,6 +121,12 @@ export async function gerarUrlAssinatura({ envelopeId, signatario, retornoUrl, o
   const apiClient = await clienteAutenticado();
   const envelopesApi = new docusign.EnvelopesApi(apiClient);
 
+  // Em produção, o DocuSign só aceita origens https em frameAncestors — basta UMA origem http (ex: localhost)
+  // na lista para ele ignorar tudo e devolver "frame-ancestors 'self'", bloqueando o iframe. O sandbox
+  // (demo) aceita http, então o teste local com a conta de demonstração continua funcionando.
+  const demo = env.DOCUSIGN_BASE_URI.includes('demo');
+  const frameAncestors = [...new Set([origemApp, origemApps()])].filter((o) => demo || o.startsWith('https://'));
+
   const view = docusign.RecipientViewRequest.constructFromObject({
     returnUrl: retornoUrl,
     authenticationMethod: 'none',
@@ -128,7 +134,7 @@ export async function gerarUrlAssinatura({ envelopeId, signatario, retornoUrl, o
     userName: signatario.nome,
     clientUserId: signatario.clientUserId,
     // o DocuSign exige que cada messageOrigin também esteja listado em frameAncestors
-    frameAncestors: [...new Set([origemApp, 'http://localhost:5173', origemApps()])],
+    frameAncestors,
     messageOrigins: [origemApps()]
   });
   const vista = await envelopesApi.createRecipientView(env.DOCUSIGN_ACCOUNT_ID, envelopeId, {
