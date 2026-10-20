@@ -15,7 +15,7 @@
   let dataEscolhida = $state(form?.valores?.data ?? '');
   let horarioEscolhido = $state(form?.valores?.horario ?? '');
   const horariosDoDia = $derived(data.agenda.find((d) => d.data === dataEscolhida)?.horarios ?? []);
-  // trocar de dia limpa o horário se ele não existir (ou estiver lotado) no novo dia
+  // trocar de dia limpa o horário se ele não existir (ou estiver indisponível) no novo dia
   $effect(() => {
     if (!horariosDoDia.some((h) => h.horario === horarioEscolhido && h.restantes > 0)) horarioEscolhido = '';
   });
@@ -201,7 +201,7 @@
             <option value="">{dataEscolhida ? 'selecione' : 'escolha a data primeiro'}</option>
             {#each horariosDoDia as h (h.horario)}
               <option value={h.horario} disabled={h.restantes === 0}>
-                {h.horario}{h.restantes === 0 ? ' (lotado)' : ''}
+                {h.horario}{h.restantes === 0 ? ' (indisponível)' : ''}
               </option>
             {/each}
           </select>
