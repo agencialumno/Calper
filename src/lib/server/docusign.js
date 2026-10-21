@@ -79,10 +79,10 @@ async function usuarioDaIntegracao() {
 
 /**
  * Quem assina pela Calper (cerimônia embutida, primeiro da ordem): o e-mail é o do usuário dono da conta
- * DocuSign, mas o nome que aparece como signatário é sempre "Calper Construtora" (DOCUSIGN_ASSINANTE_NOME muda).
+ * DocuSign, mas o nome que aparece como signatário é sempre "M1 Empreendimentos" (DOCUSIGN_ASSINANTE_NOME muda).
  */
 export async function assinanteDaCalper() {
-  const nome = env.DOCUSIGN_ASSINANTE_NOME || 'Calper Construtora';
+  const nome = env.DOCUSIGN_ASSINANTE_NOME || 'M1 Empreendimentos';
   if (env.DOCUSIGN_ASSINANTE_EMAIL) return { nome, email: env.DOCUSIGN_ASSINANTE_EMAIL };
   return { nome, email: (await usuarioDaIntegracao()).email };
 }
@@ -106,16 +106,28 @@ const ehEmailDeExemplo = (email) => /@example\.(com|org|net)$/i.test(String(emai
 
 // Caixa de assinatura: ampliada (escala máxima do DocuSign é 1,5), centralizada sobre a linha de assinatura
 // e encostada nela. O ponto de ancoragem é o canto superior esquerdo da caixa, na esquerda da linha.
-const CAIXA = { escala: '1.5', xOffset: '145', yOffset: '-30' };
+const CAIXA = { escala: '1.5', yOffset: '-30' };
+const LARGURA_LINHA = 440; // largura da linha de assinatura nos PDFs, em pontos
 
-function tabAssinar(ancora, documentId) {
+// O DocuSign ancora a caixa pelo canto esquerdo, e a largura da caixa assinada depende do nome (o carimbo
+// mostra o nome do signatário): nomes longos e em maiúsculas ficam bem mais largos. Estimamos a largura pelo nome
+// (calibrado com assinaturas reais: ~11,3 pt por letra em MAIÚSCULAS e ~8,6 pt em minúsculas, na escala 1,5)
+// e deslocamos a âncora pra a caixa ficar centralizada sobre a linha.
+function xOffsetCentralizado(nome) {
+  const texto = String(nome ?? '').trim();
+  const porLetra = texto === texto.toUpperCase() ? 11.3 : 8.6;
+  const largura = Math.min(LARGURA_LINHA - 10, texto.length * porLetra);
+  return String(Math.max(5, Math.round((LARGURA_LINHA - largura) / 2)));
+}
+
+function tabAssinar(ancora, documentId, nomeDoAssinante) {
   return docusign.Tabs.constructFromObject({
     signHereTabs: [
       docusign.SignHere.constructFromObject({
         documentId,
         anchorString: ancora,
         anchorUnits: 'pixels',
-        anchorXOffset: CAIXA.xOffset,
+        anchorXOffset: xOffsetCentralizado(nomeDoAssinante),
         anchorYOffset: CAIXA.yOffset,
         scaleValue: CAIXA.escala,
         anchorIgnoreIfNotPresent: 'false'
@@ -169,7 +181,7 @@ export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, c
       recipientId: DESTINATARIO.calperTermo,
       routingOrder: '1',
       clientUserId: calper.clientUserId,
-      tabs: tabAssinar(ANCORA.termo.calper, DOCUMENTO_ID.termo)
+      tabs: tabAssinar(ANCORA.termo.calper, DOCUMENTO_ID.termo, calper.nome)
     }),
     docusign.Signer.constructFromObject({
       email: calper.email,
@@ -184,7 +196,7 @@ export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, c
       name: cliente.nome,
       recipientId: DESTINATARIO.cliente,
       routingOrder: '3',
-      tabs: tabAssinar(ANCORA.termo.cliente, DOCUMENTO_ID.termo)
+      tabs: tabAssinar(ANCORA.termo.cliente, DOCUMENTO_ID.termo, cliente.nome)
     })
   ];
   if (conjuge) {
@@ -194,7 +206,7 @@ export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, c
         name: conjuge.nome,
         recipientId: DESTINATARIO.conjuge,
         routingOrder: '3',
-        tabs: tabAssinar(ANCORA.termo.conjuge, DOCUMENTO_ID.termo)
+        tabs: tabAssinar(ANCORA.termo.conjuge, DOCUMENTO_ID.termo, conjuge.nome)
       })
     );
   }
@@ -225,7 +237,7 @@ export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, c
  * a da Calper (destinatário de guarda, que passa a ter o que assinar), a do cliente e a do cônjuge.
  * Só funciona enquanto o destinatário de guarda ainda não concluiu (o envelope segue aberto).
  */
-export async function anexarChecklist({ envelopeId, pdfBase64, nomeDocumento, comConjuge }) {
+export async function anexarChecklist({ envelopeId, pdfBase64, nomeDocumento, calper, cliente, conjuge = null }) {
   const apiClient = await clienteAutenticado();
   const envelopesApi = new docusign.EnvelopesApi(apiClient);
   const contaId = env.DOCUSIGN_ACCOUNT_ID;
@@ -244,12 +256,12 @@ export async function anexarChecklist({ envelopeId, pdfBase64, nomeDocumento, co
   });
 
   const tabs = [
-    [DESTINATARIO.calperChecklist, ANCORA.checklist.calper],
-    [DESTINATARIO.cliente, ANCORA.checklist.cliente],
-    ...(comConjuge ? [[DESTINATARIO.conjuge, ANCORA.checklist.conjuge]] : [])
+    [DESTINATARIO.calperChecklist, ANCORA.checklist.calper, calper.nome],
+    [DESTINATARIO.cliente, ANCORA.checklist.cliente, cliente.nome],
+    ...(conjuge ? [[DESTINATARIO.conjuge, ANCORA.checklist.conjuge, conjuge.nome]] : [])
   ];
-  for (const [destinatario, ancora] of tabs) {
-    await envelopesApi.createTabs(contaId, envelopeId, destinatario, { tabs: tabAssinar(ancora, DOCUMENTO_ID.checklist) });
+  for (const [destinatario, ancora, nome] of tabs) {
+    await envelopesApi.createTabs(contaId, envelopeId, destinatario, { tabs: tabAssinar(ancora, DOCUMENTO_ID.checklist, nome) });
   }
 }
 

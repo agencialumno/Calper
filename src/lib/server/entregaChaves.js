@@ -173,7 +173,8 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
       if (existente?.docusignEnvelopeId) await anularEnvelope(existente.docusignEnvelopeId, 'termo reenviado com outro texto');
     } else {
       envelopeId = doc('termo').docusignEnvelopeId;
-      await anexarChecklist({ envelopeId, pdfBase64, nomeDocumento: NOME_DOCUMENTO.checklist, comConjuge: Boolean(conjuge) });
+      const calper = await assinanteDaCalper();
+      await anexarChecklist({ envelopeId, pdfBase64, nomeDocumento: NOME_DOCUMENTO.checklist, calper, cliente, conjuge });
     }
   } catch (err) {
     console.error('DocuSign:', err?.response?.body ?? err);

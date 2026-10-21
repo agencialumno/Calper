@@ -87,6 +87,9 @@
     <div>
       <h1 class="text-xl font-bold text-calper-dark">Unidade {u.numero} — Bloco {u.bloco}</h1>
       <p class="text-sm text-gray-500 mt-0.5">{u.empreendimento}</p>
+      <a href="/admin/unidades/{u.id}/arquivos" class="text-xs font-bold text-calper-red mt-1 inline-block">
+        Baixar todos os arquivos desta unidade (.zip)
+      </a>
     </div>
     <form method="POST" action="?/atualizarStatus" use:enhance>
       <select
