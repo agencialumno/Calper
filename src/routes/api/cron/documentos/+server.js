@@ -15,7 +15,7 @@ export async function GET({ request }) {
   }
 
   const documentos = await db.documentoAssinado.findMany({
-    where: { status: { in: ['pendente', 'aguardando_cliente'] } }
+    where: { status: { in: ['pendente', 'calper_assinou', 'aguardando_cliente'] } }
   });
   let atualizados = 0;
   for (const doc of documentos) {

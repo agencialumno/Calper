@@ -72,7 +72,8 @@
   const exigeProcuracao = $derived(quem === 'outro' && !arquivo && !procuracaoVale);
   const faltaProcuracao = $derived(tentouConfirmar && exigeProcuracao);
 
-  const passos = ['Unidade', 'Quem retira', 'Checklist', 'Termo', 'Concluído'];
+  const passos = ['Unidade', 'Quem retira', 'Termo', 'Checklist', 'Concluído'];
+  const calperJaAssinou = ['calper_assinou', 'aguardando_cliente', 'assinado'];
   const href = (passo) => `?passo=${passo}`;
 
   function aoEnviar() {
@@ -132,6 +133,7 @@
 
   const rotuloStatus = {
     pendente: 'Aguardando a assinatura da Calper',
+    calper_assinou: 'Calper assinou — aguardando o checklist',
     aguardando_cliente: 'Calper assinou — aguardando o cliente',
     assinado: 'Assinado por todos'
   };
@@ -425,10 +427,27 @@
       </form>
     </div>
 
-    <!-- PASSO 3 — checklist (a Calper assina primeiro; o cliente depois, por e-mail) -->
+    <!-- PASSO 3 — termo (cria o envelope; a Calper assina primeiro) -->
   {:else if data.passo === 3}
-    {#if ['aguardando_cliente', 'assinado'].includes(data.documentos.checklist)}
-      {@render andamento('checklist', 'Checklist', 4, 'Seguir para o termo (o cliente assina em paralelo)')}
+    {#if calperJaAssinou.includes(data.documentos.termo)}
+      {@render andamento('termo', 'Termo', 4, 'Seguir para o checklist')}
+    {:else}
+      <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-3">
+        <input type="hidden" name="tipo" value="termo" />
+        {@render quemAssina('termo')}
+        <textarea name="texto" rows="26" class="input text-sm font-mono" required>{data.texto}</textarea>
+        <p class="text-xs text-gray-400">
+          Revise e corrija o texto. Variáveis como {'{{numeroCertidao}}'} precisam ser preenchidas antes do envio.
+        </p>
+        {@render botoesDocumento('termo', href(2))}
+        {@render leitura('termo')}
+      </form>
+    {/if}
+
+    <!-- PASSO 4 — checklist (anexado ao mesmo envelope do termo) -->
+  {:else if data.passo === 4}
+    {#if calperJaAssinou.includes(data.documentos.checklist)}
+      {@render andamento('checklist', 'Checklist', 5, 'Ver resumo da entrega')}
     {:else}
       <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-4">
         <input type="hidden" name="tipo" value="checklist" />
@@ -465,25 +484,8 @@
           </div>
         {/each}
 
-        {@render botoesDocumento('checklist', href(2))}
+        {@render botoesDocumento('checklist', href(3))}
         {@render leitura('checklist')}
-      </form>
-    {/if}
-
-    <!-- PASSO 4 — termo -->
-  {:else if data.passo === 4}
-    {#if ['aguardando_cliente', 'assinado'].includes(data.documentos.termo)}
-      {@render andamento('termo', 'Termo', 5, 'Ver resumo da entrega')}
-    {:else}
-      <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-3">
-        <input type="hidden" name="tipo" value="termo" />
-        {@render quemAssina('termo')}
-        <textarea name="texto" rows="26" class="input text-sm font-mono" required>{data.texto}</textarea>
-        <p class="text-xs text-gray-400">
-          Revise e corrija o texto. Variáveis como {'{{numeroCertidao}}'} precisam ser preenchidas antes do envio.
-        </p>
-        {@render botoesDocumento('termo', href(3))}
-        {@render leitura('termo')}
       </form>
     {/if}
 
@@ -491,7 +493,7 @@
   {:else}
     <div class="card p-6 flex flex-col gap-3">
       <div class="text-sm font-bold text-calper-dark">Documentos</div>
-      {#each [['checklist', 'Checklist', 3], ['termo', 'Termo de entrega de chaves', 4]] as [tipo, rotulo, passo]}
+      {#each [['termo', 'Termo de entrega de chaves', 3], ['checklist', 'Checklist', 4]] as [tipo, rotulo, passo]}
         <div class="flex items-center justify-between border border-gray-100 rounded-xl p-3">
           <div>
             <div class="text-sm font-semibold text-calper-dark">{rotulo}</div>
@@ -578,15 +580,22 @@
     {#if data.documentos[tipo] === 'assinado'}
       <div class="text-sm font-bold text-green-700">{rotulo}: assinado por todos.</div>
       <a href={href(proximoPasso)} class="btn-primary text-center">{rotuloProximo}</a>
+    {:else if data.documentos[tipo] === 'calper_assinou'}
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold px-2.5 py-1 rounded-full {alerta}">Calper assinou o {rotulo.toLowerCase()}</span>
+      </div>
+      <p class="text-sm text-gray-600">
+        ✔ A Calper assinou. O cliente{data.conjuge ? ' e o cônjuge' : ''} ainda <strong>não receberam</strong> e-mail: eles recebem
+        <strong>um único e-mail com o termo e o checklist</strong>, logo depois que a Calper assinar também o checklist.
+      </p>
+      <a href={href(proximoPasso)} class="btn-primary text-center">{rotuloProximo}</a>
     {:else}
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-xs font-bold px-2.5 py-1 rounded-full {alerta}">Calper assinou — aguardando o cliente</span>
         <span class="text-sm font-bold text-calper-dark">{rotulo}</span>
       </div>
       <div class="text-sm text-gray-600 flex flex-col gap-2">
-        <div>
-          ✔ A Calper assinou. O DocuSign enviou o e-mail de assinatura para:
-        </div>
+        <div>✔ A Calper assinou o termo e o checklist. O DocuSign enviou um único e-mail (com os dois documentos) para:</div>
         <ul class="flex flex-col gap-1.5">
           {#each [{ nome: data.signatario.nome, email: data.signatario.email, papel: 'cliente' }, ...(data.conjuge ? [{ nome: data.conjuge.nome, email: data.conjuge.email, papel: 'cônjuge' }] : [])] as p (p.email)}
             {@const falta = data.pendentes[tipo]?.some((c) => c.email?.toLowerCase() === p.email?.toLowerCase())}

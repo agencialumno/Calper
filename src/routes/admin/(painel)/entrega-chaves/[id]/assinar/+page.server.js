@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
-import { assinanteDaCalper, gerarUrlAssinatura } from '$lib/server/docusign.js';
+import { assinanteDaCalper, clientUserIdChecklist, gerarUrlAssinatura } from '$lib/server/docusign.js';
 import { NOME_DOCUMENTO, PASSO_DO_DOCUMENTO, SLUG_ENTREGA_CHAVES } from '$lib/server/entregaChaves.js';
 
 // Tela que embute a cerimônia de assinatura do DocuSign num iframe, sem tirar o atendente do admin.
@@ -35,7 +35,12 @@ export async function load({ params, url }) {
   try {
     urlAssinatura = await gerarUrlAssinatura({
       envelopeId: doc.docusignEnvelopeId,
-      signatario: { nome: calper.nome, email: calper.email, clientUserId: doc.agendamento.id },
+      signatario: {
+        nome: calper.nome,
+        email: calper.email,
+        // termo e checklist são duas sessões da Calper no mesmo envelope, cada uma com o seu clientUserId
+        clientUserId: tipo === 'checklist' ? clientUserIdChecklist(doc.agendamento.id) : doc.agendamento.id
+      },
       retornoUrl: `${url.origin}/admin/assinatura-retorno?destino=${encodeURIComponent(destino)}`,
       origemApp: url.origin
     });

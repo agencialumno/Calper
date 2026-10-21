@@ -1,6 +1,7 @@
 import docusign from 'docusign-esign';
 import { env } from '$env/dynamic/private';
 import { normalizarChavePrivada } from './chavePrivada.js';
+import { ANCORA } from './ancoras.js';
 
 // Integração DocuSign (JWT Grant + assinatura embutida da Calper + assinatura remota do cliente).
 // Env: DOCUSIGN_INTEGRATION_KEY, DOCUSIGN_USER_ID, DOCUSIGN_ACCOUNT_ID,
@@ -93,21 +94,30 @@ export async function destinatarioDaCopia() {
   return { nome: u.nome, email: u.email };
 }
 
-// Âncoras (texto invisível no PDF) onde cada assinatura é posicionada. Não podem ser prefixo umas das outras.
-export const ANCORA_CALPER = '[ASSINATURA M1';
-export const ANCORA_INVESTIDOR = '[ASSINATURA DO INVESTIDOR';
-export const ANCORA_CONJUGE = '[ASSINATURA DO CÔNJUGE';
+
+// Ids dos destinatários e dos documentos dentro do envelope único da entrega (termo = documento 1, checklist = 2).
+export const DESTINATARIO = { calperTermo: '1', calperChecklist: '2', cliente: '3', conjuge: '4', copia: '5' };
+export const DOCUMENTO_ID = { termo: '1', checklist: '2' };
+
+/** clientUserId do destinatário que assina o checklist pela Calper (distinto do que assina o termo). */
+export const clientUserIdChecklist = (clientUserId) => `${clientUserId}:checklist`;
 
 const ehEmailDeExemplo = (email) => /@example\.(com|org|net)$/i.test(String(email ?? ''));
 
-function tabAssinar(ancora) {
+// Caixa de assinatura: ampliada (escala máxima do DocuSign é 1,5), centralizada sobre a linha de assinatura
+// e encostada nela. O ponto de ancoragem é o canto superior esquerdo da caixa, na esquerda da linha.
+const CAIXA = { escala: '1.5', xOffset: '145', yOffset: '-30' };
+
+function tabAssinar(ancora, documentId) {
   return docusign.Tabs.constructFromObject({
     signHereTabs: [
       docusign.SignHere.constructFromObject({
+        documentId,
         anchorString: ancora,
         anchorUnits: 'pixels',
-        anchorXOffset: '0',
-        anchorYOffset: '-28',
+        anchorXOffset: CAIXA.xOffset,
+        anchorYOffset: CAIXA.yOffset,
+        scaleValue: CAIXA.escala,
         anchorIgnoreIfNotPresent: 'false'
       })
     ]
@@ -115,11 +125,13 @@ function tabAssinar(ancora) {
 }
 
 /**
- * Cria o envelope com a ordem de assinatura da entrega de chaves:
- *  1. Calper — assinatura EMBUTIDA no admin (clientUserId preenchido), primeiro da ordem;
- *  2. cliente e, se houver, cônjuge — assinatura REMOTA: o DocuSign manda um e-mail com o link a cada
- *     um, separadamente, só depois que a Calper assinou (routingOrder 2, os dois em paralelo);
- *  3. cópia carbono — recebe o PDF final por e-mail quando o envelope é concluído, sem assinar.
+ * Cria o envelope único da entrega, já com a ordem de assinatura completa, mas só com o TERMO dentro:
+ *  1. Calper (termo) — assinatura EMBUTIDA no admin (clientUserId preenchido);
+ *  2. Calper (checklist) — mesmo assinante, outra sessão embutida; fica "de guarda" na ordem 2 (só com uma
+ *     caixa de texto invisível e opcional) para segurar o envelope até o checklist ser anexado (anexarChecklist);
+ *  3. cliente e, se houver, cônjuge — assinatura REMOTA, ordem 3, em paralelo: só recebem o e-mail do DocuSign
+ *     (um só, com os dois documentos) depois que a Calper assinou o termo E o checklist;
+ *  4. cópia carbono — recebe o PDF final quando o envelope é concluído.
  * A URL da cerimônia da Calper é gerada à parte (gerarUrlAssinatura): é de uso único e expira em minutos.
  */
 export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, cliente, conjuge = null, copia = null }) {
@@ -130,24 +142,49 @@ export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, c
     documentBase64: pdfBase64,
     name: nomeDocumento,
     fileExtension: 'pdf',
-    documentId: '1'
+    documentId: DOCUMENTO_ID.termo
+  });
+
+  const guarda = docusign.Tabs.constructFromObject({
+    textTabs: [
+      docusign.Text.constructFromObject({
+        documentId: DOCUMENTO_ID.termo,
+        pageNumber: '1',
+        xPosition: '5',
+        yPosition: '5',
+        width: '10',
+        height: '10',
+        required: 'false',
+        locked: 'true',
+        value: ' ',
+        tabLabel: 'guarda-checklist'
+      })
+    ]
   });
 
   const signers = [
     docusign.Signer.constructFromObject({
       email: calper.email,
       name: calper.nome,
-      recipientId: '1',
+      recipientId: DESTINATARIO.calperTermo,
       routingOrder: '1',
       clientUserId: calper.clientUserId,
-      tabs: tabAssinar(ANCORA_CALPER)
+      tabs: tabAssinar(ANCORA.termo.calper, DOCUMENTO_ID.termo)
+    }),
+    docusign.Signer.constructFromObject({
+      email: calper.email,
+      name: calper.nome,
+      recipientId: DESTINATARIO.calperChecklist,
+      routingOrder: '2',
+      clientUserId: clientUserIdChecklist(calper.clientUserId),
+      tabs: guarda
     }),
     docusign.Signer.constructFromObject({
       email: cliente.email,
       name: cliente.nome,
-      recipientId: '2',
-      routingOrder: '2',
-      tabs: tabAssinar(ANCORA_INVESTIDOR)
+      recipientId: DESTINATARIO.cliente,
+      routingOrder: '3',
+      tabs: tabAssinar(ANCORA.termo.cliente, DOCUMENTO_ID.termo)
     })
   ];
   if (conjuge) {
@@ -155,9 +192,9 @@ export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, c
       docusign.Signer.constructFromObject({
         email: conjuge.email,
         name: conjuge.nome,
-        recipientId: '3',
-        routingOrder: '2',
-        tabs: tabAssinar(ANCORA_CONJUGE)
+        recipientId: DESTINATARIO.conjuge,
+        routingOrder: '3',
+        tabs: tabAssinar(ANCORA.termo.conjuge, DOCUMENTO_ID.termo)
       })
     );
   }
@@ -166,14 +203,14 @@ export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, c
   const todosDeTeste = [cliente, conjuge].filter(Boolean).every((p) => ehEmailDeExemplo(p.email));
   const carbonCopies =
     copia && (!todosDeTeste || ehEmailDeExemplo(copia.email))
-      ? [docusign.CarbonCopy.constructFromObject({ email: copia.email, name: copia.nome, recipientId: '4', routingOrder: '3' })]
+      ? [docusign.CarbonCopy.constructFromObject({ email: copia.email, name: copia.nome, recipientId: DESTINATARIO.copia, routingOrder: '4' })]
       : [];
 
   const envelope = docusign.EnvelopeDefinition.constructFromObject({
-    emailSubject: `Calper — assine o ${nomeDocumento} da sua unidade`,
+    emailSubject: 'Calper — assine o Termo de Entrega de Chaves e o Checklist da sua unidade',
     emailBlurb:
-      'A Calper já assinou. Falta a sua assinatura: abra o documento pelo botão abaixo, confira e assine. ' +
-      'Dúvidas, procure a equipe Calper.',
+      'A Calper já assinou. Falta a sua assinatura nos dois documentos (termo e checklist): abra pelo botão abaixo, ' +
+      'confira e assine. Dúvidas, procure a equipe Calper.',
     documents: [documento],
     recipients: docusign.Recipients.constructFromObject({ signers, carbonCopies }),
     status: 'sent'
@@ -181,6 +218,52 @@ export async function criarEnvelopeEntrega({ pdfBase64, nomeDocumento, calper, c
 
   const criado = await envelopesApi.createEnvelope(env.DOCUSIGN_ACCOUNT_ID, { envelopeDefinition: envelope });
   return { envelopeId: criado.envelopeId, comCopia: carbonCopies.length > 0 };
+}
+
+/**
+ * Anexa o checklist (documento 2) ao envelope em andamento e posiciona as caixas de assinatura dele:
+ * a da Calper (destinatário de guarda, que passa a ter o que assinar), a do cliente e a do cônjuge.
+ * Só funciona enquanto o destinatário de guarda ainda não concluiu (o envelope segue aberto).
+ */
+export async function anexarChecklist({ envelopeId, pdfBase64, nomeDocumento, comConjuge }) {
+  const apiClient = await clienteAutenticado();
+  const envelopesApi = new docusign.EnvelopesApi(apiClient);
+  const contaId = env.DOCUSIGN_ACCOUNT_ID;
+
+  await envelopesApi.updateDocuments(contaId, envelopeId, {
+    envelopeDefinition: docusign.EnvelopeDefinition.constructFromObject({
+      documents: [
+        docusign.Document.constructFromObject({
+          documentBase64: pdfBase64,
+          name: nomeDocumento,
+          fileExtension: 'pdf',
+          documentId: DOCUMENTO_ID.checklist
+        })
+      ]
+    })
+  });
+
+  const tabs = [
+    [DESTINATARIO.calperChecklist, ANCORA.checklist.calper],
+    [DESTINATARIO.cliente, ANCORA.checklist.cliente],
+    ...(comConjuge ? [[DESTINATARIO.conjuge, ANCORA.checklist.conjuge]] : [])
+  ];
+  for (const [destinatario, ancora] of tabs) {
+    await envelopesApi.createTabs(contaId, envelopeId, destinatario, { tabs: tabAssinar(ancora, DOCUMENTO_ID.checklist) });
+  }
+}
+
+/** Anula um envelope (ex.: um termo ainda não assinado que será reenviado com outro texto). Não lança. */
+export async function anularEnvelope(envelopeId, motivo) {
+  try {
+    const apiClient = await clienteAutenticado();
+    const envelopesApi = new docusign.EnvelopesApi(apiClient);
+    await envelopesApi.update(env.DOCUSIGN_ACCOUNT_ID, envelopeId, {
+      envelope: { status: 'voided', voidedReason: motivo }
+    });
+  } catch (err) {
+    console.error('DocuSign (anular envelope):', err?.response?.body ?? err);
+  }
 }
 
 /**
@@ -216,8 +299,8 @@ export async function gerarUrlAssinatura({ envelopeId, signatario, retornoUrl, o
 }
 
 /**
- * Situação do envelope: status geral, se a Calper (destinatário 1) já assinou e quem ainda falta
- * entre cliente/cônjuge (destinatários 2 e 3).
+ * Situação do envelope único: status geral, se a Calper já assinou o termo (destinatário 1) e o checklist
+ * (destinatário 2) e quem ainda falta entre cliente/cônjuge (destinatários 3 e 4).
  */
 export async function situacaoDoEnvelope(envelopeId) {
   const apiClient = await clienteAutenticado();
@@ -227,11 +310,12 @@ export async function situacaoDoEnvelope(envelopeId) {
     envelopesApi.listRecipients(env.DOCUSIGN_ACCOUNT_ID, envelopeId)
   ]);
   const signers = recipientes.signers ?? [];
-  const calper = signers.find((s) => s.recipientId === '1');
-  const clientes = signers.filter((s) => s.recipientId !== '1');
+  const concluiu = (id) => signers.find((s) => s.recipientId === id)?.status === 'completed';
+  const clientes = signers.filter((s) => [DESTINATARIO.cliente, DESTINATARIO.conjuge].includes(s.recipientId));
   return {
     status: envelope.status,
-    calperAssinou: calper?.status === 'completed',
+    calperTermoAssinou: concluiu(DESTINATARIO.calperTermo),
+    calperChecklistAssinou: concluiu(DESTINATARIO.calperChecklist),
     clientesPendentes: clientes.filter((s) => s.status !== 'completed').map((s) => ({ nome: s.name, email: s.email, status: s.status }))
   };
 }
@@ -241,11 +325,11 @@ export async function statusDoEnvelope(envelopeId) {
   return (await situacaoDoEnvelope(envelopeId)).status;
 }
 
-/** Baixa o PDF final (todos os documentos combinados) como data URL base64. */
-export async function baixarPdfAssinado(envelopeId) {
+/** Baixa um documento assinado do envelope (padrão: todos combinados) como data URL base64. */
+export async function baixarPdfAssinado(envelopeId, documentId = 'combined') {
   const apiClient = await clienteAutenticado();
   const envelopesApi = new docusign.EnvelopesApi(apiClient);
-  const binario = await envelopesApi.getDocument(env.DOCUSIGN_ACCOUNT_ID, envelopeId, 'combined');
+  const binario = await envelopesApi.getDocument(env.DOCUSIGN_ACCOUNT_ID, envelopeId, documentId);
   const buffer = Buffer.isBuffer(binario) ? binario : Buffer.from(binario, 'binary');
   return `data:application/pdf;base64,${buffer.toString('base64')}`;
 }

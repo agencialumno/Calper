@@ -1,3 +1,4 @@
+import { ancoraDoBloco } from './ancoras.js';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { LOGO_DOCUMENTOS_BASE64 } from './assets/logoDocumentos.js';
 import { COR_LINK, REGRAS_TERMO, desenharLinhaRica, quebrarRico, tokenizar } from './pdfRico.js';
@@ -22,7 +23,7 @@ const BASE_RODAPE = 817.4; // linha de base do "Página X de Y"
 const LOGO = { x: 405.95, topo: 32.8, largura: 129, altura: 73 };
 const TITULO_Y = 157.2; // linha de base do título (depois do logo)
 const CABECALHO_Y = 198.4; // primeira linha depois do título
-const ASSINATURA_ESPACO = 58.2;
+const ASSINATURA_ESPACO = 72;
 const ITENS_COM_ESPACO_CHEIO = new Set(['1.', '7.']);
 const COR = rgb(0, 0, 0);
 
@@ -102,8 +103,7 @@ function montarBlocos(texto, fonte, negrito) {
     if (assinatura) {
       blocos.push({
         tipo: 'assinatura',
-        // a linha da Calper ("[ASSINATURA: M1 ...]") ganha âncora própria, que não é prefixo das do cliente
-        ancora: assinatura[1].trim() ? `[ASSINATURA${assinatura[1]}` : '[ASSINATURA M1',
+        ancora: ancoraDoBloco('termo', assinatura[1]),
         nome: textoSeguro(fonte, assinatura[2] ?? '')
       });
       continue;

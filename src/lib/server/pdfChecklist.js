@@ -1,3 +1,4 @@
+import { ancoraDoBloco } from './ancoras.js';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { LOGO_DOCUMENTOS_BASE64 } from './assets/logoDocumentos.js';
 import { quebrarLinhas, textoSeguro } from './pdfTermo.js';
@@ -203,7 +204,7 @@ export async function gerarPdfChecklist(texto, titulo) {
 
   // data à direita e bloco de assinatura (a âncora do DocuSign fica invisível sobre a linha)
   let yFecho = bordaTopo + 49.1;
-  if (yFecho + 120 + Math.max(0, assinaturas.length - 1) * 75 > BASE_CORPO) {
+  if (yFecho + 120 + Math.max(0, assinaturas.length - 1) * 90 > BASE_CORPO) {
     novaPagina();
     yFecho = 56.7 + 14.75;
   }
@@ -212,11 +213,11 @@ export async function gerarPdfChecklist(texto, titulo) {
     desenhar(d, DIREITA - fonte.widthOfTextAtSize(d, TAMANHO), yFecho);
   }
   assinaturas.forEach((assinatura, i) => {
-    const yLinha = yFecho + 88.6 + i * 75;
+    const yLinha = yFecho + 88.6 + i * 90;
     const traco = '_'.repeat(72);
     const xTraco = centro(traco, fonte, ESQUERDA, DIREITA) + 0;
     desenhar(traco, xTraco, yLinha);
-    desenhar(assinatura[1].trim() ? `[ASSINATURA${assinatura[1]}` : '[ASSINATURA M1', xTraco, yLinha, { tamanho: 1, cor: rgb(1, 1, 1) });
+    desenhar(ancoraDoBloco('checklist', assinatura[1]), xTraco, yLinha, { tamanho: 1, cor: rgb(1, 1, 1) });
     const nome = textoSeguro(fonte, (assinatura[2] ?? '').replace(/^\(|\)$/g, ''));
     if (nome) desenhar(nome, centro(nome, negrito, ESQUERDA, DIREITA), yLinha + 14.5, { f: negrito });
   });

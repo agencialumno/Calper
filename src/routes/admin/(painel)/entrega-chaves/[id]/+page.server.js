@@ -3,6 +3,7 @@ import { db } from '$lib/server/db.js';
 import { TIPOS_PROCURACAO, arquivoParaBase64 } from '$lib/server/agendamento.js';
 import { gerarPdfBase64, montarDocumento, quartosDaUnidade, titularesDaUnidade } from '$lib/server/documentos.js';
 import {
+  CALPER_JA_ASSINOU,
   NOME_DOCUMENTO,
   ROTULO_VINCULO,
   SLUG_ENTREGA_CHAVES,
@@ -52,7 +53,7 @@ export async function load(event) {
   // documento já aberto no DocuSign: confere lá se a Calper e o cliente já assinaram
   const pendentesPorDocumento = {};
   for (const doc of await db.documentoAssinado.findMany({
-    where: { agendamentoId: agendamento.id, status: { in: ['pendente', 'aguardando_cliente'] } }
+    where: { agendamentoId: agendamento.id, status: { in: ['pendente', 'calper_assinou', 'aguardando_cliente'] } }
   })) {
     try {
       const { status, clientesPendentes } = await sincronizarDocumento(doc, event);
@@ -71,8 +72,8 @@ export async function load(event) {
     ])
   );
 
-  // o termo vem depois do checklist: só abre quando a Calper já assinou o checklist
-  if (passo === 4 && !['aguardando_cliente', 'assinado'].includes(documentos.checklist)) {
+  // o checklist vem depois do termo: só abre quando a Calper já assinou o termo
+  if (passo === 4 && !CALPER_JA_ASSINOU.includes(documentos.termo)) {
     throw redirect(303, irPara(agendamento.id, 3));
   }
 
@@ -135,13 +136,13 @@ export async function load(event) {
   // quem retira (e seu vínculo) define como as partes aparecem no texto (procurador = representação)
   const opcoes = { retirante, conjuge: base.conjuge };
 
-  // passo 3 = checklist, passo 4 = termo; com a Calper já assinada o documento só mostra o andamento
-  if (passo === 3 && !['aguardando_cliente', 'assinado'].includes(documentos.checklist)) {
+  // passo 3 = termo, passo 4 = checklist; com a Calper já assinada o documento só mostra o andamento
+  if (passo === 3 && !CALPER_JA_ASSINOU.includes(documentos.termo)) {
+    return { ...base, texto: (await montarDocumento(u.id, 'termo', opcoes)).texto };
+  }
+  if (passo === 4 && !CALPER_JA_ASSINOU.includes(documentos.checklist)) {
     const { texto } = await montarDocumento(u.id, 'checklist', opcoes);
     return { ...base, checklist: parseChecklist(texto) };
-  }
-  if (passo === 4 && !['aguardando_cliente', 'assinado'].includes(documentos.termo)) {
-    return { ...base, texto: (await montarDocumento(u.id, 'termo', opcoes)).texto };
   }
   return base;
 }

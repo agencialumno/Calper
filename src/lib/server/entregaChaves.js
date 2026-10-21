@@ -13,8 +13,12 @@ export function buscarMurano() {
 
 import { redirect } from '@sveltejs/kit';
 import {
+  DOCUMENTO_ID,
+  anexarChecklist,
+  anularEnvelope,
   assinanteDaCalper,
   baixarPdfAssinado,
+  clientUserIdChecklist,
   criarEnvelopeEntrega,
   destinatarioDaCopia,
   situacaoDoEnvelope
@@ -29,17 +33,22 @@ export const NOME_DOCUMENTO = {
 
 export const ROTA_UNIDADE = { termo: 'termo-entrega', checklist: 'checklist' };
 
-// Ordem do atendimento: o checklist vem antes do termo. Passos do fluxo: 3 = checklist, 4 = termo, 5 = concluído.
-export const ORDEM_DOCUMENTOS = ['checklist', 'termo'];
-export const PASSO_DO_DOCUMENTO = { checklist: 3, termo: 4 };
+// Ordem do atendimento: o termo vem antes do checklist. Passos do fluxo: 3 = termo, 4 = checklist, 5 = concluído.
+export const ORDEM_DOCUMENTOS = ['termo', 'checklist'];
+export const PASSO_DO_DOCUMENTO = { termo: 3, checklist: 4 };
 
-// Estados de um documento: pendente (criado, a Calper ainda não assinou) → aguardando_cliente (a Calper
-// assinou e o DocuSign mandou o e-mail ao cliente/cônjuge) → assinado (envelope concluído por todos).
+// Os dois documentos vão no MESMO envelope do DocuSign. Estados de um documento:
+// pendente (a Calper ainda não assinou este documento) → calper_assinou (a Calper assinou este documento, mas o
+// envelope ainda não foi liberado ao cliente: falta a Calper assinar o outro) → aguardando_cliente (Calper assinou
+// os dois; cliente/cônjuge receberam um único e-mail) → assinado (envelope concluído por todos).
 export const ROTULO_STATUS_DOCUMENTO = {
   pendente: 'aguardando a assinatura da Calper',
+  calper_assinou: 'Calper assinou — aguardando o checklist',
   aguardando_cliente: 'Calper assinou — aguardando o cliente',
   assinado: 'assinado por todos'
 };
+/** Estados em que a Calper já assinou o documento. */
+export const CALPER_JA_ASSINOU = ['calper_assinou', 'aguardando_cliente', 'assinado'];
 
 export const ROTULO_VINCULO = {
   comprador_principal: 'Comprador principal',
@@ -99,8 +108,9 @@ export function signatariosDoCliente(agendamento, retirante) {
 }
 
 /**
- * Cria o envelope no DocuSign pro texto final e leva o atendente pra tela de assinatura da Calper
- * (iframe no admin). O cliente (e o cônjuge) só recebem o e-mail do DocuSign depois que a Calper assina;
+ * Leva o documento pra assinatura da Calper (iframe no admin). Os dois documentos da entrega ficam num único
+ * envelope do DocuSign: o termo cria o envelope; o checklist é anexado a ele depois que a Calper assinou o termo.
+ * O cliente (e o cônjuge) recebem UM e-mail, com os dois documentos, só depois que a Calper assinou os dois;
  * quando o envelope fecha, a cópia carbono recebe o PDF final.
  * Devolve { erro } quando algo impede o envio (nada é lançado nesse caso).
  * `origem`: 'fluxo' (passo a passo da entrega) ou 'unidade' (rotas /admin/unidades/[id]/...).
@@ -111,23 +121,24 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
 
   const agendamento = await db.agendamento.findUnique({
     where: { id: agendamentoId },
-    include: { unidade: true, presencas: true, documentosAssinados: { select: { tipo: true, status: true } } }
+    include: { unidade: true, presencas: true, documentosAssinados: true }
   });
   if (!agendamento) return { erro: 'Agendamento não encontrado.' };
 
-  const existente = agendamento.documentosAssinados.find((d) => d.tipo === tipo);
-  if (existente?.status === 'assinado') return { erro: 'Este documento já foi assinado.' };
-  if (existente?.status === 'aguardando_cliente') {
-    return { erro: 'A Calper já assinou este documento: ele está aguardando a assinatura do cliente.' };
+  const doc = (t) => agendamento.documentosAssinados.find((d) => d.tipo === t);
+  const existente = doc(tipo);
+  if (CALPER_JA_ASSINOU.includes(existente?.status)) {
+    return { erro: 'A Calper já assinou este documento.' };
   }
+  const irParaAssinatura = () =>
+    redirect(303, `/admin/entrega-chaves/${agendamento.id}/assinar?tipo=${tipo}&origem=${origem}`);
 
-  // o termo só começa depois que a Calper assinou o checklist
-  if (tipo === 'termo') {
-    const checklist = agendamento.documentosAssinados.find((d) => d.tipo === 'checklist');
-    if (!['aguardando_cliente', 'assinado'].includes(checklist?.status)) {
-      return { erro: 'Assine o checklist primeiro: o termo vem depois dele.' };
-    }
+  // o checklist só entra depois que a Calper assinou o termo (ele é anexado ao envelope do termo)
+  if (tipo === 'checklist' && !CALPER_JA_ASSINOU.includes(doc('termo')?.status)) {
+    return { erro: 'Assine o termo primeiro: o checklist vem depois dele.' };
   }
+  // checklist já anexado e ainda sem a assinatura da Calper: só retoma a assinatura (o anexo não é substituível)
+  if (tipo === 'checklist' && existente?.status === 'pendente') throw irParaAssinatura();
 
   const retirante = retiranteDoAgendamento(agendamento);
   if (!retirante) return { erro: 'Confirme quem está retirando as chaves antes de enviar para assinatura.' };
@@ -145,18 +156,25 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
   if (pendente) return { erro: `Preencha antes de enviar: ${[...new Set(pendente)].join(', ')}` };
 
   let envelopeId;
-  let comCopia;
+  let comCopia = false;
   try {
     const pdfBase64 = await gerarPdfBase64(textoFinal, NOME_DOCUMENTO[tipo], tipo);
-    const [calper, copia] = await Promise.all([assinanteDaCalper(), destinatarioDaCopia()]);
-    ({ envelopeId, comCopia } = await criarEnvelopeEntrega({
-      pdfBase64,
-      nomeDocumento: NOME_DOCUMENTO[tipo],
-      calper: { nome: calper.nome, email: calper.email, clientUserId: agendamento.id },
-      cliente,
-      conjuge,
-      copia
-    }));
+    if (tipo === 'termo') {
+      const [calper, copia] = await Promise.all([assinanteDaCalper(), destinatarioDaCopia()]);
+      ({ envelopeId, comCopia } = await criarEnvelopeEntrega({
+        pdfBase64,
+        nomeDocumento: NOME_DOCUMENTO.termo,
+        calper: { nome: calper.nome, email: calper.email, clientUserId: agendamento.id },
+        cliente,
+        conjuge,
+        copia
+      }));
+      // reenvio do termo (texto corrigido antes de a Calper assinar): o envelope anterior fica sem uso
+      if (existente?.docusignEnvelopeId) await anularEnvelope(existente.docusignEnvelopeId, 'termo reenviado com outro texto');
+    } else {
+      envelopeId = doc('termo').docusignEnvelopeId;
+      await anexarChecklist({ envelopeId, pdfBase64, nomeDocumento: NOME_DOCUMENTO.checklist, comConjuge: Boolean(conjuge) });
+    }
   } catch (err) {
     console.error('DocuSign:', err?.response?.body ?? err);
     return { erro: 'Não foi possível enviar para assinatura (DocuSign). Veja o log do servidor.' };
@@ -173,94 +191,105 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
     event,
     atorTipo: 'funcionario',
     acao: tipo === 'termo' ? 'termo_enviado_assinatura' : 'checklist_enviado_assinatura',
-    descricao: `${rotuloFuncionario(locals.funcionario)} enviou ${NOME_DOCUMENTO[tipo]} da Unidade ${u.numero}, Bloco ${u.bloco} para assinatura — Calper assina primeiro; depois ${cliente.nome} (${ROTULO_VINCULO[retirante.vinculo]}, ${cliente.email})${conjuge ? ` e ${conjuge.nome} (cônjuge, ${conjuge.email})` : ''} recebem o link por e-mail${comCopia ? '; a cópia do documento final vai para o e-mail da Calper' : ''}; agendamento feito por ${agendamento.nomeCompareceu ?? '—'}`,
+    descricao:
+      tipo === 'termo'
+        ? `${rotuloFuncionario(locals.funcionario)} abriu o envelope de assinatura com o ${NOME_DOCUMENTO.termo} da Unidade ${u.numero}, Bloco ${u.bloco} — Calper assina primeiro; depois ${cliente.nome} (${ROTULO_VINCULO[retirante.vinculo]}, ${cliente.email})${conjuge ? ` e ${conjuge.nome} (cônjuge, ${conjuge.email})` : ''} recebem um único e-mail com termo e checklist${comCopia ? '; a cópia do documento final vai para o e-mail da Calper' : ''}; agendamento feito por ${agendamento.nomeCompareceu ?? '—'}`
+        : `${rotuloFuncionario(locals.funcionario)} anexou o ${NOME_DOCUMENTO.checklist} ao envelope da Unidade ${u.numero}, Bloco ${u.bloco} para assinatura da Calper`,
     entidadeTipo: 'DocumentoAssinado',
     entidadeId: envelopeId
   });
 
   // a cerimônia de assinatura da Calper roda num iframe dentro do admin (tela /assinar)
-  throw redirect(303, `/admin/entrega-chaves/${agendamento.id}/assinar?tipo=${tipo}&origem=${origem}`);
+  throw irParaAssinatura();
 }
 
 /**
- * Confere no DocuSign em que ponto está um documento e atualiza o banco:
- *  - Calper assinou, cliente ainda não → "aguardando_cliente";
- *  - envelope concluído → baixa o PDF final, marca "assinado" e, com os dois documentos assinados, a entrega fica "realizada".
+ * Confere no DocuSign em que ponto está o envelope e atualiza os documentos dele no banco:
+ *  - Calper assinou o termo → "calper_assinou"; assinou também o checklist → "aguardando_cliente";
+ *  - envelope concluído → baixa o PDF assinado de cada documento, marca "assinado" e a entrega fica "realizada".
  * `event` (opcional) serve só para registrar IP/ator nos logs; sem ele (cron) os logs saem como sistema.
- * Devolve { status, clientesPendentes }: o status resultante do documento e quem ainda não assinou.
+ * Devolve { status, clientesPendentes }: o status resultante do `documento` e quem ainda não assinou.
  */
 export async function sincronizarDocumento(documento, event = null) {
   if (documento.status === 'assinado') return { status: 'assinado', clientesPendentes: [] };
 
   const situacao = await situacaoDoEnvelope(documento.docusignEnvelopeId);
-  const log = (dados) => registrarLog({ event: event ?? { locals: {}, getClientAddress: () => null, request: { headers: new Headers() } }, atorTipo: 'funcionario', ...dados });
+  const log = (dados) =>
+    registrarLog({
+      event: event ?? { locals: {}, getClientAddress: () => null, request: { headers: new Headers() } },
+      atorTipo: 'funcionario',
+      ...dados
+    });
 
   const agendamento = await db.agendamento.findUnique({
     where: { id: documento.agendamentoId },
-    include: { unidade: true, documentosAssinados: { select: { tipo: true, status: true } } }
+    include: { unidade: true, documentosAssinados: true }
   });
   const u = agendamento.unidade;
   const local = `Unidade ${u.numero}, Bloco ${u.bloco}`;
-  const nome = NOME_DOCUMENTO[documento.tipo];
   const atendente = event?.locals?.funcionario;
+  // os documentos que moram neste envelope
+  const doEnvelope = agendamento.documentosAssinados.filter((d) => d.docusignEnvelopeId === documento.docusignEnvelopeId);
 
-  if (situacao.status === 'completed') {
-    const pdfBase64 = await baixarPdfAssinado(documento.docusignEnvelopeId);
-    await db.documentoAssinado.update({
-      where: { id: documento.id },
-      data: { status: 'assinado', pdfBase64, assinadoEm: new Date() }
-    });
-    await db.historicoUnidade.create({
-      data: {
-        unidadeId: u.id,
-        tipo: 'documento',
-        descricao: `${nome} assinado via DocuSign`,
-        criadoPorId: atendente?.id ?? null
-      }
-    });
-    await log({
-      funcionarioId: atendente?.id,
-      acao: 'documento_assinado',
-      descricao: `${nome} da ${local} assinado por todos via DocuSign (agendamento feito por ${agendamento.nomeCompareceu ?? '—'}${atendente ? `; atendente: ${rotuloFuncionario(atendente)}` : ''})`,
-      entidadeTipo: 'DocumentoAssinado',
-      entidadeId: documento.id
-    });
+  const calperAssinou = (tipo) => (tipo === 'termo' ? situacao.calperTermoAssinou : situacao.calperChecklistAssinou);
+  const statusDe = (tipo) => {
+    if (situacao.status === 'completed') return 'assinado';
+    if (!calperAssinou(tipo)) return 'pendente';
+    return situacao.calperTermoAssinou && situacao.calperChecklistAssinou ? 'aguardando_cliente' : 'calper_assinou';
+  };
 
-    // checklist e termo assinados por todos = entrega concluída; a unidade sai do dropdown de agendamento
-    const outro = ORDEM_DOCUMENTOS.find((t) => t !== documento.tipo);
-    const outroAssinado = agendamento.documentosAssinados.some((d) => d.tipo === outro && d.status === 'assinado');
-    if (outroAssinado && agendamento.status !== 'realizado') {
-      await db.agendamento.update({ where: { id: agendamento.id }, data: { status: 'realizado' } });
+  for (const d of doEnvelope) {
+    const novo = statusDe(d.tipo);
+    if (novo === d.status) continue;
+    const nome = NOME_DOCUMENTO[d.tipo];
+
+    if (novo === 'assinado') {
+      const pdfBase64 = await baixarPdfAssinado(d.docusignEnvelopeId, DOCUMENTO_ID[d.tipo]);
+      await db.documentoAssinado.update({ where: { id: d.id }, data: { status: 'assinado', pdfBase64, assinadoEm: new Date() } });
       await db.historicoUnidade.create({
-        data: {
-          unidadeId: u.id,
-          tipo: 'evento_realizado',
-          descricao: 'Entrega de chaves concluída (checklist e termo assinados)',
-          criadoPorId: atendente?.id ?? null
-        }
+        data: { unidadeId: u.id, tipo: 'documento', descricao: `${nome} assinado via DocuSign`, criadoPorId: atendente?.id ?? null }
       });
       await log({
         funcionarioId: atendente?.id,
-        acao: 'entrega_concluida',
-        descricao: `Entrega de chaves da ${local} concluída — checklist e termo assinados por todos`,
-        entidadeTipo: 'Agendamento',
-        entidadeId: agendamento.id
+        acao: 'documento_assinado',
+        descricao: `${nome} da ${local} assinado por todos via DocuSign (agendamento feito por ${agendamento.nomeCompareceu ?? '—'}${atendente ? `; atendente: ${rotuloFuncionario(atendente)}` : ''})`,
+        entidadeTipo: 'DocumentoAssinado',
+        entidadeId: d.id
+      });
+    } else {
+      await db.documentoAssinado.update({ where: { id: d.id }, data: { status: novo } });
+      await log({
+        funcionarioId: atendente?.id,
+        acao: 'documento_assinado_calper',
+        descricao:
+          novo === 'aguardando_cliente'
+            ? `${nome} da ${local} assinado pela Calper; o DocuSign enviou um único e-mail (termo e checklist) para ${situacao.clientesPendentes.map((c) => c.nome).join(' e ')}`
+            : `${nome} da ${local} assinado pela Calper (o cliente só recebe o e-mail depois do checklist)`,
+        entidadeTipo: 'DocumentoAssinado',
+        entidadeId: d.id
       });
     }
-    return { status: 'assinado', clientesPendentes: [] };
+    d.status = novo;
   }
 
-  if (situacao.calperAssinou && documento.status === 'pendente') {
-    await db.documentoAssinado.update({ where: { id: documento.id }, data: { status: 'aguardando_cliente' } });
+  // termo e checklist assinados por todos = entrega concluída; a unidade sai do dropdown de agendamento
+  const todosAssinados = ORDEM_DOCUMENTOS.every((t) => agendamento.documentosAssinados.find((d) => d.tipo === t)?.status === 'assinado');
+  if (todosAssinados && agendamento.status !== 'realizado') {
+    await db.agendamento.update({ where: { id: agendamento.id }, data: { status: 'realizado' } });
+    await db.historicoUnidade.create({
+      data: { unidadeId: u.id, tipo: 'evento_realizado', descricao: 'Entrega de chaves concluída (termo e checklist assinados)', criadoPorId: atendente?.id ?? null }
+    });
     await log({
       funcionarioId: atendente?.id,
-      acao: 'documento_assinado_calper',
-      descricao: `${nome} da ${local} assinado pela Calper; o DocuSign enviou o link por e-mail para ${situacao.clientesPendentes.map((c) => c.nome).join(' e ')}`,
-      entidadeTipo: 'DocumentoAssinado',
-      entidadeId: documento.id
+      acao: 'entrega_concluida',
+      descricao: `Entrega de chaves da ${local} concluída — termo e checklist assinados por todos`,
+      entidadeTipo: 'Agendamento',
+      entidadeId: agendamento.id
     });
-    return { status: 'aguardando_cliente', clientesPendentes: situacao.clientesPendentes };
   }
 
-  return { status: documento.status, clientesPendentes: situacao.clientesPendentes };
+  return {
+    status: doEnvelope.find((d) => d.id === documento.id)?.status ?? documento.status,
+    clientesPendentes: situacao.clientesPendentes
+  };
 }
