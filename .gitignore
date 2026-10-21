@@ -9,3 +9,7 @@ dist
 # dados pessoais de clientes (planilha/documentos de referência e base importada do Murano)
 docs-referencia/
 scripts/murano-dados.json
+
+# testes (relatórios e artefatos locais)
+test-results/
+playwright-report/

@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "packageManager": "bun@1.1.38",
-  "trustedDependencies": ["@prisma/client", "prisma", "esbuild"],
+  "trustedDependencies": [
+    "@prisma/client",
+    "prisma",
+    "esbuild"
+  ],
   "scripts": {
     "dev": "vite dev",
     "build": "prisma generate && vite build",
@@ -13,9 +17,14 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:db:preparar": "node tests/preparar-banco-teste.js"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48",
     "@sveltejs/adapter-vercel": "^5.4.0",
     "@sveltejs/kit": "^2.9.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -27,6 +36,7 @@
     "svelte-check": "^4.0.0",
     "tailwindcss": "^3.4.14",
     "vite": "^5.4.11",
+    "vitest": "^2",
     "workbox-core": "^7.4.1",
     "workbox-precaching": "^7.4.1",
     "workbox-routing": "^7.4.1"
