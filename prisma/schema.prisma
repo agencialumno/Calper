@@ -47,6 +47,10 @@ model Unidade {
   vistoriaAprovada    Boolean           @default(false)
   escrituraRegistrada Boolean           @default(false) // apenas consulta/exibição por enquanto
   quartos             Int?              // tipologia (2 ou 3) — define chaves de porta interior no checklist
+  // Situação vinda da planilha da base de entrega de chaves (texto como na planilha, ex: "ESCRITURA PÚBLICA ASSINADA",
+  // "POSSIBILIDADE DE FINANCIAMENTO" / "APROVADA", "EM ESTOQUE", "JURÍDICO"...). Ver src/lib/unidadeAgendavel.js.
+  escritura           String?
+  vistoriaStatus      String?
   investidores     UnidadeInvestidor[]
   historico        HistoricoUnidade[]
   agendamentos     Agendamento[]

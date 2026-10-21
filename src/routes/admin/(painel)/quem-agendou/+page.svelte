@@ -1,4 +1,5 @@
 <script>
+  import LinkDownload from '$lib/components/LinkDownload.svelte';
   import { formatarCpf } from '$lib/cpf.js';
 
   let { data } = $props();
@@ -33,7 +34,7 @@
   <p class="text-sm text-gray-500 mt-1 mb-5">
     Todas as pessoas que agendaram pelo formulário público — {data.agendamentos.length}
     {data.agendamentos.length === data.total ? '' : `de ${data.total} `}registro(s)
-    · <a href={data.exportarHref} class="font-bold text-calper-red">Exportar CSV</a>
+    · <LinkDownload href={data.exportarHref} class="font-bold text-calper-red">Exportar CSV</LinkDownload>
   </p>
 
   <form method="GET" class="card p-4 grid grid-cols-2 md:grid-cols-[1fr_12rem_auto] gap-3 mb-5 items-end">

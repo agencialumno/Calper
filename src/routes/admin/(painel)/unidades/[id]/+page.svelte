@@ -1,4 +1,5 @@
 <script>
+  import LinkDownload from '$lib/components/LinkDownload.svelte';
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
 
@@ -87,9 +88,9 @@
     <div>
       <h1 class="text-xl font-bold text-calper-dark">Unidade {u.numero} — Bloco {u.bloco}</h1>
       <p class="text-sm text-gray-500 mt-0.5">{u.empreendimento}</p>
-      <a href="/admin/unidades/{u.id}/arquivos" class="text-xs font-bold text-calper-red mt-1 inline-block">
+      <LinkDownload href="/admin/unidades/{u.id}/arquivos" class="text-xs font-bold text-calper-red mt-1 inline-block">
         Baixar todos os arquivos desta unidade (.zip)
-      </a>
+      </LinkDownload>
     </div>
     <form method="POST" action="?/atualizarStatus" use:enhance>
       <select
@@ -168,6 +169,12 @@
           </div>
         {/if}
 
+        {#if u.vistoriaStatus || u.escritura}
+          <div class="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            Segundo a planilha da base:
+            {#if u.escritura}<strong>escritura</strong> {u.escritura.toLowerCase()}{/if}{#if u.escritura && u.vistoriaStatus} · {/if}{#if u.vistoriaStatus}<strong>vistoria</strong> {u.vistoriaStatus.toLowerCase()}{/if}
+          </div>
+        {/if}
         <label class="flex items-center gap-2 text-sm text-calper-dark">
           <input type="checkbox" name="vistoriaAprovada" checked={u.vistoriaAprovada} />
           Vistoria aprovada
@@ -351,7 +358,7 @@
                         {rotulo}: {doc?.status === 'assinado' ? 'assinado' : doc?.status === 'calper_assinou' ? 'Calper assinou' : doc?.status === 'aguardando_cliente' ? 'aguardando o cliente' : doc?.status === 'pendente' ? 'pendente' : 'não enviado'}
                       </span>
                       {#if doc?.status === 'assinado'}
-                        <a href="/admin/entrega-chaves/{a.id}/documento/{tipo}" class="text-calper-red">baixar</a>
+                        <LinkDownload href="/admin/entrega-chaves/{a.id}/documento/{tipo}" class="text-calper-red">baixar</LinkDownload>
                       {/if}
                     {/each}
                   </div>

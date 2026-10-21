@@ -50,6 +50,8 @@ export async function load({ params }) {
       financiado: unidade.financiado,
       grupoFinanciamento: unidade.grupoFinanciamento,
       vistoriaAprovada: unidade.vistoriaAprovada,
+      vistoriaStatus: unidade.vistoriaStatus,
+      escritura: unidade.escritura,
       escrituraRegistrada: unidade.escrituraRegistrada,
       empreendimento: unidade.empreendimento.nome,
       createdAt: unidade.createdAt,

@@ -41,6 +41,10 @@ export async function load(event) {
   const { params, url } = event;
   const agendamento = await buscarAgendamento(params.id);
   const u = agendamento.unidade;
+  // entrega já concluída: abre direto o resumo (passo 5), sem reabrir o fluxo de assinatura
+  if (agendamento.status === 'realizado' && !url.searchParams.get('passo')) {
+    throw redirect(303, irPara(agendamento.id, 5));
+  }
   const passo = Math.min(5, Math.max(1, Number(url.searchParams.get('passo')) || 1));
 
   const retirante = retiranteDoAgendamento(agendamento);
@@ -86,6 +90,8 @@ export async function load(event) {
     agendamento: {
       id: agendamento.id,
       status: agendamento.status,
+      // quando o último documento foi assinado por todos (entrega concluída)
+      concluidaEm: agendamento.documentosAssinados.map((d) => d.assinadoEm).filter(Boolean).sort((x, y) => y - x)[0] ?? null,
       dataHora: agendamento.dataHora,
       // quem AGENDOU (campos originais, nunca alterados pelo fluxo do dia)
       nome: agendamento.nomeCompareceu,
@@ -118,6 +124,8 @@ export async function load(event) {
       quartos: quartosDaUnidade(u), // tipologia (base Murano) ou campo quartos
       statusQuitacao: u.statusQuitacao,
       vistoriaAprovada: u.vistoriaAprovada,
+      vistoriaStatus: u.vistoriaStatus,
+      escritura: u.escritura,
       escrituraRegistrada: u.escrituraRegistrada
     },
     titulares: titularesDaUnidade(u).map((t) => ({ id: t.id, nome: t.nome, cpf: t.cpf, principal: t.principal })),

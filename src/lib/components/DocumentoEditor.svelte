@@ -1,4 +1,5 @@
 <script>
+  import LinkDownload from '$lib/components/LinkDownload.svelte';
   import { enhance } from '$app/forms';
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
 
@@ -99,12 +100,12 @@
       </button>
       <button type="button" onclick={baixarPdf} class="btn-outline text-sm !py-2.5">Baixar PDF</button>
       {#if assinatura.status === 'assinado' && assinatura.agendamentoId}
-        <a
+        <LinkDownload
           href="/admin/entrega-chaves/{assinatura.agendamentoId}/documento/{tipo === 'termo' ? 'termo' : 'checklist'}"
           class="text-sm font-bold text-calper-red"
         >
           Baixar PDF assinado
-        </a>
+        </LinkDownload>
       {/if}
       <button type="button" class="text-xs font-semibold text-gray-500" onclick={() => (editado = texto)}>
         Restaurar texto original

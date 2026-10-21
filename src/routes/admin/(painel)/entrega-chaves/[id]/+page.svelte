@@ -1,4 +1,5 @@
 <script>
+  import LinkDownload from '$lib/components/LinkDownload.svelte';
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
@@ -191,10 +192,10 @@
           Pagamento: {u.statusQuitacao === 'quitada' ? 'quitada' : u.statusQuitacao === 'a_vencer' ? 'a vencer' : 'não informado'}
         </span>
         <span class="px-2.5 py-1 rounded-full {u.vistoriaAprovada ? ok : alerta}">
-          Vistoria: {u.vistoriaAprovada ? 'aprovada' : 'pendente'}
+          Vistoria: {u.vistoriaStatus ? u.vistoriaStatus.toLowerCase() : u.vistoriaAprovada ? 'aprovada' : 'pendente'}
         </span>
-        <span class="px-2.5 py-1 rounded-full {u.escrituraRegistrada ? ok : alerta}">
-          Escritura: {u.escrituraRegistrada ? 'registrada' : 'não registrada'}
+        <span class="px-2.5 py-1 rounded-full {u.escrituraRegistrada || /ASSINADA/i.test(u.escritura ?? '') ? ok : alerta}">
+          Escritura: {u.escritura ? u.escritura.toLowerCase() : u.escrituraRegistrada ? 'registrada' : 'não registrada'}
         </span>
         <span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
           {u.quartos ? `${u.quartos} quartos` : 'Tipologia não informada'}
@@ -492,6 +493,30 @@
     <!-- PASSO 5 — concluído + download -->
   {:else}
     <div class="card p-6 flex flex-col gap-3">
+      {#if a.status === 'realizado'}
+        <div class="rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-sm text-green-800">
+          <div class="font-bold">Entrega concluída</div>
+          <div class="text-xs mt-1 text-green-700">
+            {#if a.concluidaEm}Assinada por todos em {new Date(a.concluidaEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}. {/if}Agendada para {formatarDataHora(a.dataHora)}.
+          </div>
+        </div>
+        <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <div>
+            <dt class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Agendou</dt>
+            <dd class="font-semibold text-calper-dark">{a.nome ?? '—'}</dd>
+          </div>
+          <div>
+            <dt class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Retirou as chaves</dt>
+            <dd class="font-semibold text-calper-dark">{data.retirante?.nome ?? a.retiranteNome ?? '—'}</dd>
+          </div>
+          {#if data.conjuge}
+            <div>
+              <dt class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Cônjuge</dt>
+              <dd class="font-semibold text-calper-dark">{data.conjuge.nome}</dd>
+            </div>
+          {/if}
+        </dl>
+      {/if}
       <div class="text-sm font-bold text-calper-dark">Documentos</div>
       {#each [['termo', 'Termo de entrega de chaves', 3], ['checklist', 'Checklist', 4]] as [tipo, rotulo, passo]}
         <div class="flex items-center justify-between border border-gray-100 rounded-xl p-3">
@@ -502,9 +527,9 @@
             </div>
           </div>
           {#if data.documentos[tipo] === 'assinado'}
-            <a
+            <LinkDownload
               href="/admin/entrega-chaves/{a.id}/documento/{tipo}"
-              class="text-xs font-bold text-white bg-calper-red px-3 py-2 rounded-lg">Baixar PDF</a
+              class="text-xs font-bold text-white bg-calper-red px-3 py-2 rounded-lg inline-block">Baixar PDF</LinkDownload
             >
           {:else}
             <a href={href(passo)} class="text-xs font-bold text-calper-red">Ver</a>

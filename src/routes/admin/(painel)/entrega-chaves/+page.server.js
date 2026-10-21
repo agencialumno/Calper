@@ -38,6 +38,8 @@ export async function load() {
         financiado: a.unidade.financiado,
         grupoFinanciamento: a.unidade.grupoFinanciamento,
         vistoriaAprovada: a.unidade.vistoriaAprovada,
+        vistoriaStatus: a.unidade.vistoriaStatus,
+        escritura: a.unidade.escritura,
         escrituraRegistrada: a.unidade.escrituraRegistrada
       }
     }))

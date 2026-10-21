@@ -1,4 +1,5 @@
 <script>
+  import LinkDownload from '$lib/components/LinkDownload.svelte';
   let { data } = $props();
 
   const statusEstilo = {
@@ -25,7 +26,7 @@
         <p class="text-sm text-gray-500 mt-0.5 mb-4">Visão geral de agendamentos e engajamento</p>
       </div>
       <!-- CSV simples (texto puro) de todas as entregas de chaves: unidade, comprador, documentos, presença... -->
-      <a href="/admin/dashboard/exportar" download class="btn-outline text-sm !py-2.5 shrink-0">Exportar CSV das entregas</a>
+      <LinkDownload href="/admin/dashboard/exportar" class="btn-outline text-sm !py-2.5 shrink-0">Exportar CSV das entregas</LinkDownload>
     </div>
 
     <!-- filtros: empilhados e com largura contida no mobile, pra não estourar a tela -->

@@ -8,6 +8,7 @@ import { SLUG_ENTREGA_CHAVES, buscarMurano } from '$lib/server/entregaChaves.js'
 import { notificarFuncionarios } from '$lib/server/notificacao.js';
 import { registrarLog } from '$lib/server/log.js';
 import { formatarCpf } from '$lib/cpf.js';
+import { unidadeAgendavel } from '$lib/unidadeAgendavel.js';
 
 // Rota pública (sem login): agendamento de entrega de chaves do Murano.
 
@@ -18,6 +19,8 @@ async function carregarUnidades(empreendimentoId, tipoEventoId) {
       id: true,
       bloco: true,
       numero: true,
+      compradores: true,
+      vistoriaStatus: true,
       agendamentos: {
         where: { tipoEventoId, status: { not: 'cancelado' } },
         select: { id: true },
@@ -28,6 +31,8 @@ async function carregarUnidades(empreendimentoId, tipoEventoId) {
   return unidades
     // unidade já agendada não aparece mais na lista (não dá pra agendar a mesma unidade duas vezes)
     .filter((u) => u.agendamentos.length === 0)
+    // estoque, jurídico, em notificação ou sem comprador na base: nada a entregar, não aparece
+    .filter(unidadeAgendavel)
     .map((u) => ({ id: u.id, bloco: u.bloco, numero: u.numero }))
     .sort(
       (a, b) =>
@@ -100,7 +105,7 @@ export const actions = {
     const unidade = await db.unidade.findFirst({
       where: { id: valores.unidadeId, empreendimentoId: murano.id }
     });
-    if (!unidade) return erro('Escolha uma unidade da lista.');
+    if (!unidade || !unidadeAgendavel(unidade)) return erro('Escolha uma unidade da lista.');
 
     // revalida no envio — outra pessoa pode ter agendado a unidade enquanto o formulário estava aberto
     const jaAgendada = await db.agendamento.findFirst({

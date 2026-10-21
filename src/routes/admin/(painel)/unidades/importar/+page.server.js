@@ -1,168 +1,94 @@
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
-import { hashSenha, gerarSenhaTemporaria } from '$lib/server/auth.js';
-import { cpfValido, somenteDigitos, emailValido } from '$lib/cpf.js';
 import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
+import { aplicarAtualizar, aplicarSobrescrever, lerPlanilha, montarPrevia, sanitizarUnidades } from '$lib/server/importarMurano.js';
+
+// Importação da base de entrega de chaves (planilha .xlsx): primeiro uma PRÉVIA (não grava nada), depois a
+// escolha explícita entre "Atualizar" (seguro, nunca apaga) e "Sobrescrever" (destrutivo, só perfil admin).
+export const config = { maxDuration: 60 };
+
+export function load({ locals }) {
+  return { podeSobrescrever: locals.funcionario?.perfil === 'admin' };
+}
+
+const FRASE_SOBRESCREVER = 'SOBRESCREVER';
 
 export const actions = {
-  confirmar: async (event) => {
+  previa: async ({ request }) => {
+    const form = await request.formData();
+    const arquivo = form.get('arquivo');
+    if (!arquivo || typeof arquivo === 'string' || arquivo.size === 0) {
+      return fail(400, { erro: 'Escolha a planilha (.xlsx) da base de entrega de chaves.' });
+    }
+    if (!/\.xlsx$/i.test(arquivo.name)) return fail(400, { erro: 'O arquivo precisa ser uma planilha Excel (.xlsx).' });
+
+    let leitura;
+    try {
+      leitura = await lerPlanilha(Buffer.from(await arquivo.arrayBuffer()));
+    } catch (err) {
+      return fail(400, { erro: err.message });
+    }
+    const previa = await montarPrevia(leitura.unidades);
+    return {
+      previa,
+      leitura: { avisos: leitura.avisos, erros: leitura.erros, colunasFaltando: leitura.colunasFaltando, linhasLidas: leitura.linhasLidas },
+      nomeArquivo: arquivo.name,
+      // a confirmação devolve estes dados e o servidor revalida tudo; o hash garante que nada mudou desde a prévia
+      unidadesJson: JSON.stringify(leitura.unidades.map(({ origens, ...u }) => u))
+    };
+  },
+
+  aplicar: async (event) => {
     const { request, locals } = event;
     const form = await request.formData();
-    const nomeArquivo = String(form.get('nomeArquivo') ?? 'planilha.csv');
+    const modo = String(form.get('modo') ?? '');
+    const nomeArquivo = String(form.get('nomeArquivo') ?? 'planilha.xlsx').slice(0, 200);
+    if (!['atualizar', 'sobrescrever'].includes(modo)) return fail(400, { erro: 'Escolha entre "Atualizar" e "Sobrescrever".' });
 
-    let linhas;
+    let unidades;
     try {
-      linhas = JSON.parse(String(form.get('linhas') ?? '[]'));
-    } catch {
-      return fail(400, { erro: 'Não foi possível ler os dados enviados.' });
-    }
-    if (!Array.isArray(linhas) || linhas.length === 0) {
-      return fail(400, { erro: 'Nenhuma linha válida para importar.' });
+      unidades = sanitizarUnidades(JSON.parse(String(form.get('unidadesJson') ?? '[]')));
+    } catch (err) {
+      return fail(400, { erro: `${err.message} Gere a prévia de novo.` });
     }
 
-    const erros = [];
-    const credenciaisGeradas = [];
-    let unidadesCriadas = 0;
-    let investidoresCriados = 0;
-
-    // Agrupa as linhas por unidade (empreendimento + bloco + número),
-    // já que uma unidade pode ter até 3 linhas (uma por investidor).
-    const grupos = new Map();
-    for (const [i, linha] of linhas.entries()) {
-      const empreendimento = String(linha.empreendimento ?? '').trim();
-      const bloco = String(linha.bloco ?? '').trim();
-      const numero = String(linha.numero ?? '').trim();
-      const nome = String(linha.investidorNome ?? '').trim();
-      const cpf = somenteDigitos(linha.investidorCpf);
-      const email = String(linha.investidorEmail ?? '').trim();
-
-      const linhaNum = i + 2; // +1 cabeçalho, +1 índice base 1
-
-      if (!empreendimento || !bloco || !numero) {
-        erros.push({ linha: linhaNum, motivo: 'Empreendimento, bloco ou número ausente.' });
-        continue;
-      }
-      if (!nome) {
-        erros.push({ linha: linhaNum, motivo: 'Nome do investidor ausente.' });
-        continue;
-      }
-      if (!cpfValido(cpf)) {
-        erros.push({ linha: linhaNum, motivo: `CPF inválido: ${linha.investidorCpf}` });
-        continue;
-      }
-      if (!emailValido(email)) {
-        erros.push({ linha: linhaNum, motivo: `E-mail inválido: ${linha.investidorEmail}` });
-        continue;
-      }
-
-      const chave = `${empreendimento}::${bloco}::${numero}`;
-      if (!grupos.has(chave)) grupos.set(chave, { empreendimento, bloco, numero, investidores: [] });
-      const grupo = grupos.get(chave);
-      if (grupo.investidores.length >= 3) {
-        erros.push({ linha: linhaNum, motivo: 'Unidade já tem 3 investidores — linha ignorada.' });
-        continue;
-      }
-      if (grupo.investidores.some((inv) => inv.cpf === cpf)) {
-        erros.push({ linha: linhaNum, motivo: 'CPF duplicado para a mesma unidade.' });
-        continue;
-      }
-      grupo.investidores.push({ nome, cpf, email });
-    }
-
-    for (const grupo of grupos.values()) {
-      try {
-        await db.$transaction(async (tx) => {
-          let empreendimento = await tx.empreendimento.findFirst({
-            where: { nome: { equals: grupo.empreendimento, mode: 'insensitive' } }
-          });
-          if (!empreendimento) {
-            empreendimento = await tx.empreendimento.create({ data: { nome: grupo.empreendimento } });
-          }
-
-          let unidade = await tx.unidade.findFirst({
-            where: { empreendimentoId: empreendimento.id, bloco: grupo.bloco, numero: grupo.numero }
-          });
-          const unidadeJaExistia = Boolean(unidade);
-          if (!unidade) {
-            unidade = await tx.unidade.create({
-              data: { empreendimentoId: empreendimento.id, bloco: grupo.bloco, numero: grupo.numero }
-            });
-            unidadesCriadas++;
-          }
-
-          for (const inv of grupo.investidores) {
-            let investidor = await tx.investidor.findUnique({ where: { cpf: inv.cpf } });
-            if (!investidor) {
-              const senhaTemporaria = gerarSenhaTemporaria();
-              investidor = await tx.investidor.create({
-                data: {
-                  nome: inv.nome,
-                  cpf: inv.cpf,
-                  senhaHash: hashSenha(senhaTemporaria),
-                  primeiroAcesso: true
-                }
-              });
-              investidoresCriados++;
-              credenciaisGeradas.push({ nome: inv.nome, cpf: inv.cpf, email: inv.email, senhaTemporaria });
-            }
-
-            const vinculoExistente = await tx.unidadeInvestidor.findFirst({
-              where: { unidadeId: unidade.id, investidorId: investidor.id }
-            });
-            if (!vinculoExistente) {
-              await tx.unidadeInvestidor.create({
-                data: { unidadeId: unidade.id, investidorId: investidor.id, email: inv.email }
-              });
-            }
-          }
-
-          if (!unidadeJaExistia) {
-            await tx.historicoUnidade.create({
-              data: {
-                unidadeId: unidade.id,
-                tipo: 'cadastro',
-                descricao: 'Unidade cadastrada via importação em massa',
-                criadoPorId: locals.funcionario.id
-              }
-            });
-          }
-        });
-      } catch (err) {
-        erros.push({
-          linha: null,
-          motivo: `Unidade ${grupo.numero} — Bloco ${grupo.bloco} (${grupo.empreendimento}): ${err?.message ?? 'erro desconhecido'}`
-        });
+    if (modo === 'sobrescrever') {
+      if (locals.funcionario.perfil !== 'admin') return fail(403, { erro: 'Só o perfil admin pode sobrescrever a base.' });
+      if (String(form.get('confirmacao') ?? '').trim() !== FRASE_SOBRESCREVER || form.get('entendi') !== 'on') {
+        return fail(400, { erro: `Para sobrescrever, marque a caixa de ciência e digite ${FRASE_SOBRESCREVER}.` });
       }
     }
 
-    const lote = await db.importacaoLote.create({
+    // a base pode ter mudado entre a prévia e a confirmação: confere antes de gravar qualquer coisa
+    const atual = await montarPrevia(unidades);
+    if (atual.hash !== String(form.get('previaHash') ?? '')) {
+      return fail(409, { erro: 'Os dados mudaram desde que a prévia foi gerada (alguém agendou ou editou algo). Nada foi alterado: gere a prévia de novo.' });
+    }
+
+    const opcoes = { funcionarioId: locals.funcionario.id, nomeArquivo };
+    const resultado = modo === 'sobrescrever' ? await aplicarSobrescrever(unidades, opcoes) : await aplicarAtualizar(unidades, opcoes);
+
+    await db.importacaoLote.create({
       data: {
         nomeArquivo,
-        totalLinhas: linhas.length,
-        unidadesCriadas,
-        investidoresCriados,
-        erros,
-        credenciais: credenciaisGeradas,
+        totalLinhas: unidades.length,
+        unidadesCriadas: resultado.criadas,
+        investidoresCriados: 0,
+        erros: { modo, atualizadas: resultado.atualizadas, apagado: modo === 'sobrescrever' ? atual.apagar : null },
         criadoPorId: locals.funcionario.id
       }
     });
-
     await registrarLog({
       event,
       atorTipo: 'funcionario',
-      acao: 'importacao_realizada',
-      descricao: `${rotuloFuncionario(locals.funcionario)} importou "${nomeArquivo}": ${unidadesCriadas} unidade(s) e ${investidoresCriados} investidor(es) criados, ${erros.length} erro(s)`,
-      entidadeTipo: 'ImportacaoLote',
-      entidadeId: lote.id
+      acao: modo === 'sobrescrever' ? 'base_sobrescrita' : 'base_atualizada',
+      descricao:
+        modo === 'sobrescrever'
+          ? `${rotuloFuncionario(locals.funcionario)} SOBRESCREVEU a base de entrega de chaves com "${nomeArquivo}": apagou ${atual.apagar.unidades} unidade(s), ${atual.apagar.agendamentos} agendamento(s), ${atual.apagar.investidores} investidor(es) e importou ${resultado.criadas} unidade(s)`
+          : `${rotuloFuncionario(locals.funcionario)} atualizou a base de entrega de chaves com "${nomeArquivo}": ${resultado.criadas} criada(s), ${resultado.atualizadas} atualizada(s), ${resultado.iguais} sem mudança`,
+      entidadeTipo: 'ImportacaoLote'
     });
 
-    return {
-      sucesso: true,
-      loteId: lote.id,
-      unidadesCriadas,
-      investidoresCriados,
-      erros,
-      credenciais: credenciaisGeradas
-    };
+    return { resultado, nomeArquivo };
   }
 };

@@ -1,4 +1,5 @@
 <script>
+  import LinkDownload from '$lib/components/LinkDownload.svelte';
   let { data } = $props();
   let busca = $state('');
   let filtrados = $derived(
@@ -70,12 +71,16 @@
           </div>
 
           <div class="flex items-center gap-3 mt-3 text-xs font-bold">
-            <a href="/admin/entrega-chaves/{a.id}" class="text-white bg-calper-red px-3 py-1.5 rounded-lg">
-              {a.documentos.termo === 'assinado' && a.documentos.checklist === 'assinado' ? 'Ver documentos' : 'Iniciar entrega'}
+            <!-- entrega concluída: abre direto o resumo (passo 5) com os PDFs, sem reabrir o fluxo -->
+            <a
+              href="/admin/entrega-chaves/{a.id}{a.status === 'realizado' ? '?passo=5' : ''}"
+              class="text-white bg-calper-red px-3 py-1.5 rounded-lg"
+            >
+              {a.status === 'realizado' || (a.documentos.termo === 'assinado' && a.documentos.checklist === 'assinado') ? 'Ver documentos' : 'Iniciar entrega'}
             </a>
             {#each [['termo', 'Termo'], ['checklist', 'Checklist']] as [tipo, rotulo]}
               {#if a.documentos[tipo] === 'assinado'}
-                <a href="/admin/entrega-chaves/{a.id}/documento/{tipo}" class="text-calper-red">PDF {rotulo}</a>
+                <LinkDownload href="/admin/entrega-chaves/{a.id}/documento/{tipo}" class="text-calper-red">PDF {rotulo}</LinkDownload>
               {/if}
             {/each}
           </div>
@@ -96,14 +101,14 @@
                 ? 'bg-green-50 text-green-700'
                 : 'bg-amber-50 text-amber-700'}"
             >
-              Vistoria: {u.vistoriaAprovada ? 'aprovada' : 'pendente'}
+              Vistoria: {u.vistoriaStatus ? u.vistoriaStatus.toLowerCase() : u.vistoriaAprovada ? 'aprovada' : 'pendente'}
             </span>
             <span
-              class="px-2 py-0.5 rounded-full {u.escrituraRegistrada
+              class="px-2 py-0.5 rounded-full {u.escrituraRegistrada || /ASSINADA/i.test(u.escritura ?? '')
                 ? 'bg-green-50 text-green-700'
                 : 'bg-gray-100 text-gray-600'}"
             >
-              Escritura: {u.escrituraRegistrada ? 'registrada' : 'não registrada'}
+              Escritura: {u.escritura ? u.escritura.toLowerCase() : u.escrituraRegistrada ? 'registrada' : 'não registrada'}
             </span>
             {#if u.quartos}
               <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{u.quartos} quartos</span>

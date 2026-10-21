@@ -18,12 +18,20 @@
 
   // O Popover API cuida de abrir/fechar (clique fora, Esc) e de renderizar na
   // top layer — assim o painel nunca é cortado por um container com scroll.
-  // Só falta ancorar o painel no botão a cada abertura.
+  // Só falta ancorar o painel no botão a cada abertura, sempre DENTRO da tela: alinha à direita do sino
+  // (sino no canto direito, como no celular) e, se isso empurrar o painel pra fora pela esquerda (sino na
+  // barra lateral do desktop), alinha à esquerda do sino. No fim, trava dentro da janela.
+  const MARGEM = 8;
   function posicionar(e) {
     if (e.newState !== 'open' || !botaoEl || !popoverEl) return;
     const rect = botaoEl.getBoundingClientRect();
+    const largura = Math.min(popoverEl.offsetWidth || 340, window.innerWidth - MARGEM * 2);
+    let esquerda = rect.right - largura;
+    if (esquerda < MARGEM) esquerda = rect.left;
+    esquerda = Math.min(Math.max(MARGEM, esquerda), window.innerWidth - largura - MARGEM);
     popoverEl.style.top = `${rect.bottom + 8}px`;
-    popoverEl.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+    popoverEl.style.left = `${esquerda}px`;
+    popoverEl.style.right = 'auto';
   }
 
   async function marcarLida(id) {

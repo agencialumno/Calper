@@ -9,7 +9,7 @@ test.describe('guarda da área da equipe', () => {
       expect(r.status(), caminho).toBe(303);
       expect(r.headers().location).toContain('/admin/login');
     }
-    for (const acao of ['/admin/documentos?/salvarTexto', '/admin/unidades/importar?/confirmar', '/admin/agenda?/salvarPadrao']) {
+    for (const acao of ['/admin/documentos?/salvarTexto', '/admin/unidades/importar?/aplicar', '/admin/unidades/importar?/previa', '/admin/unidades/importar/investidores?/confirmar', '/admin/agenda?/salvarPadrao']) {
       const r = await request.post(acao, { form: { a: '1' }, headers: { 'x-sveltekit-action': 'true', origin: 'http://localhost:5301' } });
       expect(r.status(), acao).toBe(401);
     }

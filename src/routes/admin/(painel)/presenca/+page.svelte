@@ -1,4 +1,5 @@
 <script>
+  import LinkDownload from '$lib/components/LinkDownload.svelte';
   let { data } = $props();
 
   const rotuloDoc = {
@@ -63,7 +64,7 @@
   </div>
 
   <div class="flex justify-end mb-3">
-    <a href={data.exportarEntregasHref} class="text-sm font-bold text-calper-red">Exportar CSV: recebeu x ainda não recebeu</a>
+    <LinkDownload href={data.exportarEntregasHref} class="text-sm font-bold text-calper-red">Exportar CSV: recebeu x ainda não recebeu</LinkDownload>
   </div>
 
   <section id="faltam" class="card p-4 md:p-5 mb-6 border-l-4 border-l-amber-400">
@@ -110,7 +111,7 @@
 
   <div class="flex items-center justify-between mb-3">
     <h2 class="text-base font-bold text-calper-dark">Quem compareceu</h2>
-    <a href={data.exportarHref} class="text-sm font-bold text-calper-red">Exportar CSV da lista de presença</a>
+    <LinkDownload href={data.exportarHref} class="text-sm font-bold text-calper-red">Exportar CSV da lista de presença</LinkDownload>
   </div>
 
   <div class="card overflow-x-auto">

@@ -60,7 +60,7 @@ export async function prepararBancoDeTeste() {
       ['102', [{ nome: 'COMPRADOR DOIS TESTE', principal: true }]],
       ['103', [{ nome: 'COMPRADOR TRES TESTE', principal: true }]],
       ['104', [{ nome: 'COMPRADOR QUATRO TESTE', principal: true }]],
-      ['105', [{ nome: 'COMPRADOR CINCO TESTE', principal: true }]],
+      ['105', [{ nome: 'COMPRADOR CINCO TESTE', principal: true }, { nome: 'CO-COMPRADOR CINCO TESTE', principal: false }]],
       ['106', [{ nome: 'COMPRADOR SEIS TESTE', principal: true }]],
       ['107', [{ nome: 'COMPRADOR SETE TESTE', principal: true }]]
     ]) {
@@ -68,6 +68,11 @@ export async function prepararBancoDeTeste() {
         data: { empreendimentoId: murano.id, bloco: '2', numero, tipologia: '2 QUARTOS', statusQuitacao: 'quitada', compradores }
       });
     }
+
+    // modelo do termo editado pela equipe: a importação (inclusive "sobrescrever") não pode apagá-lo
+    await db.documentoTemplate.create({
+      data: { empreendimentoId: murano.id, tipo: 'termo_entrega_chaves', conteudo: 'TEXTO DO TERMO EDITADO PELA EQUIPE', variaveis: { numeroCertidao: '99/9999/2030' } }
+    });
 
     await db.funcionario.create({ data: { nome: 'Admin Teste', email: ADMIN.email, senhaHash: hashSenha(ADMIN.senha), perfil: 'admin', ativo: true } });
     await db.funcionario.create({ data: { nome: 'Atendimento Teste', email: ATENDIMENTO.email, senhaHash: hashSenha(ATENDIMENTO.senha), perfil: 'atendimento', ativo: true } });
