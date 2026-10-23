@@ -13,3 +13,11 @@ scripts/murano-dados.json
 # testes (relatórios e artefatos locais)
 test-results/
 playwright-report/
+
+# backups do banco (contêm dados pessoais)
+backups/
+prints/
+
+# planilhas (base de clientes: nunca versionar); só as planilhas SINTÉTICAS de teste em tests/fixtures entram
+*.xlsx
+!tests/fixtures/*.xlsx
