@@ -83,6 +83,7 @@ export const actions = {
 
     // quem não é o proprietário precisa anexar a procuração já no agendamento — a equipe confere no dossiê da unidade
     let procuracaoBase64 = null;
+    let documentoIdentidadeBase64 = null;
     if (!ehProprietario) {
       if (valores.proprietarioNome.length < 3) return erro('Informe o nome do proprietário da unidade.');
       try {
@@ -94,6 +95,13 @@ export const actions = {
         return erro(err.message);
       }
       if (!procuracaoBase64) return erro('Anexe a procuração para confirmar o agendamento.');
+      // além da procuração, o documento de identidade de quem vai assinar/comparecer (foto ou PDF)
+      try {
+        documentoIdentidadeBase64 = await arquivoParaBase64(form.get('identidade'));
+      } catch (err) {
+        return erro(`Documento de identidade: ${err.message}`);
+      }
+      if (!documentoIdentidadeBase64) return erro('Anexe o documento de identidade de quem vai assinar/comparecer.');
     }
 
     const [murano, tipoEvento] = await Promise.all([
@@ -153,6 +161,7 @@ export const actions = {
               ehProprietario,
               proprietarioNome: ehProprietario ? null : valores.proprietarioNome,
               procuracaoBase64,
+              documentoBase64: documentoIdentidadeBase64,
               procuracaoCpf: procuracaoBase64 ? cpf : null
             }
           });
@@ -181,7 +190,7 @@ export const actions = {
       data: {
         unidadeId: unidade.id,
         tipo: 'outro',
-        descricao: `Entrega de chaves agendada para ${valores.data} às ${valores.horario} (${valores.nome})${procuracaoBase64 ? ` — procuração anexada, proprietário: ${valores.proprietarioNome}` : ''}`
+        descricao: `Entrega de chaves agendada para ${valores.data} às ${valores.horario} (${valores.nome})${procuracaoBase64 ? ` — procuração e documento de identidade anexados, proprietário: ${valores.proprietarioNome}` : ''}`
       }
     });
     await registrarLog({

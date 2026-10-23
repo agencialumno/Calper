@@ -47,6 +47,8 @@ export async function GET(event) {
       numero: true,
       compradores: true,
       procuracoes: { orderBy: { createdAt: 'asc' } },
+      // documentos assinados cujo agendamento foi apagado (ficam ligados à unidade)
+      documentosAssinados: { where: { agendamentoId: null, status: 'assinado' }, select: { id: true, tipo: true, pdfBase64: true, assinadoEm: true } },
       agendamentos: {
         orderBy: { createdAt: 'asc' },
         select: {
@@ -83,6 +85,9 @@ export async function GET(event) {
   unidade.procuracoes.forEach((p, i) =>
     adicionar('procuracoes', `${String(i + 1).padStart(2, '0')}-${seguro(p.nome)}`, p.arquivoBase64, 'procuração', `Procurador: ${p.nome} (CPF ${p.cpf}), origem: ${p.origem}`, p.createdAt)
   );
+  for (const d of unidade.documentosAssinados) {
+    if (d.pdfBase64) adicionar('documentos-assinados', `${NOME_DOC[d.tipo] ?? d.tipo}-${d.id.slice(-8)}`, d.pdfBase64, `${d.tipo} assinado`, 'Documento de uma entrega cujo agendamento foi apagado', d.assinadoEm);
+  }
   for (const a of unidade.agendamentos) {
     const rotulo = `${a.dataHora.toISOString().slice(0, 10)}-${seguro(a.nomeCompareceu)}`;
     for (const d of a.documentosAssinados) {

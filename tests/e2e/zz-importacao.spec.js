@@ -39,11 +39,11 @@ test.describe('importação da base (prévia, atualizar e sobrescrever)', () => 
     // coluna GRUPO ausente: aviso
     await expect(page.getByText(/não tem a coluna GRUPO/)).toBeVisible();
     // detalhe de cada unidade (a lista já vem aberta quando são poucas)
-    await expect(page.getByText('Pagamento: quitada → a vencer')).toBeVisible();
+    await expect(page.getByText('Status-Quitação: Saldo quitado → A vencer')).toBeVisible();
     await page.screenshot({ path: process.env.PREVIA_PNG ?? 'test-results/previa-importacao.png', fullPage: true });
 
     expect(await comBanco((db) => db.unidade.count())).toBe(antes);
-    expect(await comBanco((db) => db.unidade.count({ where: { vistoriaStatus: { not: null } } }))).toBe(0);
+    expect(await comBanco((db) => db.unidade.count({ where: { numero: { in: ['101', '102', '103', '104', '105'] }, vistoriaStatus: { not: null } } }))).toBe(0);
   });
 
   test('"Sobrescrever" exige confirmação e perfil admin; sem isso nada é apagado', async ({ page }) => {

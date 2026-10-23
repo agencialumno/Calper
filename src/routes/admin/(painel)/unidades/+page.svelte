@@ -1,5 +1,7 @@
 <script>
   import { agruparUnidades } from './agrupamento.js';
+  import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
+  import { OPCOES_QUITACAO } from '$lib/rotulosUnidade.js';
 
   let { data } = $props();
 
@@ -136,14 +138,15 @@
     <input
       type="search"
       bind:value={busca}
-      placeholder="Buscar por número da unidade, comprador, bloco ou empreendimento..."
+      placeholder="Buscar por unidade, nome do comprador/proprietário/investidor, bloco ou empreendimento..."
       class="input"
     />
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
       <select bind:value={quitacao} class="input !py-2.5 text-sm" aria-label="Status de quitação">
         <option value="">Quitação: todas</option>
-        <option value="quitada">Quitada</option>
-        <option value="a_vencer">A vencer</option>
+        {#each OPCOES_QUITACAO as o}
+          <option value={o.valor}>{o.rotulo}</option>
+        {/each}
         <option value="sem">Não informada</option>
       </select>
       <select bind:value={grupo} class="input !py-2.5 text-sm" aria-label="Grupo">
@@ -252,39 +255,19 @@
                       {#each a.unidades as u (u.id)}
                         {@const principal = u.compradores.find((c) => c.principal) ?? u.compradores[0]}
                         {@const temComprador = u.compradores.length > 0 || u.investidores.length > 0}
-                        <li>
+                        <li class="px-4 md:px-5 py-3 flex flex-col gap-2 hover:bg-gray-50/60">
                           <a
                             href={`/admin/unidades/${u.id}`}
-                            class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3 hover:bg-gray-50"
+                            class="flex items-center gap-x-4 gap-y-1 flex-wrap"
                           >
                             <span class="w-14 text-base font-extrabold text-calper-dark shrink-0">{u.numero}</span>
-
-                            <span class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-                              {#if u.tipologia}
-                                <span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">{u.tipologia}</span>
-                              {/if}
-                              {#if u.grupo}
-                                <span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">Grupo {u.grupo}</span>
-                              {/if}
-                              {#if u.statusQuitacao}
-                                <span
-                                  class="px-2.5 py-1 rounded-full {u.statusQuitacao === 'quitada'
-                                    ? 'bg-green-50 text-green-700'
-                                    : 'bg-amber-50 text-amber-700'}"
-                                >
-                                  {u.statusQuitacao === 'quitada' ? 'Quitada' : 'A vencer'}
-                                </span>
-                              {/if}
-                              {#if statusUnidade[u.status]}
-                                <span class="px-2.5 py-1 rounded-full {statusUnidade[u.status].cls}">
-                                  {statusUnidade[u.status].texto}
-                                </span>
-                              {/if}
-                            </span>
-
-                            <span class="basis-full md:basis-auto md:ml-auto text-sm min-w-0 md:max-w-[16rem] truncate">
+                            {#if statusUnidade[u.status]}
+                              <span class="px-2.5 py-1 rounded-full text-xs font-bold {statusUnidade[u.status].cls}">
+                                {statusUnidade[u.status].texto}
+                              </span>
+                            {/if}
+                            <span class="md:ml-auto text-sm min-w-0 md:max-w-[18rem] truncate">
                               {#if temComprador}
-                                <span class="text-green-700 font-bold" aria-hidden="true">✓</span>
                                 <span class="text-gray-600">
                                   {principal?.nome ?? u.investidores[0]}{u.compradores.length > 1
                                     ? ` +${u.compradores.length - 1}`
@@ -295,6 +278,7 @@
                               {/if}
                             </span>
                           </a>
+                          <UnidadeStatus unidade={u} podeEditar={data.podeEditar} />
                         </li>
                       {/each}
                     </ul>

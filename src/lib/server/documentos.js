@@ -236,3 +236,17 @@ export async function gerarPdfBase64(texto, titulo, tipo = null) {
 
   return Buffer.from(await pdf.save()).toString('base64');
 }
+
+/**
+ * Junta vários PDFs (Buffers) num só, na ordem recebida. Usado no download final da entrega: termo e checklist
+ * assinados continuam documentos separados durante o atendimento e saem juntos no PDF completo.
+ */
+export async function juntarPdfs(buffers) {
+  const saida = await PDFDocument.create();
+  for (const buffer of buffers) {
+    const origem = await PDFDocument.load(buffer);
+    const paginas = await saida.copyPages(origem, origem.getPageIndices());
+    paginas.forEach((p) => saida.addPage(p));
+  }
+  return Buffer.from(await saida.save());
+}

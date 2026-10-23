@@ -1,10 +1,9 @@
-import { PERFIS_COM_ACESSO_CADASTRO } from './auth-staff.js';
+import { permissaoNoCaminho } from '../perfis.js';
 
-// Área da equipe (/admin): a sessão é exigida AQUI, na entrada de toda requisição — páginas, ações de formulário
-// (?/acao) e endpoints (+server.js). Guardar só no `load` do layout não basta: ações e endpoints não passam por ele.
+// Área da equipe (/admin): a sessão e o PERFIL são exigidos AQUI, na entrada de toda requisição — páginas, ações de
+// formulário (?/acao) e endpoints (+server.js). Guardar só no `load` do layout não basta: ações e endpoints não
+// passam por ele. As regras por perfil (admin / supervisor / colaborador) estão em src/lib/perfis.js.
 export const ADMIN_PUBLICO = ['/admin/login', '/admin/cadastro', '/admin/assinatura-retorno', '/admin/logout'];
-// qualquer perfil logado (inclusive atendimento) pode usar estas áreas; o resto exige perfil de gestão
-export const ADMIN_TODOS_OS_PERFIS = ['/admin/checkin', '/admin/sem-acesso'];
 
 const sob = (caminho, bases) => bases.some((b) => caminho === b || caminho.startsWith(`${b}/`));
 
@@ -20,9 +19,13 @@ export function bloqueioAdmin(event) {
   const funcionario = event.locals.funcionario;
   if (!funcionario) return leitura ? redirecionar('/admin/login') : new Response('Não autorizado.', { status: 401 });
 
-  if (!sob(caminho, ADMIN_TODOS_OS_PERFIS) && !PERFIS_COM_ACESSO_CADASTRO.includes(funcionario.perfil)) {
+  // a tela de aviso é de qualquer perfil logado
+  if (caminho === '/admin/sem-acesso') return null;
+
+  const permissao = permissaoNoCaminho(funcionario.perfil, event.request.method, caminho);
+  if (permissao === 'sem-acesso') {
     return leitura ? redirecionar('/admin/sem-acesso') : new Response('Acesso negado.', { status: 403 });
   }
+  if (permissao === 'somente-leitura') return new Response('Seu perfil é somente leitura: não é possível alterar dados.', { status: 403 });
   return null;
 }
-

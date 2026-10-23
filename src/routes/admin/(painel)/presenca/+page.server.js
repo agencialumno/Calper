@@ -29,6 +29,7 @@ export async function load({ url }) {
       createdAt: p.createdAt,
       unidadeId: p.unidade.id,
       unidade: `Bloco ${p.unidade.bloco} - nº ${p.unidade.numero}`,
+      observacoes: p.agendamento?.observacoesAtendimento ?? '',
       chaveEntregue: unidadesEntregues.has(p.unidade.id)
     }))
   };

@@ -9,8 +9,9 @@ import { senhaAceitavel } from '$lib/password.js';
 
 // Cadastro da equipe pela tela de login, com ATIVAÇÃO DIRETA: a conta nasce ativa e já entra logada,
 // sem aprovação de um admin e sem código de convite (decisão consciente da Calper).
-// Quem se cadastra recebe o perfil "admin" (acesso total, inclusive à tela de logs) — decisão consciente da
-// Calper — e os admins existentes são avisados no sino.
+// Quem se cadastra recebe o perfil de MENOR privilégio, "colaborador" (somente leitura + atendimento presencial).
+// Antes de existirem perfis, todo cadastro virava admin; agora um admin promove a pessoa em /admin/usuarios, e os
+// admins existentes são avisados no sino.
 export function load({ locals }) {
   if (locals.funcionario) throw redirect(303, '/admin/unidades');
 }
@@ -41,7 +42,7 @@ export const actions = {
     let funcionario;
     try {
       funcionario = await db.funcionario.create({
-        data: { nome, email, senhaHash: hashSenha(senha), perfil: 'admin', ativo: true }
+        data: { nome, email, senhaHash: hashSenha(senha), perfil: 'colaborador', ativo: true }
       });
     } catch (err) {
       if (err?.code === 'P2002') return fail(400, { erro: 'Já existe uma conta com esse e-mail.', valores });
@@ -53,14 +54,14 @@ export const actions = {
       atorTipo: 'funcionario',
       funcionarioId: funcionario.id,
       acao: 'funcionario_cadastrado',
-      descricao: `${nome} (${email}) se cadastrou na área da equipe pela tela de login (perfil admin, ativação direta, sem aprovação)`,
+      descricao: `${nome} (${email}) se cadastrou na área da equipe pela tela de login (perfil colaborador, ativação direta, sem aprovação; um admin pode alterar o perfil em Usuários)`,
       entidadeTipo: 'Funcionario',
       entidadeId: funcionario.id
     });
     await notificarFuncionarios({
       titulo: 'Novo cadastro na equipe',
-      mensagem: `${nome} (${email}) criou uma conta de administrador pela tela de login.`,
-      link: '/admin/logs',
+      mensagem: `${nome} (${email}) criou uma conta pela tela de login (perfil colaborador). Defina o perfil certo em Usuários.`,
+      link: '/admin/usuarios',
       perfis: ['admin']
     });
 

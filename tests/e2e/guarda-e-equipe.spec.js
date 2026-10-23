@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ATENDIMENTO } from '../preparar-banco-teste.js';
+import { COLABORADOR } from '../preparar-banco-teste.js';
 import { entrarComoAdmin } from './helpers.js';
 
 test.describe('guarda da área da equipe', () => {
@@ -15,13 +15,15 @@ test.describe('guarda da área da equipe', () => {
     }
   });
 
-  test('o atendimento entra no check-in mas não nas áreas de gestão', async ({ page }) => {
-    await entrarComoAdmin(page, ATENDIMENTO);
+  test('o colaborador entra no check-in e lê as telas, mas não vê as áreas restritas', async ({ page }) => {
+    await entrarComoAdmin(page, COLABORADOR);
     await page.goto('/admin/checkin');
     await expect(page).toHaveURL(/\/admin\/checkin/);
-    const r = await page.request.get('/admin/presenca/exportar', { maxRedirects: 0 });
-    expect(r.status()).toBe(303);
-    expect(r.headers().location).toContain('/admin/sem-acesso');
+    for (const caminho of ['/admin/questionarios', '/admin/atualizacoes', '/admin/empreendimentos', '/admin/usuarios', '/admin/logs']) {
+      const r = await page.request.get(caminho, { maxRedirects: 0 });
+      expect(r.status(), caminho).toBe(303);
+      expect(r.headers().location).toContain('/admin/sem-acesso');
+    }
   });
 });
 

@@ -1,9 +1,10 @@
 <script>
+  import { ROTULO_PERFIL } from '$lib/perfis.js';
   import { onMount } from 'svelte';
 
   let { data, children } = $props();
 
-  const rotuloPerfil = { admin: 'Admin', gestao: 'Gestão', atendimento: 'Atendimento' };
+  const rotuloPerfil = ROTULO_PERFIL;
 
   // null = ainda não checado (evita piscar o conteúdo no desktop)
   let dispositivoPermitido = $state(null);

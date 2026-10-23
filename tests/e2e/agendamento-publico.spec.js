@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { DATAS_ABERTAS, DIA_COM_LIMITE_1 } from '../preparar-banco-teste.js';
+import { comBanco } from './db.js';
 
 const PDF = { name: 'procuracao.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 teste') };
 const PNG = {
@@ -66,9 +67,20 @@ test.describe('agendamento público de entrega de chaves', () => {
     await page.setInputFiles('#procuracao', PNG);
     await expect(page.getByText(/precisa ser um documento: PDF, DOC ou DOCX/)).toBeVisible();
 
-    // PDF vale
+    // PDF vale; mas falta o documento de identidade de quem vai comparecer
     await page.setInputFiles('#procuracao', PDF);
     await page.click('button:has-text("Confirmar agendamento")');
+    await expect(page.getByText('Anexe o documento de identidade para confirmar o agendamento.')).toBeVisible();
+    // documento que não é foto nem PDF é recusado
+    await page.setInputFiles('#identidade', { name: 'identidade.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('x') });
+    await expect(page.getByText(/precisa ser uma foto \(JPG ou PNG\) ou um PDF/)).toBeVisible();
+
+    // foto do documento de identidade vale
+    await page.setInputFiles('#identidade', PNG);
+    await page.click('button:has-text("Confirmar agendamento")');
     await expect(page.getByText('Agendamento realizado com sucesso')).toBeVisible();
+    const ag = await comBanco((db) => db.agendamento.findFirst({ where: { nomeCompareceu: 'Procurador Teste' } }));
+    expect(ag.documentoBase64).toMatch(/^data:image\/png;base64,/); // identidade guardada
+    expect(ag.procuracaoBase64).toMatch(/^data:application\/pdf/); // procuração continua exigida
   });
 });

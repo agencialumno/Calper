@@ -38,7 +38,7 @@ test.describe('correções: download, "Ver documentos" e painel de notificaçõe
   test('download que falha mostra mensagem e destrava o botão', async ({ page }) => {
     const id = await comBanco(async (db) => (await db.agendamento.findFirst({ where: { status: 'realizado' }, select: { id: true } })).id);
     await page.goto(`/admin/entrega-chaves/${id}?passo=5`, { waitUntil: 'networkidle' });
-    await page.route('**/documento/termo', (r) => r.fulfill({ status: 500, body: 'erro' }));
+    await page.route('**/documento/completo', (r) => r.fulfill({ status: 500, body: 'erro' }));
     const botao = page.getByRole('link', { name: 'Baixar PDF' }).first();
     await botao.click();
     await expect(page.getByRole('alert')).toContainText(/indisponível|expirada/);

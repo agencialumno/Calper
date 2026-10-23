@@ -253,6 +253,25 @@ export async function anexarChecklist({ envelopeId, pdfBase64, nomeDocumento, ca
   }
 }
 
+/**
+ * Corrige o e-mail de um destinatário (cliente ou cônjuge) no envelope em andamento. O link que o DocuSign mandou
+ * ao e-mail antigo deixa de valer. `reenviar`: manda o e-mail de assinatura ao novo endereço (use quando o
+ * destinatário já tinha sido notificado, isto é, a Calper já assinou tudo). Lança se o DocuSign recusar
+ * (ex.: destinatário que já assinou).
+ */
+export async function corrigirEmailDoDestinatario({ envelopeId, destinatario, nome, email, reenviar = false }) {
+  const apiClient = await clienteAutenticado();
+  const envelopesApi = new docusign.EnvelopesApi(apiClient);
+  const resultado = await envelopesApi.updateRecipients(env.DOCUSIGN_ACCOUNT_ID, envelopeId, {
+    recipients: docusign.Recipients.constructFromObject({
+      signers: [docusign.Signer.constructFromObject({ recipientId: destinatario, name: nome, email })]
+    }),
+    resendEnvelope: reenviar ? 'true' : 'false'
+  });
+  const erro = (resultado?.recipientUpdateResults ?? []).find((r) => r.errorDetails?.errorCode && r.errorDetails.errorCode !== 'SUCCESS');
+  if (erro) throw new Error(erro.errorDetails.message ?? erro.errorDetails.errorCode);
+}
+
 /** Anula um envelope (ex.: um termo ainda não assinado que será reenviado com outro texto). Não lança. */
 export async function anularEnvelope(envelopeId, motivo) {
   try {

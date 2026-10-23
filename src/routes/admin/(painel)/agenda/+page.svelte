@@ -4,6 +4,9 @@
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
 
   let { data, form } = $props();
+  import { autoAtualizar } from '$lib/autoAtualizar.svelte.js';
+  // a página se atualiza sozinha (novo agendamento, cancelamento, check-in, mudança de status)
+  const auto = autoAtualizar();
   let salvando = $state('');
   let novoDia = $state('');
 
@@ -27,9 +30,17 @@
 
 <div class="p-5 md:p-8 max-w-4xl">
   <h1 class="text-2xl font-extrabold text-calper-dark">Agenda de entrega de chaves</h1>
+  <p class="text-[11px] text-gray-400 mb-3" data-testid="auto-atualizacao">
+    Atualiza sozinha a cada 20 s · última atualização {auto.em.toLocaleTimeString('pt-BR')}
+  </p>
   <p class="text-sm text-gray-500 mt-1 mb-6">
     Defina quais dias ficam abertos no formulário público e quantos agendamentos cabem por horário.
   </p>
+
+  {#if !data.funcionario.podeEditar}
+    <div class="mb-4 rounded-xl bg-gray-100 text-gray-600 text-sm px-4 py-3">Seu perfil é somente leitura: você vê a agenda, mas não altera dias, horários e limites.</div>
+  {/if}
+  <fieldset disabled={!data.funcionario.podeEditar} class="contents">
 
   {#if form?.sucesso}
     <div class="bg-green-50 border border-green-100 text-green-700 text-sm rounded-xl px-4 py-3 mb-4">{form.sucesso}</div>
@@ -113,4 +124,5 @@
       </form>
     {/each}
   </div>
+  </fieldset>
 </div>

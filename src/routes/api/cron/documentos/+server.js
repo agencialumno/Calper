@@ -15,7 +15,8 @@ export async function GET({ request }) {
   }
 
   const documentos = await db.documentoAssinado.findMany({
-    where: { status: { in: ['pendente', 'calper_assinou', 'aguardando_cliente'] } }
+    // documentos cujo agendamento foi apagado (agendamentoId nulo) não têm mais fluxo a atualizar
+    where: { status: { in: ['pendente', 'calper_assinou', 'aguardando_cliente'] }, agendamentoId: { not: null } }
   });
   let atualizados = 0;
   for (const doc of documentos) {

@@ -1,13 +1,8 @@
 import { db } from './db.js';
+import { SLUG_ENTREGA_CHAVES, buscarMurano } from './murano.js';
 
-export const SLUG_ENTREGA_CHAVES = 'entrega-chaves';
-
-/** Empreendimento Murano (busca por nome, sem diferenciar maiúsculas). */
-export function buscarMurano() {
-  return db.empreendimento.findFirst({
-    where: { nome: { contains: 'Murano', mode: 'insensitive' } }
-  });
-}
+// (a base do Murano mora em ./murano.js, sem dependências de DocuSign; reexportada aqui por compatibilidade)
+export { SLUG_ENTREGA_CHAVES, buscarMurano };
 
 // --- assinatura dos documentos (termo / checklist) ---
 
@@ -184,7 +179,8 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
   await db.documentoAssinado.upsert({
     where: { agendamentoId_tipo: { agendamentoId, tipo } },
     update: { docusignEnvelopeId: envelopeId, status: 'pendente' },
-    create: { agendamentoId, tipo, docusignEnvelopeId: envelopeId }
+    // unidadeId: o documento assinado continua ligado à unidade mesmo que o agendamento seja apagado um dia
+    create: { agendamentoId, unidadeId: agendamento.unidadeId, tipo, docusignEnvelopeId: envelopeId }
   });
 
   const u = agendamento.unidade;
@@ -213,6 +209,8 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
  */
 export async function sincronizarDocumento(documento, event = null) {
   if (documento.status === 'assinado') return { status: 'assinado', clientesPendentes: [] };
+  // agendamento apagado: o documento fica guardado, mas não há mais entrega para atualizar
+  if (!documento.agendamentoId) return { status: documento.status, clientesPendentes: [] };
 
   const situacao = await situacaoDoEnvelope(documento.docusignEnvelopeId);
   const log = (dados) =>

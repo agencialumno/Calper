@@ -32,7 +32,10 @@ export function buscarPresencas(where, opcoes = {}) {
   return db.presencaEntrega.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    include: { unidade: { select: { id: true, bloco: true, numero: true } } },
+    include: {
+      unidade: { select: { id: true, bloco: true, numero: true } },
+      agendamento: { select: { observacoesAtendimento: true } }
+    },
     ...opcoes
   });
 }

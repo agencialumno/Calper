@@ -32,7 +32,8 @@ export async function handle({ event, resolve }) {
   // o botão "voltar" reexibiria uma tela antiga (ex: um agendamento já
   // cancelado, ou a confirmação de um check-in) deixando a ação parecer
   // reversível quando na verdade já foi persistida no banco.
-  response.headers.set('cache-control', 'no-store, must-revalidate');
+  // (endpoints que definem o próprio cache — ex.: foto de perfil versionada — mantêm o que escolheram)
+  if (!response.headers.has('cache-control')) response.headers.set('cache-control', 'no-store, must-revalidate');
 
   return response;
 }

@@ -130,3 +130,32 @@ funcionário.
 
 ### Próximo módulo
 Check-in (scanner de QR Code do funcionário + confirmação de presença).
+
+## Equipe Calper: perfis (admin, supervisor, colaborador)
+
+| Perfil | O que pode |
+|---|---|
+| **Admin** | Tudo. Gerencia usuários e perfis (`/admin/usuarios`: alterar perfil, ativar/desativar, redefinir senha, ver quem está logado agora), vê os logs de auditoria e pode sobrescrever a base. |
+| **Supervisor** | Altera unidades, status (quitação, vistoria, escritura), documentos, agenda, empreendimentos, atualizações e questionários. Não gerencia usuários e não vê os logs. |
+| **Colaborador** | Somente leitura, mais o atendimento presencial (entrega de chaves, check-in) e a própria conta. Não vê Questionários, Atualizações nem Empreendimentos. |
+
+- As regras ficam em `src/lib/perfis.js` e são aplicadas no servidor, na entrada de toda requisição de `/admin`
+  (`src/lib/server/guardaAdmin.js`); os menus só escondem o que o perfil não acessa.
+- Qualquer perfil troca a própria senha e a foto em **Minha conta** (`/admin/conta`; foto: JPG/PNG/WEBP, até 2 MB).
+- Quem se cadastra pela tela de login entra como **colaborador**; um admin promove em Usuários.
+- Os nomes antigos `gestao` e `atendimento` continuam valendo (= supervisor e colaborador) até
+  `scripts/migrar-perfis.js --aplicar` rodar. **Rode esse script depois do deploy**, nunca antes.
+
+## Scripts úteis (rodar com `node --env-file=.env scripts/<arquivo>`)
+
+- `backup-banco.js` — backup completo (schema + todas as tabelas) em `backups/` (pasta fora do git: tem dados pessoais).
+- `importar-planilha.js "<arquivo.xlsx>" [--aplicar]` — atualiza as unidades a partir da planilha da base (modo "atualizar":
+  nunca apaga nada). A planilha **nunca** vai para o git (`*.xlsx` está no `.gitignore`).
+- `limpar-agendamentos.js [--aplicar]` — apaga só os agendamentos; unidades, usuários, dossiês e documentos assinados ficam.
+- `migrar-perfis.js [--aplicar]` — converte os perfis da equipe para o modelo novo.
+
+## Convenção de migrações
+
+Migrações que alteram o banco compartilhado com a versão em produção devem ser **aditivas** (colunas novas, restrições
+relaxadas) para a versão antiga continuar funcionando até o deploy. As colunas `Unidade.financiado` e
+`Unidade.grupoFinanciamento` deixaram de ser usadas, mas continuam no banco; apague-as numa migração própria depois do deploy.

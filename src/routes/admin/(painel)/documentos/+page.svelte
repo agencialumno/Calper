@@ -32,6 +32,11 @@
       <p class="text-sm text-calper-red mb-4">{form.erro}</p>
     {/if}
 
+    {#if !data.funcionario.podeEditar}
+      <div class="mb-4 rounded-xl bg-gray-100 text-gray-600 text-sm px-4 py-3">Seu perfil é somente leitura: você vê os textos, mas não os altera.</div>
+    {/if}
+    <fieldset disabled={!data.funcionario.podeEditar} class="contents">
+
     <div class="card p-6 mb-5">
       <div class="text-sm font-bold text-calper-dark mb-1">Dados fixos do empreendimento</div>
       <p class="text-xs text-gray-500 mb-4">
@@ -90,5 +95,6 @@
         {#if form?.sucesso === t.tipo}<span class="text-xs text-green-700">Salvo.</span>{/if}
       </form>
     {/each}
+    </fieldset>
   {/if}
 </div>

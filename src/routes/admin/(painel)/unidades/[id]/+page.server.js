@@ -2,6 +2,8 @@ import { error, fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 import { quartosDaUnidade } from '$lib/server/documentos.js';
+import { statusDaUnidade } from '$lib/server/unidadeStatus.js';
+import { podeEditar } from '$lib/perfis.js';
 
 async function logUnidade(event, acao, texto) {
   const u = await db.unidade.findUnique({ where: { id: event.params.id }, select: { numero: true, bloco: true } });
@@ -15,7 +17,7 @@ async function logUnidade(event, acao, texto) {
   });
 }
 
-export async function load({ params }) {
+export async function load({ params, locals }) {
   const unidade = await db.unidade.findUnique({
     where: { id: params.id },
     include: {
@@ -35,7 +37,16 @@ export async function load({ params }) {
     orderBy: { createdAt: 'desc' }
   });
 
+  // documentos assinados cujo agendamento foi apagado ficam guardados, ligados à unidade
+  const documentosSoltos = await db.documentoAssinado.findMany({
+    where: { unidadeId: params.id, agendamentoId: null },
+    select: { id: true, tipo: true, status: true, assinadoEm: true, createdAt: true },
+    orderBy: { createdAt: 'desc' }
+  });
+
   return {
+    podeEditar: podeEditar(locals.funcionario.perfil),
+    documentosSoltos,
     unidade: {
       id: unidade.id,
       numero: unidade.numero,
@@ -43,16 +54,9 @@ export async function load({ params }) {
       status: unidade.status,
       observacoes: unidade.observacoes,
       quartos: quartosDaUnidade(unidade),
-      tipologia: unidade.tipologia,
-      grupo: unidade.grupo,
-      statusQuitacao: unidade.statusQuitacao,
+      // mesmas etiquetas do cartão das abas Unidades e Chaves (tipologia, grupo, quitação, vistoria, escritura + "ver mais")
+      ...statusDaUnidade(unidade),
       compradores: Array.isArray(unidade.compradores) ? unidade.compradores : [],
-      financiado: unidade.financiado,
-      grupoFinanciamento: unidade.grupoFinanciamento,
-      vistoriaAprovada: unidade.vistoriaAprovada,
-      vistoriaStatus: unidade.vistoriaStatus,
-      escritura: unidade.escritura,
-      escrituraRegistrada: unidade.escrituraRegistrada,
       empreendimento: unidade.empreendimento.nome,
       createdAt: unidade.createdAt,
       procuracoes,
@@ -105,65 +109,6 @@ export const actions = {
       }
     });
     await logUnidade(event, 'unidade_editada', `alterou o status da unidade para "${status.replace('_', ' ')}"`);
-    return { sucesso: true };
-  },
-
-  atualizarTipologia: async (event) => {
-    const { request, params, locals } = event;
-    const form = await request.formData();
-    const bruto = String(form.get('quartos') ?? '').trim();
-    const quartos = bruto === '' ? null : Number(bruto);
-    if (quartos !== null && (!Number.isInteger(quartos) || quartos < 1 || quartos > 10)) {
-      return fail(400, { erro: 'Número de quartos inválido.' });
-    }
-
-    await db.unidade.update({ where: { id: params.id }, data: { quartos } });
-    await db.historicoUnidade.create({
-      data: {
-        unidadeId: params.id,
-        tipo: 'outro',
-        descricao: `Tipologia atualizada: ${quartos ?? 'não informada'} quarto(s)`,
-        criadoPorId: locals.funcionario.id
-      }
-    });
-    await logUnidade(event, 'unidade_editada', `atualizou a tipologia para ${quartos ?? 'não informada'} quarto(s)`);
-    return { sucesso: true };
-  },
-
-  atualizarFinanceiroJuridico: async (event) => {
-    const { request, params, locals } = event;
-    const form = await request.formData();
-    const statusQuitacao = String(form.get('statusQuitacao') ?? '') || null;
-    const financiado = form.get('financiado') === 'on';
-    const grupoBruto = String(form.get('grupoFinanciamento') ?? '');
-    const vistoriaAprovada = form.get('vistoriaAprovada') === 'on';
-    const escrituraRegistrada = form.get('escrituraRegistrada') === 'on';
-
-    if (statusQuitacao !== null && !['quitada', 'a_vencer'].includes(statusQuitacao)) {
-      return fail(400, { erro: 'Status de pagamento inválido.' });
-    }
-    if (financiado && !['A', 'B'].includes(grupoBruto)) {
-      return fail(400, { erro: 'Unidade financiada precisa de grupo A ou B.' });
-    }
-    const grupoFinanciamento = financiado ? grupoBruto : null;
-
-    await db.unidade.update({
-      where: { id: params.id },
-      data: { statusQuitacao, financiado, grupoFinanciamento, vistoriaAprovada, escrituraRegistrada }
-    });
-    await db.historicoUnidade.create({
-      data: {
-        unidadeId: params.id,
-        tipo: 'outro',
-        descricao: `Status financeiro/jurídico atualizado: pagamento ${statusQuitacao ?? 'não informado'}, ${
-          financiado ? `financiada (grupo ${grupoFinanciamento})` : 'não financiada'
-        }, vistoria ${vistoriaAprovada ? 'aprovada' : 'pendente'}, escritura ${
-          escrituraRegistrada ? 'registrada' : 'não registrada'
-        }`,
-        criadoPorId: locals.funcionario.id
-      }
-    });
-    await logUnidade(event, 'unidade_editada', `atualizou o status financeiro/jurídico (pagamento ${statusQuitacao ?? 'não informado'}, ${financiado ? 'financiada, grupo ' + grupoFinanciamento : 'não financiada'}, vistoria ${vistoriaAprovada ? 'aprovada' : 'pendente'}, escritura ${escrituraRegistrada ? 'registrada' : 'não registrada'})`);
     return { sucesso: true };
   },
 

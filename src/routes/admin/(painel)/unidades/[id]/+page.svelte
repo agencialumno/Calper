@@ -2,33 +2,11 @@
   import LinkDownload from '$lib/components/LinkDownload.svelte';
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
+  import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
 
   let { data } = $props();
   let u = $derived(data.unidade);
   let adicionando = $state(false);
-  let financiado = $state(false);
-  let salvandoFin = $state(false);
-  let salvandoTipologia = $state(false);
-  $effect(() => {
-    financiado = data.unidade.financiado;
-  });
-
-  function aoSubmeterFin() {
-    salvandoFin = true;
-    return async ({ update }) => {
-      await update({ reset: false });
-      salvandoFin = false;
-    };
-  }
-
-  function aoSubmeterTipologia() {
-    salvandoTipologia = true;
-    return async ({ update }) => {
-      await update({ reset: false });
-      salvandoTipologia = false;
-    };
-  }
-
   let editandoEmailDe = $state(null); // investidorId em edição, ou null
   let salvandoEmail = $state(false);
 
@@ -92,6 +70,9 @@
         Baixar todos os arquivos desta unidade (.zip)
       </LinkDownload>
     </div>
+    {#if !data.podeEditar}
+      <span class="text-sm font-bold text-gray-600 bg-gray-100 rounded-full px-3 py-1.5">{statusLabel[u.status] ?? u.status}</span>
+    {:else}
     <form method="POST" action="?/atualizarStatus" use:enhance>
       <select
         name="status"
@@ -103,108 +84,23 @@
         {/each}
       </select>
     </form>
+    {/if}
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-[1.1fr_1.4fr] gap-5">
-    <!-- tipologia + status financeiro/jurídico -->
-    <div class="card p-6 flex flex-col gap-5">
-      <form
-        method="POST"
-        action="?/atualizarTipologia"
-        use:enhance={aoSubmeterTipologia}
-        class="flex items-end gap-2"
-      >
-        <div class="flex-1">
-          <label for="quartos" class="block text-sm font-bold text-calper-dark mb-1.5">Tipologia (quartos)</label>
-          <input
-            id="quartos"
-            name="quartos"
-            type="number"
-            min="1"
-            max="10"
-            value={u.quartos ?? ''}
-            class="input !py-2 text-sm"
-            placeholder="ex: 2 ou 3"
-          />
-        </div>
-        <div class="w-28 shrink-0">
-          <SubmitButton loading={salvandoTipologia} variant="outline" class="!py-2.5 text-sm">Salvar</SubmitButton>
-        </div>
-      </form>
-
-      <div class="h-px bg-gray-100"></div>
-
-      <form
-        method="POST"
-        action="?/atualizarFinanceiroJuridico"
-        use:enhance={aoSubmeterFin}
-        class="flex flex-col gap-3.5"
-      >
-        <div class="text-sm font-bold text-calper-dark">Status financeiro e jurídico</div>
-
-        <div>
-          <label for="statusQuitacao" class="block text-xs font-semibold text-gray-500 mb-1">Pagamento</label>
-          <select id="statusQuitacao" name="statusQuitacao" class="input !py-2 text-sm">
-            <option value="" selected={!u.statusQuitacao}>Não informado</option>
-            <option value="a_vencer" selected={u.statusQuitacao === 'a_vencer'}>A vencer</option>
-            <option value="quitada" selected={u.statusQuitacao === 'quitada'}>Quitada</option>
-          </select>
-        </div>
-
-        <label class="flex items-center gap-2 text-sm text-calper-dark">
-          <input type="checkbox" name="financiado" bind:checked={financiado} />
-          Financiado
-        </label>
-
-        {#if financiado}
-          <div>
-            <label for="grupoFinanciamento" class="block text-xs font-semibold text-gray-500 mb-1">
-              Grupo de financiamento
-            </label>
-            <select id="grupoFinanciamento" name="grupoFinanciamento" class="input !py-2 text-sm" required>
-              <option value="">selecione</option>
-              <option value="A" selected={u.grupoFinanciamento === 'A'}>Grupo A</option>
-              <option value="B" selected={u.grupoFinanciamento === 'B'}>Grupo B</option>
-            </select>
-          </div>
-        {/if}
-
-        {#if u.vistoriaStatus || u.escritura}
-          <div class="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            Segundo a planilha da base:
-            {#if u.escritura}<strong>escritura</strong> {u.escritura.toLowerCase()}{/if}{#if u.escritura && u.vistoriaStatus} · {/if}{#if u.vistoriaStatus}<strong>vistoria</strong> {u.vistoriaStatus.toLowerCase()}{/if}
-          </div>
-        {/if}
-        <label class="flex items-center gap-2 text-sm text-calper-dark">
-          <input type="checkbox" name="vistoriaAprovada" checked={u.vistoriaAprovada} />
-          Vistoria aprovada
-        </label>
-        <label class="flex items-center gap-2 text-sm text-calper-dark">
-          <input type="checkbox" name="escrituraRegistrada" checked={u.escrituraRegistrada} />
-          Escritura registrada
-        </label>
-
-        <SubmitButton loading={salvandoFin} variant="outline" class="!py-2.5 text-sm">Salvar status</SubmitButton>
-      </form>
+    <!-- status da unidade: o mesmo cartão das abas Unidades e Chaves -->
+    <div class="card p-6 flex flex-col gap-3 lg:col-span-2">
+      <div class="text-sm font-bold text-calper-dark">Status da unidade</div>
+      <UnidadeStatus unidade={u} podeEditar={data.podeEditar} />
+      {#if !u.tipologia && !u.vistoriaStatus && !u.escrituraAtual && !u.statusQuitacao}
+        <p class="text-sm text-gray-400">Nenhuma informação de status importada para esta unidade.</p>
+      {/if}
     </div>
 
     <!-- compradores (base Murano) + documentos de entrega -->
-    {#if u.compradores.length > 0 || u.tipologia}
+    {#if u.compradores.length > 0 || u.tipologia || u.vistoriaStatus}
       <div class="card p-6 flex flex-col gap-4">
         <div class="text-sm font-bold text-calper-dark">Compradores e entrega de chaves</div>
-        <div class="flex flex-wrap gap-2 text-xs font-bold">
-          {#if u.tipologia}<span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">{u.tipologia}</span>{/if}
-          {#if u.grupo}<span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">Grupo {u.grupo}</span>{/if}
-          {#if u.statusQuitacao}
-            <span
-              class="px-2.5 py-1 rounded-full {u.statusQuitacao === 'quitada'
-                ? 'bg-green-50 text-green-700'
-                : 'bg-amber-50 text-amber-700'}"
-            >
-              {u.statusQuitacao === 'quitada' ? 'Quitada' : 'A vencer'}
-            </span>
-          {/if}
-        </div>
         {#each u.compradores as c}
           <div class="text-sm text-calper-dark">
             {c.nome}
@@ -264,6 +160,8 @@
                   Cancelar
                 </button>
               </form>
+            {:else if !data.podeEditar}
+              <div class="text-xs text-gray-600 mt-1.5 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-2 truncate">{inv.email}</div>
             {:else}
               <button
                 type="button"
@@ -357,10 +255,13 @@
                       >
                         {rotulo}: {doc?.status === 'assinado' ? 'assinado' : doc?.status === 'calper_assinou' ? 'Calper assinou' : doc?.status === 'aguardando_cliente' ? 'aguardando o cliente' : doc?.status === 'pendente' ? 'pendente' : 'não enviado'}
                       </span>
-                      {#if doc?.status === 'assinado'}
+                      {#if doc?.status === 'assinado' && !(a.documentos.every((d) => d.status === 'assinado') && a.documentos.length === 2)}
                         <LinkDownload href="/admin/entrega-chaves/{a.id}/documento/{tipo}" class="text-calper-red">baixar</LinkDownload>
                       {/if}
                     {/each}
+                    {#if a.documentos.length === 2 && a.documentos.every((d) => d.status === 'assinado')}
+                      <LinkDownload href="/admin/entrega-chaves/{a.id}/documento/completo" class="text-calper-red">baixar PDF completo</LinkDownload>
+                    {/if}
                   </div>
                   {#if a.presencas.length > 0}
                     <div class="mt-2 text-xs text-gray-600">
@@ -382,10 +283,31 @@
       {/if}
     </div>
 
+    {#if data.documentosSoltos.length > 0}
+      <div class="card p-6">
+        <div class="text-sm font-bold text-calper-dark mb-1">Documentos assinados guardados</div>
+        <p class="text-xs text-gray-500 mb-3">O agendamento foi apagado, mas o documento assinado continua guardado nesta unidade.</p>
+        <div class="flex flex-col gap-2">
+          {#each data.documentosSoltos as d (d.id)}
+            <div class="flex items-center justify-between gap-3 border border-gray-100 rounded-xl p-3 text-sm">
+              <div>
+                <div class="font-semibold text-calper-dark">{d.tipo === 'termo' ? 'Termo de entrega' : 'Checklist'}</div>
+                <div class="text-xs text-gray-500">{d.status === 'assinado' ? `assinado em ${formatarData(d.assinadoEm)}` : d.status}</div>
+              </div>
+              {#if d.status === 'assinado'}
+                <LinkDownload href="/admin/unidades/{u.id}/documento-assinado/{d.id}" class="text-xs font-bold text-calper-red">Baixar PDF</LinkDownload>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <!-- histórico -->
     <div class="card p-6">
       <div class="text-sm font-bold text-calper-dark mb-4">Histórico</div>
 
+      {#if data.podeEditar}
       <form method="POST" action="?/adicionarApontamento" use:enhance={aoSubmeterApontamento} class="flex gap-2 mb-5">
         <input type="hidden" name="tipo" value="apontamento" />
         <input name="descricao" class="input text-sm" placeholder="Adicionar apontamento..." required />
@@ -395,6 +317,7 @@
           </SubmitButton>
         </div>
       </form>
+      {/if}
 
       <div class="flex flex-col">
         {#each u.historico as h (h.id)}

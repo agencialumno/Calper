@@ -13,6 +13,20 @@ const LIMITE_PADRAO = 4;
 
 export const dataHoraDoSlot = (data, horario) => new Date(`${data}T${horario}:00.000Z`);
 
+/**
+ * "Agora" no mesmo formato de Agendamento.dataHora: o relógio de Brasília gravado como UTC. Serve para comparar
+ * "o horário do atendimento já passou?" sem erro de fuso (ex.: 10:00 agendado vs. 13:00 UTC = 10:00 em Brasília).
+ */
+export function agoraComoRelogioDeBrasilia(agora = new Date()) {
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+    }).formatToParts(agora).map((p) => [p.type, p.value])
+  );
+  return new Date(Date.UTC(Number(partes.year), Number(partes.month) - 1, Number(partes.day), Number(partes.hour), Number(partes.minute), Number(partes.second)));
+}
+
 export function horarioValido(h) {
   return typeof h === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(h);
 }
