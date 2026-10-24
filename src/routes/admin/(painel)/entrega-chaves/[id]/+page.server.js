@@ -13,7 +13,7 @@ import {
   signatariosDoCliente,
   sincronizarDocumento
 } from '$lib/server/entregaChaves.js';
-import { corrigirEmailDoDestinatario, DESTINATARIO } from '$lib/server/docusign.js';
+import { corrigirEmailDoDestinatario, DESTINATARIO, situacaoDoEnvelope } from '$lib/server/docusign.js';
 import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
 import { montarChecklist, parseChecklist } from '$lib/documentosPadrao.js';
@@ -350,6 +350,15 @@ export const actions = {
     if (doc) {
       if (documentos.every((d) => d.status === 'assinado')) {
         return fail(400, { erroEmail: 'Todos já assinaram: não há mais o que corrigir no envelope.' });
+      }
+      // quem já assinou não pode ter o e-mail trocado: o DocuSign não aceita e a assinatura ficaria com o e-mail antigo
+      try {
+        const situacao = await situacaoDoEnvelope(doc.docusignEnvelopeId);
+        const aindaFalta = situacao.clientesPendentes.some((c) => String(c.email ?? '').toLowerCase() === String(atual ?? '').toLowerCase());
+        if (!aindaFalta) return fail(400, { erroEmail: `${nome} já assinou: o e-mail não pode mais ser corrigido no envelope.` });
+      } catch (err) {
+        console.error('DocuSign (situação antes de corrigir e-mail):', err?.response?.body ?? err);
+        return fail(502, { erroEmail: 'Não foi possível consultar o DocuSign agora. Nada foi alterado; tente de novo em instantes.' });
       }
       try {
         await corrigirEmailDoDestinatario({

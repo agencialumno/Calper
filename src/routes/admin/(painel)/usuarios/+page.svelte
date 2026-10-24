@@ -53,6 +53,8 @@
             <span class="font-bold text-green-700 bg-green-50 rounded-full px-2.5 py-1">● online agora</span>
           {:else if u.sessoes > 0}
             <span class="font-bold text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">sessão aberta</span>
+          {:else if !u.ativo}
+            <span class="font-bold text-amber-800 bg-amber-100 rounded-full px-2.5 py-1">inativa — aguardando ativação</span>
           {:else}
             <span class="text-gray-400">sem sessão</span>
           {/if}
