@@ -15,8 +15,8 @@
   let resultado = $derived(form?.resultado ?? null);
   const podeAplicar = $derived(modo === 'atualizar' || (data.podeSobrescrever && entendi && confirmacao.trim() === 'SOBRESCREVER'));
 
-  const rotuloCampo = { tipologia: 'Tipologia', statusQuitacao: 'Pagamento', compradores: 'Compradores', escritura: 'Escritura', vistoriaStatus: 'Vistoria', grupo: 'Grupo' };
-  const valor = (campo, v) => (v === null || v === undefined || v === '' ? '—' : campo === 'statusQuitacao' ? v.replace('_', ' ') : v);
+  import { ROTULO_CAMPO as rotuloCampo, ROTULO_QUITACAO } from '$lib/rotulosUnidade.js';
+  const valor = (campo, v) => (v === null || v === undefined || v === '' ? '—' : campo === 'statusQuitacao' ? (ROTULO_QUITACAO[v] ?? v) : v);
 
   function aoEnviar() {
     enviando = true;

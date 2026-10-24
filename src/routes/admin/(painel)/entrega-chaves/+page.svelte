@@ -1,6 +1,10 @@
 <script>
   import LinkDownload from '$lib/components/LinkDownload.svelte';
+  import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
   let { data } = $props();
+  import { autoAtualizar } from '$lib/autoAtualizar.svelte.js';
+  // a página se atualiza sozinha (novo agendamento, cancelamento, check-in, mudança de status)
+  const auto = autoAtualizar();
   let busca = $state('');
   let filtrados = $derived(
     data.agendamentos.filter((a) => {
@@ -40,7 +44,10 @@
       <a href="/admin/presenca">Lista de presença →</a>
     </div>
   </div>
-  <p class="text-sm text-gray-500 mt-0.5 mb-6">Murano Residencial — {data.agendamentos.length} agendamento(s)</p>
+  <p class="text-sm text-gray-500 mt-0.5 mb-1">Murano Residencial — {data.agendamentos.length} agendamento(s)</p>
+  <p class="text-[11px] text-gray-400 mb-3" data-testid="auto-atualizacao">
+    Atualiza sozinha a cada 20 s · última atualização {auto.em.toLocaleTimeString('pt-BR')}
+  </p>
 
   {#if data.semMurano}
     <p class="text-sm text-gray-400">Empreendimento Murano não encontrado.</p>
@@ -78,41 +85,20 @@
             >
               {a.status === 'realizado' || (a.documentos.termo === 'assinado' && a.documentos.checklist === 'assinado') ? 'Ver documentos' : 'Iniciar entrega'}
             </a>
-            {#each [['termo', 'Termo'], ['checklist', 'Checklist']] as [tipo, rotulo]}
-              {#if a.documentos[tipo] === 'assinado'}
-                <LinkDownload href="/admin/entrega-chaves/{a.id}/documento/{tipo}" class="text-calper-red">PDF {rotulo}</LinkDownload>
-              {/if}
-            {/each}
+            {#if a.documentos.termo === 'assinado' && a.documentos.checklist === 'assinado'}
+              <!-- download final: um único PDF com termo e checklist assinados -->
+              <LinkDownload href="/admin/entrega-chaves/{a.id}/documento/completo" class="text-calper-red">PDF completo</LinkDownload>
+            {:else}
+              {#each [['termo', 'Termo'], ['checklist', 'Checklist']] as [tipo, rotulo]}
+                {#if a.documentos[tipo] === 'assinado'}
+                  <LinkDownload href="/admin/entrega-chaves/{a.id}/documento/{tipo}" class="text-calper-red">PDF {rotulo}</LinkDownload>
+                {/if}
+              {/each}
+            {/if}
           </div>
 
-          <div class="flex flex-wrap gap-1.5 mt-3 text-[11px] font-bold">
-            <span
-              class="px-2 py-0.5 rounded-full {u.statusQuitacao === 'quitada'
-                ? 'bg-green-50 text-green-700'
-                : 'bg-amber-50 text-amber-700'}"
-            >
-              Pagamento: {u.statusQuitacao === 'quitada' ? 'quitada' : u.statusQuitacao === 'a_vencer' ? 'a vencer' : 'não informado'}
-            </span>
-            <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-              {u.financiado ? `Financiado (grupo ${u.grupoFinanciamento ?? '?'})` : 'Sem financiamento'}
-            </span>
-            <span
-              class="px-2 py-0.5 rounded-full {u.vistoriaAprovada
-                ? 'bg-green-50 text-green-700'
-                : 'bg-amber-50 text-amber-700'}"
-            >
-              Vistoria: {u.vistoriaStatus ? u.vistoriaStatus.toLowerCase() : u.vistoriaAprovada ? 'aprovada' : 'pendente'}
-            </span>
-            <span
-              class="px-2 py-0.5 rounded-full {u.escrituraRegistrada || /ASSINADA/i.test(u.escritura ?? '')
-                ? 'bg-green-50 text-green-700'
-                : 'bg-gray-100 text-gray-600'}"
-            >
-              Escritura: {u.escritura ? u.escritura.toLowerCase() : u.escrituraRegistrada ? 'registrada' : 'não registrada'}
-            </span>
-            {#if u.quartos}
-              <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{u.quartos} quartos</span>
-            {/if}
+          <div class="mt-3">
+            <UnidadeStatus unidade={u} podeEditar={data.podeEditar} />
           </div>
         </div>
       {/each}

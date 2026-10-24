@@ -1,6 +1,9 @@
 <script>
   import LinkDownload from '$lib/components/LinkDownload.svelte';
   let { data } = $props();
+  import { autoAtualizar } from '$lib/autoAtualizar.svelte.js';
+  // a página se atualiza sozinha (novo agendamento, cancelamento, check-in, mudança de status)
+  const auto = autoAtualizar();
 
   const statusEstilo = {
     confirmado: { texto: 'Confirmado', bg: 'bg-amber-50', fg: 'text-amber-700' },
@@ -51,8 +54,64 @@
           <option value={emp.id} selected={data.empreendimentoId === emp.id}>{emp.nome}</option>
         {/each}
       </select>
+      <label class="flex items-center gap-2 text-xs text-gray-500">
+        De
+        <input type="date" name="de" value={data.de} class="input !py-2 text-sm" onchange={(e) => e.currentTarget.form.requestSubmit()} />
+      </label>
+      <label class="flex items-center gap-2 text-xs text-gray-500">
+        Até
+        <input type="date" name="ate" value={data.ate} class="input !py-2 text-sm" onchange={(e) => e.currentTarget.form.requestSubmit()} />
+      </label>
+      {#if data.intervaloManual}
+        <a href="?periodo={data.periodo}" class="text-xs font-semibold text-calper-red self-center">limpar datas</a>
+      {/if}
     </form>
   </div>
+
+  <!-- atendimentos: realizados × agendados e não realizados (no período escolhido) -->
+  <section class="mb-6" aria-label="Atendimentos">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-4">
+      <div class="card p-4 md:p-5 border-l-4 border-l-green-500">
+        <div class="text-xs text-gray-400 font-semibold">Atendimentos realizados</div>
+        <div class="text-3xl font-extrabold text-green-700 mt-1.5" data-testid="kpi-realizados">{data.atendimentos.realizados}</div>
+        <div class="text-xs text-gray-400 mt-0.5">no período escolhido</div>
+      </div>
+      <div class="card p-4 md:p-5 border-l-4 border-l-red-400">
+        <div class="text-xs text-gray-400 font-semibold">Agendados e não realizados</div>
+        <div class="text-3xl font-extrabold text-red-600 mt-1.5" data-testid="kpi-nao-realizados">{data.atendimentos.naoRealizados}</div>
+        <div class="text-xs text-gray-400 mt-0.5">o horário passou e a entrega não foi concluída</div>
+      </div>
+      <div class="card p-4 md:p-5 border-l-4 border-l-amber-400">
+        <div class="text-xs text-gray-400 font-semibold">Agendados para os próximos dias</div>
+        <div class="text-3xl font-extrabold text-amber-700 mt-1.5" data-testid="kpi-a-fazer">{data.atendimentos.aFazer}</div>
+        <div class="text-xs text-gray-400 mt-0.5">ainda vão acontecer</div>
+      </div>
+    </div>
+    <div class="card p-5 md:p-6 overflow-x-auto">
+      <div class="flex items-center justify-between gap-3 mb-5 flex-wrap">
+        <div class="text-sm font-bold text-calper-dark">Atendimentos por data</div>
+        <div class="flex items-center gap-3 text-[11px] text-gray-500">
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-green-500"></span>realizados</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-red-400"></span>agendados e não realizados</span>
+        </div>
+      </div>
+      <div class="flex items-end gap-2 md:gap-3 min-w-[300px]" style="height: 150px">
+        {#each data.atendimentos.grafico as b}
+          <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+            <div class="w-full flex flex-col justify-end h-full" title="{b.realizados} realizado(s), {b.naoRealizados} não realizado(s)">
+              {#if b.realizados + b.naoRealizados === 0}
+                <div class="w-full rounded-t-md bg-gray-100" style="height: 4%"></div>
+              {:else}
+                <div class="w-full bg-red-400 {b.realizados === 0 ? 'rounded-t-md' : ''}" style="height: {b.pctNaoRealizados}%"></div>
+                <div class="w-full bg-green-500 rounded-t-md" style="height: {b.pctRealizados}%"></div>
+              {/if}
+            </div>
+            <div class="text-[10px] text-gray-400 whitespace-nowrap">{b.label}</div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  </section>
 
   <!-- kpis -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">

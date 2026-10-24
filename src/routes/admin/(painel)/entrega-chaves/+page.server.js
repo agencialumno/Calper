@@ -1,8 +1,9 @@
 import { db } from '$lib/server/db.js';
 import { SLUG_ENTREGA_CHAVES, buscarMurano } from '$lib/server/entregaChaves.js';
-import { quartosDaUnidade } from '$lib/server/documentos.js';
+import { statusDaUnidade } from '$lib/server/unidadeStatus.js';
+import { podeEditar } from '$lib/perfis.js';
 
-export async function load() {
+export async function load({ locals }) {
   const murano = await buscarMurano();
   if (!murano) return { agendamentos: [], semMurano: true };
 
@@ -17,6 +18,7 @@ export async function load() {
 
   return {
     semMurano: false,
+    podeEditar: podeEditar(locals.funcionario.perfil),
     agendamentos: agendamentos.map((a) => ({
       id: a.id,
       dataHora: a.dataHora,
@@ -30,17 +32,10 @@ export async function load() {
       documentos: Object.fromEntries(a.documentosAssinados.map((d) => [d.tipo, d.status])),
       temProcuracao: Boolean(a.procuracaoBase64),
       unidade: {
-        id: a.unidade.id,
         bloco: a.unidade.bloco,
         numero: a.unidade.numero,
-        quartos: quartosDaUnidade(a.unidade), // tipologia da base Murano ("3 QUARTOS") ou o campo quartos
-        statusQuitacao: a.unidade.statusQuitacao,
-        financiado: a.unidade.financiado,
-        grupoFinanciamento: a.unidade.grupoFinanciamento,
-        vistoriaAprovada: a.unidade.vistoriaAprovada,
-        vistoriaStatus: a.unidade.vistoriaStatus,
-        escritura: a.unidade.escritura,
-        escrituraRegistrada: a.unidade.escrituraRegistrada
+        // as mesmas etiquetas e o mesmo "ver mais" da aba Unidades
+        ...statusDaUnidade(a.unidade)
       }
     }))
   };

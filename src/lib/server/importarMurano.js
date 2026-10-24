@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
 import readXlsxFile from 'read-excel-file/node';
 import { db } from './db.js';
-import { SLUG_ENTREGA_CHAVES, buscarMurano } from './entregaChaves.js';
+import { SLUG_ENTREGA_CHAVES, buscarMurano } from './murano.js';
 import { motivoSemAgendamento } from '../unidadeAgendavel.js';
+import { ROTULO_CAMPO, ROTULO_QUITACAO } from '../rotulosUnidade.js';
+
+export { ROTULO_CAMPO, ROTULO_QUITACAO };
 
 // Importação da base de entrega de chaves (planilha .xlsx) pelo admin, em 2 modos:
 //  - "atualizar": casa por bloco+número, só altera os campos que mudaram, cria as unidades novas e NUNCA apaga nada
@@ -22,29 +25,79 @@ const semAcento = (s) =>
     .toUpperCase()
     .trim();
 
-// cabeçalhos aceitos (comparados sem acento/maiúsculas) → campo interno
+// cabeçalhos aceitos (comparados sem acento/maiúsculas) → campo interno.
+// Aceita a base antiga (UNIDADE, NOME DO CLIENTE, ESCRITURA...) e a base consolidada (FUTURA UNID., STATUS VENDA...).
 const CABECALHOS = {
   BLOCO: 'bloco',
   UNIDADE: 'numero',
+  'FUTURA UNID.': 'numero',
+  'FUTURA UNID': 'numero',
   TIPOLOGIA: 'tipologia',
   'NOME DO CLIENTE': 'nome',
   'COMPRADOR PRINCIPAL': 'principal',
   ESCRITURA: 'escritura',
   'STATUS QUITACAO': 'quitacao',
+  'STATUS - QUITACAO': 'quitacao',
   'VISTORIA DE UNIDADE': 'vistoria',
-  GRUPO: 'grupo'
+  GRUPO: 'grupo',
+  // base consolidada
+  'STATUS VENDA': 'statusVenda',
+  'DATA DA VENDA': 'dataVenda',
+  'VENCIDO PAGO': 'vencidoPago',
+  'VENCIDO NAO PAGO': 'vencidoNaoPago',
+  'SALDO VINCENDO': 'saldoVincendo',
+  'FASE ESCRITURA': 'faseEscritura',
+  ESCRITURADA: 'escriturada',
+  'DATA ESCRITURA': 'dataEscritura',
+  'ESCRITURA ATUAL': 'escrituraAtual',
+  'ESCRITURA A SER LAVRADA': 'escrituraALavrar'
 };
-const STATUS_QUITACAO = { QUITADA: 'quitada', 'A VENCER': 'a_vencer' };
 
-export const ROTULO_CAMPO = {
-  tipologia: 'Tipologia',
-  statusQuitacao: 'Pagamento',
-  compradores: 'Compradores',
-  escritura: 'Escritura',
-  vistoriaStatus: 'Vistoria',
-  grupo: 'Grupo'
+// Status-Quitação: o valor da planilha vira um código curto (o que o app sempre guardou: quitada / a_vencer).
+const STATUS_QUITACAO = {
+  'SALDO QUITADO': 'quitada',
+  QUITADA: 'quitada',
+  QUITADO: 'quitada',
+  'A VENCER': 'a_vencer',
+  ESTOQUE: 'estoque',
+  'JURIDICO CIVEL': 'juridico_civel'
 };
+
 const CAMPOS = Object.keys(ROTULO_CAMPO);
+// campos de texto simples da base consolidada (lidos como estão na planilha, em maiúsculas não forçadas)
+const CAMPOS_TEXTO_BASE = ['statusVenda', 'faseEscritura', 'escriturada', 'escrituraAtual', 'escrituraALavrar'];
+const CAMPOS_DATA = ['dataVenda', 'dataEscritura'];
+const CAMPOS_NUMERO = ['vencidoPago', 'vencidoNaoPago', 'saldoVincendo'];
+
+const dataIso = (d) => d.toISOString().slice(0, 10);
+
+/** Data da célula (Date, "dd/mm/aaaa" ou "aaaa-mm-dd") → "AAAA-MM-DD", ou null (inclusive para datas que não existem, como 31/02). */
+export function lerData(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : dataIso(v);
+  const t = String(v).trim();
+  let ano;
+  let mes;
+  let dia;
+  let m;
+  if ((m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/))) [, ano, mes, dia] = m;
+  else if ((m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) [, dia, mes, ano] = m;
+  else return null;
+  const d = new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
+  // 31/02 viraria 03/03: só vale se o dia/mês/ano continuarem os mesmos
+  if (d.getUTCFullYear() !== Number(ano) || d.getUTCMonth() !== Number(mes) - 1 || d.getUTCDate() !== Number(dia)) return null;
+  return dataIso(d);
+}
+
+/** Valor em reais da célula (número ou texto "1.234,56") → número, ou null se vazio/inválido. */
+export function lerNumero(v) {
+  if (v === null || v === undefined || String(v).trim() === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const limpo = String(v).trim().replace(/[^\d,.-]/g, '');
+  if (!/\d/.test(limpo)) return null; // sem nenhum dígito (ex.: "abc"): não é um valor
+  const n = Number(limpo.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
 
 const texto = (v) => {
   const t = String(v ?? '').replace(/\s+/g, ' ').trim();
@@ -107,15 +160,33 @@ export async function lerPlanilha(buffer) {
       if (colunas.has('tipologia')) mescla('tipologia', texto(campo('tipologia'))?.toUpperCase() ?? null, 'Tipologia');
       if (colunas.has('quitacao')) {
         const bruto = texto(campo('quitacao'))?.toUpperCase() ?? null;
-        const norm = bruto ? semAcento(bruto) : null;
-        if (bruto && !STATUS_QUITACAO[norm]) avisos.push(`Pagamento "${bruto}" da unidade ${bloco}/${numero} não reconhecido (esperado QUITADA ou A VENCER): ignorado.`);
-        mescla('statusQuitacao', norm ? (STATUS_QUITACAO[norm] ?? null) : null, 'Pagamento');
+        const norm = bruto ? semAcento(bruto.replace(/_/g, ' ')) : null;
+        if (bruto && !STATUS_QUITACAO[norm]) {
+          avisos.push(`Status-Quitação "${bruto}" da unidade ${bloco}/${numero} não reconhecido (esperado SALDO QUITADO, A VENCER, ESTOQUE ou JURÍDICO_CÍVEL): ignorado.`);
+        }
+        mescla('statusQuitacao', norm ? (STATUS_QUITACAO[norm] ?? null) : null, 'Status-Quitação');
       }
       if (colunas.has('escritura')) mescla('escritura', texto(campo('escritura')), 'Escritura');
       if (colunas.has('vistoria')) mescla('vistoriaStatus', texto(campo('vistoria')), 'Vistoria');
       if (colunas.has('grupo')) {
-        const g = texto(campo('grupo'))?.toUpperCase() ?? null;
-        mescla('grupo', g && ['A', 'B'].includes(g) ? g : null, 'Grupo');
+        // base antiga: "A"/"B"; base consolidada: "Grupo A - a quitar até entrega das chaves" (só a letra interessa)
+        const g = texto(campo('grupo'))?.toUpperCase().match(/^(?:GRUPO\s+)?([AB])(?![A-Z])/)?.[1] ?? null;
+        mescla('grupo', g, 'Grupo');
+      }
+      for (const c of CAMPOS_TEXTO_BASE) if (colunas.has(c)) mescla(c, texto(campo(c)), ROTULO_CAMPO[c]);
+      for (const c of CAMPOS_DATA) {
+        if (!colunas.has(c)) continue;
+        const bruto = campo(c);
+        const d = lerData(bruto);
+        if (bruto !== null && bruto !== undefined && String(bruto).trim() !== '' && !d) avisos.push(`${ROTULO_CAMPO[c]} da unidade ${bloco}/${numero} não é uma data válida ("${bruto}"): ignorada.`);
+        mescla(c, d, ROTULO_CAMPO[c]);
+      }
+      for (const c of CAMPOS_NUMERO) {
+        if (!colunas.has(c)) continue;
+        const bruto = campo(c);
+        const n = lerNumero(bruto);
+        if (bruto !== null && bruto !== undefined && String(bruto).trim() !== '' && n === null) avisos.push(`${ROTULO_CAMPO[c]} da unidade ${bloco}/${numero} não é um valor numérico ("${bruto}"): ignorado.`);
+        mescla(c, n, ROTULO_CAMPO[c]);
       }
       unidades.set(chave, u);
     });
@@ -138,6 +209,26 @@ export async function lerPlanilha(buffer) {
 }
 
 const norm = (v) => (v === undefined || v === '' ? null : v);
+const brl = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dataBr = (iso) => iso.split('-').reverse().join('/');
+
+/** Valor como está no banco, na mesma forma da planilha (datas "AAAA-MM-DD"; números como número). */
+function valorDoBanco(campo, existente) {
+  const v = norm(existente[campo]);
+  if (v === null) return null;
+  return CAMPOS_DATA.includes(campo) ? dataIso(new Date(v)) : v;
+}
+/** Texto mostrado na prévia pra um valor (data/valor em reais formatados). */
+function exibir(campo, v) {
+  if (v === null || v === undefined) return null;
+  if (CAMPOS_DATA.includes(campo)) return dataBr(v);
+  if (CAMPOS_NUMERO.includes(campo)) return brl(v);
+  return v;
+}
+const iguaisValores = (campo, a, b) => (CAMPOS_NUMERO.includes(campo) && a !== null && b !== null ? Math.abs(a - b) < 0.005 : a === b);
+/** Valor no formato que o Prisma grava (datas viram Date). */
+const paraBanco = (campo, v) => (CAMPOS_DATA.includes(campo) ? new Date(`${v}T00:00:00.000Z`) : v);
+
 const chaveCompradores = (c) => (Array.isArray(c) ? c.map((x) => `${x.principal ? '*' : ''}${x.nome}`).join(' | ') : '');
 const rotuloCompradores = (c) => (Array.isArray(c) && c.length ? c.map((x) => `${x.nome}${x.principal && c.length > 1 ? ' (principal)' : ''}`).join(' | ') : null);
 
@@ -179,13 +270,13 @@ export function calcularDiferencas(existente, nova) {
     }
     if (nova[campo] === undefined) continue; // coluna ausente na planilha
     const novo = norm(nova[campo]);
-    const atual = norm(existente[campo]);
+    const atual = valorDoBanco(campo, existente);
     if (novo === null) {
       // célula em branco na planilha: nunca apaga o que já existe
       if (atual !== null) ignorados.push(campo);
       continue;
     }
-    if (atual !== novo) dif.push({ campo, de: atual, para: novo, valorNovo: novo });
+    if (!iguaisValores(campo, atual, novo)) dif.push({ campo, de: exibir(campo, atual), para: exibir(campo, novo), valorNovo: paraBanco(campo, novo) });
   }
   return { dif, ignorados };
 }
@@ -219,6 +310,8 @@ export async function montarPrevia(unidades) {
         select: {
           id: true, bloco: true, numero: true, tipologia: true, grupo: true, statusQuitacao: true,
           compradores: true, escritura: true, vistoriaStatus: true,
+          statusVenda: true, dataVenda: true, vencidoPago: true, vencidoNaoPago: true, saldoVincendo: true,
+          faseEscritura: true, escriturada: true, dataEscritura: true, escrituraAtual: true, escrituraALavrar: true,
           agendamentos: { where: { tipoEvento: { slug: SLUG_ENTREGA_CHAVES }, status: { not: 'cancelado' } }, select: { status: true, documentosAssinados: { select: { tipo: true, status: true } } } }
         }
       })
@@ -274,8 +367,14 @@ export async function montarPrevia(unidades) {
   const chavesPlanilha = new Set(unidades.map((u) => `${u.bloco}::${u.numero}`));
   const ausentes = existentes.filter((u) => !chavesPlanilha.has(`${u.bloco}::${u.numero}`)).map((u) => ({ bloco: u.bloco, numero: u.numero }));
 
+  // unidades que ficariam fora do agendamento público DEPOIS da importação: vale o que ficará gravado (a planilha
+  // consolidada não traz compradores, então os já cadastrados continuam valendo; vistoria em branco mantém a atual)
   const ocultas = unidades
-    .map((u) => ({ bloco: u.bloco, numero: u.numero, motivo: motivoSemAgendamento({ vistoriaStatus: u.vistoriaStatus ?? null, compradores: u.compradores }) }))
+    .map((u) => {
+      const atual = porChave.get(`${u.bloco}::${u.numero}`);
+      const compradores = u.compradores.length === 0 && !Array.isArray(atual?.compradores) ? null : atual ? mesclarCompradores(atual.compradores, u.compradores) : u.compradores;
+      return { bloco: u.bloco, numero: u.numero, motivo: motivoSemAgendamento({ vistoriaStatus: u.vistoriaStatus ?? atual?.vistoriaStatus ?? null, compradores }) };
+    })
     .filter((u) => u.motivo);
 
   const apagar = await contagensParaApagar();
@@ -302,6 +401,9 @@ const dadosDeCriacao = (empreendimentoId, u) => ({
   escritura: u.escritura ?? null,
   vistoriaStatus: u.vistoriaStatus ?? null,
   vistoriaAprovada: semAcento(u.vistoriaStatus) === 'APROVADA',
+  ...Object.fromEntries(
+    [...CAMPOS_TEXTO_BASE, ...CAMPOS_DATA, ...CAMPOS_NUMERO].map((c) => [c, u[c] === undefined || u[c] === null ? null : paraBanco(c, u[c])])
+  ),
   observacoes: u.compradores.length === 0 ? 'Sem comprador cadastrado na base importada.' : null
 });
 
@@ -359,7 +461,7 @@ export async function aplicarAtualizar(unidades, { funcionarioId, nomeArquivo })
           data: {
             unidadeId: atual.id,
             tipo: 'outro',
-            descricao: `Atualizada pela importação (${nomeArquivo}): ${dif.map((d) => `${ROTULO_CAMPO[d.campo]}: ${d.de ?? '—'} → ${d.para}`).join('; ')}`,
+            descricao: `Atualizada pela importação (${nomeArquivo}): ${dif.map((d) => `${ROTULO_CAMPO[d.campo]}: ${d.de ?? '—'} → ${d.para}`).join('; ')}`.slice(0, 1500),
             criadoPorId: funcionarioId
           }
         });
@@ -442,12 +544,14 @@ export function sanitizarUnidades(bruto) {
     vistos.add(chave);
     const compradores = (Array.isArray(u.compradores) ? u.compradores : []).slice(0, 10).map((c) => ({ nome: sTexto(c?.nome), principal: Boolean(c?.principal) })).filter((c) => c.nome);
     const limpa = { bloco, numero, compradores };
-    for (const campo of ['tipologia', 'escritura', 'vistoriaStatus']) {
+    for (const campo of ['tipologia', 'escritura', 'vistoriaStatus', ...CAMPOS_TEXTO_BASE]) {
       const v = sTexto(u[campo]);
       if (v !== undefined) limpa[campo] = v;
     }
-    if (['quitada', 'a_vencer'].includes(u.statusQuitacao)) limpa.statusQuitacao = u.statusQuitacao;
+    if (Object.keys(ROTULO_QUITACAO).includes(u.statusQuitacao)) limpa.statusQuitacao = u.statusQuitacao;
     if (['A', 'B'].includes(u.grupo)) limpa.grupo = u.grupo;
+    for (const campo of CAMPOS_DATA) if (typeof u[campo] === 'string' && lerData(u[campo]) === u[campo]) limpa[campo] = u[campo];
+    for (const campo of CAMPOS_NUMERO) if (typeof u[campo] === 'number' && Number.isFinite(u[campo])) limpa[campo] = u[campo];
     return limpa;
   });
 }

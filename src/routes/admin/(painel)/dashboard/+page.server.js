@@ -1,5 +1,6 @@
 import { db } from '$lib/server/db.js';
 import { mediaPesquisa } from '$lib/pesquisa.js';
+import { agoraComoRelogioDeBrasilia, dataValida } from '$lib/server/agenda.js';
 
 const PERIODOS = { '7': 7, '30': 30, '90': 90, '365': 365 };
 
@@ -34,6 +35,34 @@ export async function load({ url }) {
       agendamento: filtroUnidade
     }
   });
+
+  // Atendimentos (pela DATA DO ATENDIMENTO, não pela data em que foi agendado): realizados × agendados e não realizados.
+  // Filtro: períodos prontos ou um intervalo de datas (de/ate), que vale sobre o relógio de Brasília.
+  const agoraRelogio = agoraComoRelogioDeBrasilia();
+  const de = url.searchParams.get('de') ?? '';
+  const ate = url.searchParams.get('ate') ?? '';
+  const intervaloManual = dataValida(de) || dataValida(ate);
+  const inicioAt = dataValida(de) ? new Date(`${de}T00:00:00.000Z`) : new Date(agoraRelogio.getTime() - periodo * 86400000);
+  const fimAt = dataValida(ate) ? new Date(`${ate}T23:59:59.999Z`) : agoraRelogio;
+  const atendimentosPeriodo = await db.agendamento.findMany({
+    where: { dataHora: { gte: inicioAt, lte: fimAt }, status: { not: 'cancelado' }, ...filtroUnidade },
+    select: { dataHora: true, status: true }
+  });
+  const atendimentosRealizados = atendimentosPeriodo.filter((a) => a.status === 'realizado').length;
+  // agendou, o horário já passou e a entrega não foi concluída
+  const agendadosNaoRealizados = atendimentosPeriodo.filter((a) => a.status === 'confirmado' && a.dataHora < agoraRelogio).length;
+  const agendadosAFazer = await db.agendamento.count({ where: { status: 'confirmado', dataHora: { gte: agoraRelogio }, ...filtroUnidade } });
+
+  const diasAt = Math.max(1, Math.ceil((fimAt.getTime() - inicioAt.getTime()) / 86400000));
+  const numBucketsAt = Math.min(12, diasAt);
+  const tamBucketAt = (fimAt.getTime() - inicioAt.getTime()) / numBucketsAt;
+  const bucketsAt = Array.from({ length: numBucketsAt }, (_, i) => ({ inicio: new Date(inicioAt.getTime() + i * tamBucketAt), realizados: 0, naoRealizados: 0 }));
+  for (const a of atendimentosPeriodo) {
+    const i = Math.min(numBucketsAt - 1, Math.max(0, Math.floor((a.dataHora.getTime() - inicioAt.getTime()) / tamBucketAt)));
+    if (a.status === 'realizado') bucketsAt[i].realizados++;
+    else if (a.status === 'confirmado' && a.dataHora < agoraRelogio) bucketsAt[i].naoRealizados++;
+  }
+  const maiorAt = Math.max(1, ...bucketsAt.map((b) => b.realizados + b.naoRealizados));
 
   // KPIs
   const total = agendamentosPeriodo.length;
@@ -95,6 +124,21 @@ export async function load({ url }) {
 
   return {
     periodo: String(periodo),
+    de: dataValida(de) ? de : '',
+    ate: dataValida(ate) ? ate : '',
+    intervaloManual,
+    atendimentos: {
+      realizados: atendimentosRealizados,
+      naoRealizados: agendadosNaoRealizados,
+      aFazer: agendadosAFazer,
+      grafico: bucketsAt.map((b) => ({
+        label: b.inicio.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }),
+        realizados: b.realizados,
+        naoRealizados: b.naoRealizados,
+        pctRealizados: Math.round((b.realizados / maiorAt) * 100),
+        pctNaoRealizados: Math.round((b.naoRealizados / maiorAt) * 100)
+      }))
+    },
     empreendimentoId,
     empreendimentos,
     kpis: {

@@ -27,7 +27,14 @@
   <div class="card w-full max-w-sm p-8">
     <img src="/logo.png" alt="Calper" class="h-16 w-auto mb-7" />
     <h1 class="text-xl font-bold text-calper-dark mb-1">Cadastro da equipe</h1>
-    <p class="text-sm text-gray-500 mb-7">Crie sua conta para acessar o painel Calper.</p>
+    {#if form?.pendente}
+      <div class="text-sm text-green-800 bg-green-50 border border-green-100 rounded-xl px-4 py-4" data-testid="cadastro-pendente">
+        <div class="font-bold mb-1">Pedido enviado</div>
+        A conta de <strong>{form.email}</strong> foi criada, mas ainda está <strong>inativa</strong>: um admin da Calper precisa
+        ativá-la antes do primeiro acesso. Você poderá entrar com este e-mail e a senha que acabou de criar.
+      </div>
+    {:else}
+    <p class="text-sm text-gray-500 mb-7">Peça acesso ao painel Calper. Um admin ativa a conta antes do primeiro acesso.</p>
 
     <form method="POST" use:enhance={aoSubmeter} class="flex flex-col gap-4">
       {#if form?.erro}
@@ -52,9 +59,10 @@
         <input id="confirmarSenha" name="confirmarSenha" class="input" type="password" required />
       </div>
       <div class="mt-2">
-        <SubmitButton loading={criando}>Criar conta e entrar</SubmitButton>
+        <SubmitButton loading={criando}>Pedir acesso</SubmitButton>
       </div>
     </form>
+    {/if}
 
     <p class="text-sm text-gray-500 mt-6 text-center">
       Já tem conta? <a href="/admin/login" class="font-bold text-calper-red">Entrar</a>

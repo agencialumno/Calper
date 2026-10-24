@@ -1,6 +1,9 @@
 <script>
   import LinkDownload from '$lib/components/LinkDownload.svelte';
   let { data } = $props();
+  import { autoAtualizar } from '$lib/autoAtualizar.svelte.js';
+  // a página se atualiza sozinha (novo agendamento, cancelamento, check-in, mudança de status)
+  const auto = autoAtualizar();
 
   const rotuloDoc = {
     pendente: 'aguardando a Calper',
@@ -103,6 +106,9 @@
           agendou: <strong>{e.agendouNome ?? '—'}</strong> · retirou: <strong>{e.retirante ?? '—'}</strong>
         </div>
         <div class="text-xs text-gray-500 md:w-40 shrink-0">{formatarDataHora(e.entregueEm)}</div>
+        {#if e.observacoes}
+          <div class="basis-full text-xs text-gray-600"><strong class="text-gray-500">Obs.:</strong> {e.observacoes}</div>
+        {/if}
       </div>
     {:else}
       <p class="text-sm text-gray-400">Nenhuma entrega concluída no período.</p>
@@ -123,6 +129,9 @@
         <a href="/admin/unidades/{p.unidadeId}" class="text-sm font-bold text-calper-red md:w-36 shrink-0">{p.unidade}</a>
         {#if p.chaveEntregue}
           <span class="text-[11px] font-bold text-green-700 bg-green-50 rounded-full px-2.5 py-1 shrink-0">chave entregue</span>
+        {/if}
+        {#if p.observacoes}
+          <span class="basis-full text-xs text-gray-600 md:pl-44"><strong class="text-gray-500">Obs.:</strong> {p.observacoes}</span>
         {/if}
       </div>
     {:else}

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { ATENDIMENTO } from '../preparar-banco-teste.js';
+import { COLABORADOR } from '../preparar-banco-teste.js';
+import { comBanco } from './db.js';
 import { entrarComoAdmin } from './helpers.js';
 
 test.describe('guarda da área da equipe', () => {
@@ -15,24 +16,47 @@ test.describe('guarda da área da equipe', () => {
     }
   });
 
-  test('o atendimento entra no check-in mas não nas áreas de gestão', async ({ page }) => {
-    await entrarComoAdmin(page, ATENDIMENTO);
+  test('o colaborador entra no check-in e lê as telas, mas não vê as áreas restritas', async ({ page }) => {
+    await entrarComoAdmin(page, COLABORADOR);
     await page.goto('/admin/checkin');
     await expect(page).toHaveURL(/\/admin\/checkin/);
-    const r = await page.request.get('/admin/presenca/exportar', { maxRedirects: 0 });
-    expect(r.status()).toBe(303);
-    expect(r.headers().location).toContain('/admin/sem-acesso');
+    for (const caminho of ['/admin/questionarios', '/admin/atualizacoes', '/admin/empreendimentos', '/admin/usuarios', '/admin/logs']) {
+      const r = await page.request.get(caminho, { maxRedirects: 0 });
+      expect(r.status(), caminho).toBe(303);
+      expect(r.headers().location).toContain('/admin/sem-acesso');
+    }
   });
 });
 
 test.describe('cadastro da equipe', () => {
-  test('cria a conta com senha forte e já entra no painel', async ({ page }) => {
+  test('o pedido de cadastro cria conta INATIVA: só entra depois que um admin ativar', async ({ page }) => {
     await page.goto('/admin/cadastro', { waitUntil: 'networkidle' });
     await page.fill('#nome', 'Pessoa Nova Teste');
     await page.fill('#email', 'pessoa.nova@example.com');
     await page.fill('#senha', 'Forte@Teste2030');
     await page.fill('#confirmarSenha', 'Forte@Teste2030');
-    await Promise.all([page.waitForURL((u) => !u.pathname.endsWith('/cadastro')), page.click('button[type=submit]')]);
+    await page.click('button[type=submit]');
+    await expect(page.getByTestId('cadastro-pendente')).toContainText('inativa');
+    // sem login automático
+    await page.goto('/admin/dashboard');
+    await expect(page).toHaveURL(/\/admin\/login/);
+    const conta = await comBanco((db) => db.funcionario.findFirst({ where: { email: 'pessoa.nova@example.com' } }));
+    expect(conta).toMatchObject({ ativo: false, perfil: 'colaborador' });
+    // a conta inativa não consegue entrar
+    await page.fill('input[name=email]', 'pessoa.nova@example.com');
+    await page.fill('input[name=senha]', 'Forte@Teste2030');
+    await page.click('button[type=submit]');
+    await expect(page).toHaveURL(/\/admin\/login/);
+
+    // o admin ativa em Usuários e aí o acesso funciona
+    const admin = await page.context().browser().newContext();
+    const paginaAdmin = await admin.newPage();
+    await entrarComoAdmin(paginaAdmin);
+    await paginaAdmin.goto('/admin/usuarios', { waitUntil: 'networkidle' });
+    await expect(paginaAdmin.getByText('inativa — aguardando ativação').first()).toBeVisible();
+    await comBanco((db) => db.funcionario.update({ where: { id: conta.id }, data: { ativo: true } }));
+    await admin.close();
+    await entrarComoAdmin(page, { email: 'pessoa.nova@example.com', senha: 'Forte@Teste2030' });
     await page.goto('/admin/dashboard');
     await expect(page).toHaveURL(/\/admin\/dashboard/);
   });

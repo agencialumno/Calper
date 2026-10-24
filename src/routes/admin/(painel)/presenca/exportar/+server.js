@@ -14,14 +14,15 @@ export async function GET({ url, locals }) {
   const fmt = (d) =>
     d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
   const linhas = [
-    ['Data/hora', 'Nome', 'Vínculo', 'CPF', 'Bloco', 'Unidade'],
+    ['Data/hora', 'Nome', 'Vínculo', 'CPF', 'Bloco', 'Unidade', 'Observações do atendimento'],
     ...presencas.map((p) => [
       fmt(p.createdAt),
       p.nome,
       ROTULO_VINCULO[p.vinculo] ?? p.vinculo,
       p.cpf ?? '',
       p.unidade.bloco,
-      p.unidade.numero
+      p.unidade.numero,
+      p.agendamento?.observacoesAtendimento ?? ''
     ])
   ];
 

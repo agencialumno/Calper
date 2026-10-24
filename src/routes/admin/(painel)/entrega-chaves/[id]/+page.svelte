@@ -5,12 +5,14 @@
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
   import { formatarCpf } from '$lib/cpf.js';
   import { fotosParaPdf } from '$lib/fotoParaPdf.js';
+  import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
 
   let { data, form } = $props();
 
   let u = $derived(data.unidade);
   let a = $derived(data.agendamento);
   let enviando = $state(false);
+  let abrirCorrecao = $state(false);
 
   // passo 2
   let quem = $state('');
@@ -157,17 +159,33 @@
     {/if}
   </p>
 
-  <ol class="flex flex-wrap gap-1.5 mb-6 text-[11px] font-bold">
+  <!-- as etapas são links: dá pra voltar e avançar livremente (o que ainda não pode ser feito explica o motivo) -->
+  <ol class="flex flex-wrap gap-1.5 mb-6 text-[11px] font-bold" aria-label="Etapas do atendimento">
     {#each passos as nome, i}
-      <li
-        class="px-2.5 py-1 rounded-full {data.passo === i + 1
-          ? 'bg-calper-red text-white'
-          : 'bg-gray-100 text-gray-500'}"
-      >
-        {i + 1}. {nome}
+      <li>
+        <a
+          href={href(i + 1)}
+          aria-current={data.passo === i + 1 ? 'step' : undefined}
+          class="inline-block px-2.5 py-1 rounded-full {data.passo === i + 1
+            ? 'bg-calper-red text-white'
+            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}"
+        >
+          {i + 1}. {nome}
+        </a>
       </li>
     {/each}
   </ol>
+
+  {#if data.bloqueio && (data.passo === 3 || data.passo === 4)}
+    <div class="card p-6 flex flex-col gap-3" data-testid="etapa-bloqueada">
+      <div class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">{data.bloqueio.texto}</div>
+      <a href={href(data.bloqueio.passo)} class="btn-primary text-center">{data.bloqueio.rotulo}</a>
+      <div class="flex gap-2 text-sm text-gray-500">
+        <a href={href(data.passo - 1)} class="flex-1 text-center">← Voltar</a>
+        {#if data.passo === 3}<a href={href(4)} class="flex-1 text-center">Avançar →</a>{/if}
+      </div>
+    </div>
+  {/if}
 
   {#if form?.erro}
     <div class="mb-4"><AvisoSutil>{form.erro}</AvisoSutil></div>
@@ -184,23 +202,12 @@
   {/if}
 
   <!-- PASSO 1 — consulta -->
-  {#if data.passo === 1}
+  {#if data.bloqueio && (data.passo === 3 || data.passo === 4)}
+    <!-- (etapa bloqueada: o aviso está acima) -->
+  {:else if data.passo === 1}
     <div class="card p-6 flex flex-col gap-4">
-      <div class="text-sm font-bold text-calper-dark">Situação da unidade (somente consulta)</div>
-      <div class="flex flex-wrap gap-2 text-xs font-bold">
-        <span class="px-2.5 py-1 rounded-full {u.statusQuitacao === 'quitada' ? ok : alerta}">
-          Pagamento: {u.statusQuitacao === 'quitada' ? 'quitada' : u.statusQuitacao === 'a_vencer' ? 'a vencer' : 'não informado'}
-        </span>
-        <span class="px-2.5 py-1 rounded-full {u.vistoriaAprovada ? ok : alerta}">
-          Vistoria: {u.vistoriaStatus ? u.vistoriaStatus.toLowerCase() : u.vistoriaAprovada ? 'aprovada' : 'pendente'}
-        </span>
-        <span class="px-2.5 py-1 rounded-full {u.escrituraRegistrada || /ASSINADA/i.test(u.escritura ?? '') ? ok : alerta}">
-          Escritura: {u.escritura ? u.escritura.toLowerCase() : u.escrituraRegistrada ? 'registrada' : 'não registrada'}
-        </span>
-        <span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
-          {u.quartos ? `${u.quartos} quartos` : 'Tipologia não informada'}
-        </span>
-      </div>
+      <div class="text-sm font-bold text-calper-dark">Situação da unidade</div>
+      <UnidadeStatus unidade={u} podeEditar={data.podeEditar} />
       <a href={href(2)} class="btn-primary text-center">Continuar</a>
     </div>
 
@@ -373,6 +380,16 @@
         </div>
       {/if}
 
+      {#if a.temIdentidade}
+        <div class="rounded-xl border border-gray-200 px-4 py-3 text-sm">
+          <div class="text-xs font-bold text-gray-500 mb-1.5">Documento de identidade enviado no agendamento ({a.nome ?? '—'})</div>
+          {#if a.identidadeTipo?.startsWith('image/')}
+            <img src="/admin/entrega-chaves/{a.id}/identidade" alt="Documento de identidade" class="w-full max-h-[28rem] object-contain rounded-lg border border-gray-100 bg-gray-50" />
+          {/if}
+          <a href="/admin/entrega-chaves/{a.id}/identidade" target="_blank" rel="noopener" class="inline-block mt-2 text-xs font-bold text-calper-red">Abrir em nova aba</a>
+        </div>
+      {/if}
+
       <div>
         <label for="email" class="block text-xs font-semibold text-gray-500 mb-1">
           E-mail de quem retira (usado na assinatura)
@@ -396,42 +413,30 @@
         </div>
       </div>
 
+      <!-- observações livres do atendimento: vão para o resumo final e para os CSVs -->
+      <div class="border border-gray-100 rounded-xl p-4 flex flex-col gap-2">
+        <label for="observacoes" class="text-xs font-bold text-gray-500">Observações do atendimento (opcional)</label>
+        <textarea id="observacoes" name="observacoes" rows="3" maxlength="2000" class="input text-sm" placeholder="Ex.: cliente pediu uma via extra das chaves; combinou retornar para a vistoria...">{a.observacoes}</textarea>
+        <div class="flex items-center gap-3 text-xs">
+          <button type="submit" formaction="?/salvarObservacoes" formnovalidate class="font-bold text-calper-red">Salvar observações</button>
+          {#if form?.sucesso === 'observacoes'}<span class="text-green-700 font-semibold">Observações salvas.</span>{/if}
+        </div>
+      </div>
+
       <div class="flex gap-2">
         <a href={href(1)} class="btn-outline text-center flex-1">Voltar</a>
         <div class="flex-1"><SubmitButton loading={enviando}>Confirmar e continuar</SubmitButton></div>
       </div>
+      {#if data.retirante}
+        <a href={href(3)} class="text-center text-sm text-gray-500">Avançar sem alterar →</a>
+      {/if}
     </form>
-
-    <!-- lista de presença -->
-    <div class="card p-6 mt-5 flex flex-col gap-3">
-      <div class="text-sm font-bold text-calper-dark">Lista de presença</div>
-      {#each data.presencas as p (p.id)}
-        <div class="flex items-center justify-between gap-3 text-sm border border-gray-100 rounded-xl p-3">
-          <div>
-            <div class="text-calper-dark font-semibold">{p.nome}</div>
-            <div class="text-xs text-gray-500">{p.vinculoRotulo} · {formatarHora(p.createdAt)}</div>
-          </div>
-          {#if p.vinculo === 'acompanhante'}
-            <form method="POST" action="?/removerPresente" use:enhance>
-              <input type="hidden" name="id" value={p.id} />
-              <button type="submit" class="text-xs font-semibold text-gray-400 hover:text-calper-red">remover</button>
-            </form>
-          {/if}
-        </div>
-      {:else}
-        <p class="text-sm text-gray-400">Ninguém registrado ainda. Quem retira as chaves entra na lista ao confirmar.</p>
-      {/each}
-
-      <form method="POST" action="?/adicionarPresente" use:enhance={() => async ({ update }) => update()} class="flex gap-2">
-        <input name="nome" class="input !py-2 text-sm" placeholder="Outra pessoa presente (acompanhante)" required />
-        <button type="submit" class="btn-outline !py-2 text-sm shrink-0">Adicionar</button>
-      </form>
-    </div>
 
     <!-- PASSO 3 — termo (cria o envelope; a Calper assina primeiro) -->
   {:else if data.passo === 3}
     {#if calperJaAssinou.includes(data.documentos.termo)}
       {@render andamento('termo', 'Termo', 4, 'Seguir para o checklist')}
+      {#if data.documentos.termo !== 'assinado'}{@render corrigirEmail('termo')}{/if}
     {:else}
       <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-3">
         <input type="hidden" name="tipo" value="termo" />
@@ -440,15 +445,17 @@
         <p class="text-xs text-gray-400">
           Revise e corrija o texto. Variáveis como {'{{numeroCertidao}}'} precisam ser preenchidas antes do envio.
         </p>
-        {@render botoesDocumento('termo', href(2))}
+        {@render botoesDocumento('termo', href(2), href(4))}
         {@render leitura('termo')}
       </form>
+      {@render corrigirEmail('termo')}
     {/if}
 
     <!-- PASSO 4 — checklist (anexado ao mesmo envelope do termo) -->
   {:else if data.passo === 4}
     {#if calperJaAssinou.includes(data.documentos.checklist)}
       {@render andamento('checklist', 'Checklist', 5, 'Ver resumo da entrega')}
+      {#if data.documentos.checklist !== 'assinado'}{@render corrigirEmail('checklist')}{/if}
     {:else}
       <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-4">
         <input type="hidden" name="tipo" value="checklist" />
@@ -485,9 +492,10 @@
           </div>
         {/each}
 
-        {@render botoesDocumento('checklist', href(3))}
+        {@render botoesDocumento('checklist', href(3), href(5))}
         {@render leitura('checklist')}
       </form>
+      {@render corrigirEmail('checklist')}
     {/if}
 
     <!-- PASSO 5 — concluído + download -->
@@ -518,6 +526,12 @@
         </dl>
       {/if}
       <div class="text-sm font-bold text-calper-dark">Documentos</div>
+      {#if data.documentos.termo === 'assinado' && data.documentos.checklist === 'assinado'}
+        <LinkDownload
+          href="/admin/entrega-chaves/{a.id}/documento/completo"
+          class="btn-primary text-center inline-block"
+        >Baixar PDF completo (termo + checklist assinados)</LinkDownload>
+      {/if}
       {#each [['termo', 'Termo de entrega de chaves', 3], ['checklist', 'Checklist', 4]] as [tipo, rotulo, passo]}
         <div class="flex items-center justify-between border border-gray-100 rounded-xl p-3">
           <div>
@@ -545,9 +559,14 @@
       {:else}
         <p class="text-sm text-gray-400">Ninguém registrado.</p>
       {/each}
-      {#if a.status === 'realizado'}
-        <div class="text-xs font-bold text-green-700 mt-2">Entrega concluída — agendamento marcado como realizado.</div>
+      {#if a.observacoes}
+        <div class="text-sm font-bold text-calper-dark mt-3">Observações do atendimento</div>
+        <p class="text-sm text-calper-dark whitespace-pre-line border border-gray-100 rounded-xl p-3" data-testid="observacoes-resumo">{a.observacoes}</p>
       {/if}
+      <div class="flex gap-2 text-sm text-gray-500 mt-2">
+        <a href={href(4)} class="flex-1 text-center">← Voltar</a>
+        <a href={href(2)} class="flex-1 text-center">Editar observações</a>
+      </div>
     </div>
   {/if}
 </div>
@@ -563,7 +582,7 @@
   </div>
 {/snippet}
 
-{#snippet botoesDocumento(tipo, voltar)}
+{#snippet botoesDocumento(tipo, voltar, avancar)}
   <div class="flex flex-col gap-2">
     <button
       type="submit"
@@ -578,7 +597,10 @@
         Continuar a assinatura da Calper
       </a>
     {/if}
-    <a href={voltar} class="text-center text-sm text-gray-500">Voltar</a>
+    <div class="flex gap-2 text-sm text-gray-500">
+      <a href={voltar} class="flex-1 text-center">← Voltar</a>
+      <a href={avancar} class="flex-1 text-center">Avançar →</a>
+    </div>
   </div>
 {/snippet}
 
@@ -643,6 +665,44 @@
         <SubmitButton loading={enviando}>Verificar agora no DocuSign</SubmitButton>
       </form>
       <a href={href(proximoPasso)} class="btn-outline text-center">{rotuloProximo}</a>
+    {/if}
+  </div>
+{/snippet}
+
+<!-- "Corrigir e-mail": abaixo do botão de avançar nas etapas em que se espera a assinatura (também com o envelope já enviado) -->
+{#snippet corrigirEmail(tipo)}
+  <div class="mt-3" data-testid="corrigir-email">
+    {#if !abrirCorrecao}
+      <button type="button" class="w-full text-center text-sm font-semibold text-gray-600 hover:text-calper-red border border-gray-200 rounded-xl py-2.5" onclick={() => (abrirCorrecao = true)}>
+        Corrigir e-mail
+      </button>
+    {:else}
+      <form method="POST" action="?/corrigirEmail" use:enhance={() => async ({ update }) => { await update({ reset: false }); }} class="card p-5 flex flex-col gap-3">
+        <div class="text-sm font-bold text-calper-dark">Corrigir e-mail de quem assina</div>
+        <p class="text-xs text-gray-500">
+          Atualiza o cadastro e corrige o destinatário no DocuSign: o link enviado ao e-mail antigo deixa de valer e,
+          se o e-mail já tinha sido enviado, o DocuSign reenvia ao endereço novo.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-gray-500">De quem?</span>
+            <select name="quem" class="input !py-2 text-sm">
+              <option value="cliente">{data.signatario.nome ?? 'Quem retira'} — {data.signatario.email ?? 'sem e-mail'}</option>
+              {#if data.conjuge}<option value="conjuge">{data.conjuge.nome} (cônjuge) — {data.conjuge.email}</option>{/if}
+            </select>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-gray-500">E-mail correto</span>
+            <input name="email" type="email" class="input !py-2 text-sm" required />
+          </label>
+        </div>
+        {#if form?.erroEmail}<AvisoSutil>{form.erroEmail}</AvisoSutil>{/if}
+        {#if form?.sucessoEmail}<p class="text-sm text-green-700 font-semibold">{form.sucessoEmail}</p>{/if}
+        <div class="flex items-center gap-3">
+          <button type="submit" class="btn-primary !py-2 !px-4 text-sm">Salvar e-mail</button>
+          <button type="button" class="text-sm font-semibold text-gray-500" onclick={() => (abrirCorrecao = false)}>Fechar</button>
+        </div>
+      </form>
     {/if}
   </div>
 {/snippet}

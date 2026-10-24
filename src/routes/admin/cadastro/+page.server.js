@@ -1,23 +1,23 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { hashSenha } from '$lib/server/auth.js';
-import { STAFF_SESSION_COOKIE, criarSessaoFuncionario } from '$lib/server/auth-staff.js';
 import { registrarLog } from '$lib/server/log.js';
 import { notificarFuncionarios } from '$lib/server/notificacao.js';
 import { emailValido } from '$lib/cpf.js';
 import { senhaAceitavel } from '$lib/password.js';
 
-// Cadastro da equipe pela tela de login, com ATIVAÇÃO DIRETA: a conta nasce ativa e já entra logada,
-// sem aprovação de um admin e sem código de convite (decisão consciente da Calper).
-// Quem se cadastra recebe o perfil "admin" (acesso total, inclusive à tela de logs) — decisão consciente da
-// Calper — e os admins existentes são avisados no sino.
+// Pedido de cadastro da equipe pela tela de login: a conta nasce INATIVA e sem login automático; um admin ativa
+// (e define o perfil) em /admin/usuarios. Os admins são avisados no sino.
+// Quem se cadastra recebe o perfil de MENOR privilégio, "colaborador" (somente leitura + atendimento presencial).
+// Antes de existirem perfis, todo cadastro virava admin; agora um admin promove a pessoa em /admin/usuarios, e os
+// admins existentes são avisados no sino.
 export function load({ locals }) {
   if (locals.funcionario) throw redirect(303, '/admin/unidades');
 }
 
 export const actions = {
   default: async (event) => {
-    const { request, cookies } = event;
+    const { request } = event;
     const form = await request.formData();
     const nome = String(form.get('nome') ?? '').trim();
     const email = String(form.get('email') ?? '').trim().toLowerCase();
@@ -41,7 +41,7 @@ export const actions = {
     let funcionario;
     try {
       funcionario = await db.funcionario.create({
-        data: { nome, email, senhaHash: hashSenha(senha), perfil: 'admin', ativo: true }
+        data: { nome, email, senhaHash: hashSenha(senha), perfil: 'colaborador', ativo: false }
       });
     } catch (err) {
       if (err?.code === 'P2002') return fail(400, { erro: 'Já existe uma conta com esse e-mail.', valores });
@@ -53,25 +53,18 @@ export const actions = {
       atorTipo: 'funcionario',
       funcionarioId: funcionario.id,
       acao: 'funcionario_cadastrado',
-      descricao: `${nome} (${email}) se cadastrou na área da equipe pela tela de login (perfil admin, ativação direta, sem aprovação)`,
+      descricao: `${nome} (${email}) se cadastrou na área da equipe pela tela de login (conta INATIVA, perfil colaborador: só entra depois que um admin ativar em Usuários)`,
       entidadeTipo: 'Funcionario',
       entidadeId: funcionario.id
     });
     await notificarFuncionarios({
-      titulo: 'Novo cadastro na equipe',
-      mensagem: `${nome} (${email}) criou uma conta de administrador pela tela de login.`,
-      link: '/admin/logs',
+      titulo: 'Pedido de acesso da equipe',
+      mensagem: `${nome} (${email}) pediu acesso pela tela de login. A conta está inativa: ative e defina o perfil em Usuários.`,
+      link: '/admin/usuarios',
       perfis: ['admin']
     });
 
-    const { token, expiresAt } = await criarSessaoFuncionario(funcionario.id);
-    cookies.set(STAFF_SESSION_COOKIE, token, {
-      path: '/',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      expires: expiresAt
-    });
-    throw redirect(303, '/admin/unidades');
+    // sem login automático: a conta só funciona depois que um admin a ativa em /admin/usuarios
+    return { pendente: true, email };
   }
 };

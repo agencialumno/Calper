@@ -28,8 +28,23 @@
     if (form?.sucesso && modalEl && !modalFechado && !modalEl.open) modalEl.showModal();
   });
   let arquivoProcuracao = $state(null);
+  let arquivoIdentidade = $state(null);
   let tentouEnviar = $state(false);
   let erroTipoProcuracao = $state('');
+  let erroIdentidade = $state('');
+
+  // documento de identidade: foto (JPG/PNG) ou PDF, até 4 MB
+  function aoEscolherIdentidade(e) {
+    const arq = e.currentTarget.files?.[0] ?? null;
+    erroIdentidade = '';
+    if (arq && !/\.(pdf|jpe?g|png)$/i.test(arq.name)) {
+      e.currentTarget.value = '';
+      arquivoIdentidade = null;
+      erroIdentidade = 'O documento de identidade precisa ser uma foto (JPG ou PNG) ou um PDF.';
+      return;
+    }
+    arquivoIdentidade = arq;
+  }
 
   // só documento de texto (PDF/Word): imagem é recusada na hora, antes de enviar
   function aoEscolherProcuracao(e) {
@@ -44,10 +59,11 @@
     arquivoProcuracao = arq;
   }
   const faltaProcuracao = $derived(ehProprietario === 'nao' && !arquivoProcuracao);
+  const faltaIdentidade = $derived(ehProprietario === 'nao' && !arquivoIdentidade);
 
   function aoSubmeter({ cancel }) {
     tentouEnviar = true;
-    if (faltaProcuracao) {
+    if (faltaProcuracao || faltaIdentidade) {
       cancel();
       return;
     }
@@ -259,6 +275,25 @@
           {/if}
           {#if tentouEnviar && faltaProcuracao}
             <AvisoSutil>Anexe a procuração para confirmar o agendamento.</AvisoSutil>
+          {/if}
+
+          <label for="identidade" class="block text-sm font-semibold text-calper-dark mt-1">
+            Documento de identidade de quem vai assinar/comparecer (foto ou PDF, até 4 MB) <span class="text-calper-red">*</span>
+          </label>
+          <p class="text-xs text-gray-500">RG, CNH ou outro documento oficial com foto da pessoa que vai ao atendimento.</p>
+          <input
+            id="identidade"
+            name="identidade"
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+            class="input"
+            onchange={aoEscolherIdentidade}
+          />
+          {#if erroIdentidade}
+            <AvisoSutil>{erroIdentidade}</AvisoSutil>
+          {/if}
+          {#if tentouEnviar && faltaIdentidade}
+            <AvisoSutil>Anexe o documento de identidade para confirmar o agendamento.</AvisoSutil>
           {/if}
         </div>
       {/if}

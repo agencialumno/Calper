@@ -8,7 +8,9 @@ import { createRequire } from 'node:module';
 export const DATAS_ABERTAS = ['2030-10-28', '2030-10-29', '2030-10-30'];
 export const DIA_COM_LIMITE_1 = '2030-10-30'; // limite de 1 agendamento por hora (testa a lotação)
 export const ADMIN = { email: 'teste.admin@example.com', senha: 'Teste@12345' };
-export const ATENDIMENTO = { email: 'teste.atendimento@example.com', senha: 'Teste@12345' };
+export const SUPERVISOR = { email: 'teste.supervisor@example.com', senha: 'Teste@12345' };
+export const COLABORADOR = { email: 'teste.colaborador@example.com', senha: 'Teste@12345' };
+export const ATENDIMENTO = COLABORADOR; // nome antigo do perfil colaborador
 
 /** Lê DATABASE_URL_TESTE do .env.test (ou do ambiente) e confere que é o schema de teste. */
 export function urlDoBancoDeTeste() {
@@ -65,7 +67,18 @@ export async function prepararBancoDeTeste() {
       ['107', [{ nome: 'COMPRADOR SETE TESTE', principal: true }]]
     ]) {
       unidades[numero] = await db.unidade.create({
-        data: { empreendimentoId: murano.id, bloco: '2', numero, tipologia: '2 QUARTOS', statusQuitacao: 'quitada', compradores }
+        data: {
+          empreendimentoId: murano.id, bloco: '2', numero, tipologia: '2 QUARTOS', statusQuitacao: 'quitada', compradores,
+          // As unidades 106 e 107 ficam FORA da planilha dos testes de importação e já têm os dados da base consolidada
+          // (aparecem nas etiquetas e no "ver mais"); as demais começam sem vistoria/escritura pra a importação ter o que atualizar.
+          ...(['106', '107'].includes(numero)
+            ? {
+                grupo: 'A', vistoriaStatus: 'APROVADA', vistoriaAprovada: true, escrituraAtual: 'PROMESSA DE COMPRA E VENDA', statusVenda: 'VENDIDA',
+                dataVenda: new Date('2024-03-15T00:00:00.000Z'), vencidoPago: 123456.78, vencidoNaoPago: 0, saldoVincendo: 0,
+                faseEscritura: 'SIM (1ª FASE)', escrituraALavrar: 'COMPRA E VENDA'
+              }
+            : {})
+        }
       });
     }
 
@@ -75,7 +88,8 @@ export async function prepararBancoDeTeste() {
     });
 
     await db.funcionario.create({ data: { nome: 'Admin Teste', email: ADMIN.email, senhaHash: hashSenha(ADMIN.senha), perfil: 'admin', ativo: true } });
-    await db.funcionario.create({ data: { nome: 'Atendimento Teste', email: ATENDIMENTO.email, senhaHash: hashSenha(ATENDIMENTO.senha), perfil: 'atendimento', ativo: true } });
+    await db.funcionario.create({ data: { nome: 'Supervisor Teste', email: SUPERVISOR.email, senhaHash: hashSenha(SUPERVISOR.senha), perfil: 'supervisor', ativo: true } });
+    await db.funcionario.create({ data: { nome: 'Colaborador Teste', email: COLABORADOR.email, senhaHash: hashSenha(COLABORADOR.senha), perfil: 'colaborador', ativo: true } });
     const investidor = await db.investidor.create({ data: { nome: '[TESTE] Investidor', cpf: '11144477735', senhaHash: hashSenha('Teste@12345'), primeiroAcesso: false } });
 
     for (const data of DATAS_ABERTAS) {
@@ -84,7 +98,10 @@ export async function prepararBancoDeTeste() {
 
     // agendamentos prontos para as telas de gestão: 1 entrega concluída, 1 compareceu sem concluir, 1 não compareceu
     const base = { tipoEventoId: entrega.id, investidorId: investidor.id, emailCompareceu: 'agendou@example.com', ehProprietario: true };
-    const pdf = 'data:application/pdf;base64,' + Buffer.from('%PDF-1.4 teste').toString('base64');
+    const { PDFDocument } = require('pdf-lib');
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+    const pdf = 'data:application/pdf;base64,' + Buffer.from(await doc.save()).toString('base64');
     const concluido = await db.agendamento.create({
       data: { ...base, unidadeId: unidades['101'].id, dataHora: new Date('2030-10-28T09:00:00Z'), qrToken: 'qr-teste-1', status: 'realizado', nomeCompareceu: 'Pessoa Concluida', cpfCompareceu: '52998224725', telefoneCompareceu: '21999990001', retiranteNome: 'Pessoa Concluida' }
     });

@@ -13,9 +13,12 @@ import {
   signatariosDoCliente,
   sincronizarDocumento
 } from '$lib/server/entregaChaves.js';
+import { corrigirEmailDoDestinatario, DESTINATARIO, situacaoDoEnvelope } from '$lib/server/docusign.js';
 import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
 import { montarChecklist, parseChecklist } from '$lib/documentosPadrao.js';
+import { statusDaUnidade } from '$lib/server/unidadeStatus.js';
+import { podeEditar } from '$lib/perfis.js';
 
 async function buscarAgendamento(id) {
   const agendamento = await db.agendamento.findUnique({
@@ -38,7 +41,7 @@ async function buscarAgendamento(id) {
 const irPara = (id, passo) => `/admin/entrega-chaves/${id}?passo=${passo}`;
 
 export async function load(event) {
-  const { params, url } = event;
+  const { params, url, locals } = event;
   const agendamento = await buscarAgendamento(params.id);
   const u = agendamento.unidade;
   // entrega já concluída: abre direto o resumo (passo 5), sem reabrir o fluxo de assinatura
@@ -48,10 +51,14 @@ export async function load(event) {
   const passo = Math.min(5, Math.max(1, Number(url.searchParams.get('passo')) || 1));
 
   const retirante = retiranteDoAgendamento(agendamento);
-  // termo e checklist só depois de confirmar quem retira (e, sendo procurador, com procuração)
+  // Navegação livre entre as etapas: nada redireciona. Termo e checklist só são montados depois de confirmar quem
+  // retira (e, sendo procurador, com procuração); antes disso a etapa mostra o que falta, com o caminho até lá.
   const procuradorSemProcuracao = retirante?.vinculo === 'procurador' && !procuracaoValidaParaRetirante(agendamento, retirante.cpf);
-  if ((passo === 3 || passo === 4) && (!retirante || procuradorSemProcuracao)) {
-    throw redirect(303, irPara(agendamento.id, 2));
+  let bloqueio = null;
+  if ((passo === 3 || passo === 4) && !retirante) {
+    bloqueio = { texto: 'Confirme quem está retirando as chaves antes de seguir para os documentos.', passo: 2, rotulo: 'Ir para "Quem retira"' };
+  } else if ((passo === 3 || passo === 4) && procuradorSemProcuracao) {
+    bloqueio = { texto: 'Quem retira é procurador: anexe a procuração antes de seguir para os documentos.', passo: 2, rotulo: 'Ir para "Quem retira"' };
   }
 
   // documento já aberto no DocuSign: confere lá se a Calper e o cliente já assinaram
@@ -76,14 +83,16 @@ export async function load(event) {
     ])
   );
 
-  // o checklist vem depois do termo: só abre quando a Calper já assinou o termo
-  if (passo === 4 && !CALPER_JA_ASSINOU.includes(documentos.termo)) {
-    throw redirect(303, irPara(agendamento.id, 3));
+  // o checklist vem depois do termo (ele é anexado ao envelope do termo): só abre quando a Calper já assinou o termo
+  if (!bloqueio && passo === 4 && !CALPER_JA_ASSINOU.includes(documentos.termo)) {
+    bloqueio = { texto: 'O checklist vem depois do termo: a Calper precisa assinar o termo primeiro.', passo: 3, rotulo: 'Ir para o termo' };
   }
 
   const base = {
     passo,
     aviso: url.searchParams.get('aviso'),
+    podeEditar: podeEditar(locals.funcionario.perfil),
+    bloqueio,
     documentos,
     // quem ainda não assinou (nome/e-mail), por documento — vem da consulta ao DocuSign feita acima
     pendentes: pendentesPorDocumento,
@@ -105,6 +114,9 @@ export async function load(event) {
       retiranteEmail: agendamento.retiranteEmail,
       conjugeNome: agendamento.conjugeNome,
       conjugeEmail: agendamento.conjugeEmail,
+      observacoes: agendamento.observacoesAtendimento ?? '',
+      temIdentidade: Boolean(agendamento.documentoBase64),
+      identidadeTipo: agendamento.documentoBase64 ? agendamento.documentoBase64.slice(5, agendamento.documentoBase64.indexOf(';')) : null,
       temProcuracao: Boolean(agendamento.procuracaoBase64),
       // CPF de quem a procuração anexada representa (nulo em registros antigos) e o nome, quando
       // foi a própria pessoa que agendou — o passo 2 só dispensa novo upload se o retirante for ela
@@ -122,6 +134,8 @@ export async function load(event) {
       bloco: u.bloco,
       numero: u.numero,
       quartos: quartosDaUnidade(u), // tipologia (base Murano) ou campo quartos
+      // o mesmo cartão de status das abas Unidades e Chaves (admin/supervisor alteram aqui, no dia da entrega)
+      ...statusDaUnidade(u),
       statusQuitacao: u.statusQuitacao,
       vistoriaAprovada: u.vistoriaAprovada,
       vistoriaStatus: u.vistoriaStatus,
@@ -145,10 +159,10 @@ export async function load(event) {
   const opcoes = { retirante, conjuge: base.conjuge };
 
   // passo 3 = termo, passo 4 = checklist; com a Calper já assinada o documento só mostra o andamento
-  if (passo === 3 && !CALPER_JA_ASSINOU.includes(documentos.termo)) {
+  if (!bloqueio && passo === 3 && !CALPER_JA_ASSINOU.includes(documentos.termo)) {
     return { ...base, texto: (await montarDocumento(u.id, 'termo', opcoes)).texto };
   }
-  if (passo === 4 && !CALPER_JA_ASSINOU.includes(documentos.checklist)) {
+  if (!bloqueio && passo === 4 && !CALPER_JA_ASSINOU.includes(documentos.checklist)) {
     const { texto } = await montarDocumento(u.id, 'checklist', opcoes);
     return { ...base, checklist: parseChecklist(texto) };
   }
@@ -229,6 +243,7 @@ export const actions = {
           retiranteEmail: email,
           conjugeNome: conjugeNome || null,
           conjugeEmail: conjugeEmail || null,
+          ...(form.has('observacoes') ? { observacoesAtendimento: String(form.get('observacoes') ?? '').trim().slice(0, 2000) || null } : {}),
           ...(procuracaoNova ? { procuracaoBase64: procuracaoNova, procuracaoCpf: cpf } : {})
         }
       }),
@@ -286,55 +301,91 @@ export const actions = {
     throw redirect(303, irPara(agendamento.id, 3));
   },
 
-  // Lista de presença: outras pessoas que compareceram além de quem retira as chaves.
-  adicionarPresente: async (event) => {
+  // Observações livres do atendimento (substituem a antiga lista de acompanhantes). Aparecem no resumo final e nos CSVs.
+  salvarObservacoes: async (event) => {
     const { request, params, locals } = event;
     const agendamento = await buscarAgendamento(params.id);
     const form = await request.formData();
-    const nome = String(form.get('nome') ?? '').trim();
-    if (nome.length < 3) return fail(400, { erro: 'Informe o nome de quem compareceu.' });
-
-    await db.presencaEntrega.create({
-      data: {
-        agendamentoId: agendamento.id,
-        unidadeId: agendamento.unidadeId,
-        nome,
-        vinculo: 'acompanhante',
-        registradoPorId: locals.funcionario.id
-      }
-    });
+    const observacoes = String(form.get('observacoes') ?? '').trim().slice(0, 2000);
+    await db.agendamento.update({ where: { id: agendamento.id }, data: { observacoesAtendimento: observacoes || null } });
     const u = agendamento.unidade;
     await registrarLog({
       event,
       atorTipo: 'funcionario',
-      acao: 'presenca_registrada',
-      descricao: `${rotuloFuncionario(locals.funcionario)} registrou a presença de ${nome} (${ROTULO_VINCULO.acompanhante}) — Unidade ${u.numero}, Bloco ${u.bloco}`,
+      acao: 'observacoes_atendimento_salvas',
+      descricao: `${rotuloFuncionario(locals.funcionario)} ${observacoes ? 'registrou' : 'apagou'} as observações do atendimento — Unidade ${u.numero}, Bloco ${u.bloco}${observacoes ? `: "${observacoes.slice(0, 200)}"` : ''}`,
       entidadeTipo: 'Agendamento',
       entidadeId: agendamento.id
     });
-    return { sucesso: 'presenca' };
+    return { sucesso: 'observacoes' };
   },
 
-  removerPresente: async (event) => {
+  // "Corrigir e-mail": o e-mail de quem assina (cliente ou cônjuge) estava errado. Atualiza o cadastro e corrige o
+  // destinatário no envelope do DocuSign (o link enviado ao e-mail antigo deixa de valer; se o e-mail já tinha sido
+  // enviado, o DocuSign reenvia ao endereço novo). Vale também depois de o envelope ter sido enviado.
+  corrigirEmail: async (event) => {
     const { request, params, locals } = event;
+    const agendamento = await buscarAgendamento(params.id);
     const form = await request.formData();
-    const id = String(form.get('id') ?? '');
-    const presenca = await db.presencaEntrega.findFirst({
-      where: { id, agendamentoId: params.id, vinculo: 'acompanhante' },
-      include: { unidade: true }
-    });
-    if (!presenca) return fail(404, { erro: 'Registro não encontrado.' });
+    const ehConjuge = String(form.get('quem') ?? 'cliente') === 'conjuge';
+    const novo = String(form.get('email') ?? '').trim();
+    if (!emailValido(novo)) return fail(400, { erroEmail: 'Informe um e-mail válido.' });
 
-    await db.presencaEntrega.delete({ where: { id } });
+    const retirante = retiranteDoAgendamento(agendamento);
+    if (!retirante) return fail(400, { erroEmail: 'Confirme quem retira as chaves (passo 2) antes de corrigir o e-mail.' });
+    if (ehConjuge && !(agendamento.conjugeNome && agendamento.conjugeEmail)) {
+      return fail(400, { erroEmail: 'Não há cônjuge cadastrado nesta entrega.' });
+    }
+    const nome = ehConjuge ? agendamento.conjugeNome : retirante.nome;
+    const atual = ehConjuge ? agendamento.conjugeEmail : retirante.email;
+    const outro = ehConjuge ? retirante.email : agendamento.conjugeEmail;
+    if (novo.toLowerCase() === String(atual ?? '').toLowerCase()) return fail(400, { erroEmail: 'Esse já é o e-mail cadastrado.' });
+    if (outro && novo.toLowerCase() === outro.toLowerCase()) {
+      return fail(400, { erroEmail: 'O e-mail precisa ser diferente do da outra pessoa que assina: cada um recebe o próprio link.' });
+    }
+
+    // envelope do DocuSign (termo e checklist moram no mesmo)
+    const documentos = await db.documentoAssinado.findMany({ where: { agendamentoId: agendamento.id }, orderBy: { createdAt: 'asc' } });
+    const doc = documentos[0];
+    if (doc) {
+      if (documentos.every((d) => d.status === 'assinado')) {
+        return fail(400, { erroEmail: 'Todos já assinaram: não há mais o que corrigir no envelope.' });
+      }
+      // quem já assinou não pode ter o e-mail trocado: o DocuSign não aceita e a assinatura ficaria com o e-mail antigo
+      try {
+        const situacao = await situacaoDoEnvelope(doc.docusignEnvelopeId);
+        const aindaFalta = situacao.clientesPendentes.some((c) => String(c.email ?? '').toLowerCase() === String(atual ?? '').toLowerCase());
+        if (!aindaFalta) return fail(400, { erroEmail: `${nome} já assinou: o e-mail não pode mais ser corrigido no envelope.` });
+      } catch (err) {
+        console.error('DocuSign (situação antes de corrigir e-mail):', err?.response?.body ?? err);
+        return fail(502, { erroEmail: 'Não foi possível consultar o DocuSign agora. Nada foi alterado; tente de novo em instantes.' });
+      }
+      try {
+        await corrigirEmailDoDestinatario({
+          envelopeId: doc.docusignEnvelopeId,
+          destinatario: ehConjuge ? DESTINATARIO.conjuge : DESTINATARIO.cliente,
+          nome,
+          email: novo,
+          // o cliente só foi notificado quando a Calper assinou os dois documentos
+          reenviar: documentos.some((d) => d.status === 'aguardando_cliente')
+        });
+      } catch (err) {
+        console.error('DocuSign (corrigir e-mail):', err?.response?.body ?? err);
+        return fail(502, { erroEmail: 'O DocuSign não aceitou a correção agora. Nada foi alterado; tente de novo em instantes.' });
+      }
+    }
+
+    await db.agendamento.update({ where: { id: agendamento.id }, data: ehConjuge ? { conjugeEmail: novo } : { retiranteEmail: novo } });
+    const u = agendamento.unidade;
     await registrarLog({
       event,
       atorTipo: 'funcionario',
-      acao: 'presenca_removida',
-      descricao: `${rotuloFuncionario(locals.funcionario)} removeu ${presenca.nome} da lista de presença — Unidade ${presenca.unidade.numero}, Bloco ${presenca.unidade.bloco}`,
+      acao: 'email_assinante_corrigido',
+      descricao: `${rotuloFuncionario(locals.funcionario)} corrigiu o e-mail de ${nome} (${ehConjuge ? 'cônjuge' : 'quem retira'}) de ${atual ?? '—'} para ${novo} — Unidade ${u.numero}, Bloco ${u.bloco}${doc ? ' (envelope do DocuSign atualizado; o link do e-mail antigo deixou de valer)' : ''}`,
       entidadeTipo: 'Agendamento',
-      entidadeId: params.id
+      entidadeId: agendamento.id
     });
-    return { sucesso: 'presenca' };
+    return { sucessoEmail: `E-mail de ${nome} corrigido para ${novo}.${doc ? ' O DocuSign foi atualizado.' : ''}` };
   },
 
   // "Verificar agora": consulta o DocuSign na hora (sem esperar o cron) e atualiza o status do documento.

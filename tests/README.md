@@ -7,7 +7,7 @@ Rode **antes de qualquer novo ajuste** (e antes de cada deploy): `bun run test` 
 | Camada | Comando | Duração | Cobre |
 |---|---|---|---|
 | Unidade (vitest) | `bun run test` | ~3 s | regras de agenda (limite por hora/dia/horário), validação de CPF/e-mail, âncoras e caixa de assinatura, linhas de assinatura dos documentos (M1/cônjuge), zip, CSV, filtros de "quem agendou", guarda de `/admin` (sessão e perfil) |
-| Ponta a ponta (Playwright) | `bun run test:e2e` | ~3 min | agendamento público (proprietário, procurador, PDF/DOC/DOCX × imagem, lotação "(indisponível)", unidade some da lista), guarda sem login, perfil atendimento, cadastro da equipe, "quem agendou" + CSV, presença recebeu × falta + CSV, exportações existentes, zip por unidade, foto da procuração → PDF |
+| Ponta a ponta (Playwright) | `bun run test:e2e` | ~10 min | agendamento público (proprietário, procurador, PDF/DOC/DOCX × imagem, lotação "(indisponível)", unidade some da lista), guarda sem login, perfil atendimento, cadastro da equipe, "quem agendou" + CSV, presença recebeu × falta + CSV, exportações existentes, zip por unidade, foto da procuração → PDF |
 
 ## Banco de teste
 
@@ -30,3 +30,12 @@ O fluxo de assinatura com o DocuSign (Calper assina termo e checklist, envelope 
 4. "Verificar agora no DocuSign" responde sem erro.
 5. Baixar o PDF assinado: caixas centralizadas sobre a linha, sem sobrepor o nome de cima.
 6. Limpeza: anular o envelope no DocuSign e apagar o agendamento de teste.
+
+## Ordem dos testes e perfis de teste
+
+- Os testes rodam em ordem alfabética de arquivo e compartilham o mesmo banco de teste. O de importação **"Sobrescrever"**
+  apaga unidades e agendamentos de propósito, por isso o arquivo se chama `zz-importacao.spec.js`: tem que rodar por último.
+- Usuários de teste (criados em `tests/preparar-banco-teste.js`): `ADMIN`, `SUPERVISOR` e `COLABORADOR` (os três perfis).
+- As unidades 106 e 107 do banco de teste já trazem os dados da base consolidada (vistoria, escritura, datas, valores): são as que
+  os testes de etiquetas, "ver mais" e edição de status usam. A planilha sintética `tests/fixtures/base-consolidada-teste.xlsx`
+  imita o layout da planilha nova **sem dados reais** (planilhas de verdade nunca entram no git).

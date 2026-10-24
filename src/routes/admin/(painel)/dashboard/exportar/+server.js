@@ -33,6 +33,7 @@ export async function GET({ locals }) {
       retiranteNome: true,
       retiranteCpf: true,
       retiranteEmail: true,
+      observacoesAtendimento: true,
       unidade: {
         select: { bloco: true, numero: true, tipologia: true, quartos: true, grupo: true, statusQuitacao: true, compradores: true }
       },
@@ -67,10 +68,11 @@ export async function GET({ locals }) {
     'Checklist assinado em',
     'Entrega concluída',
     'Presentes',
+    'Observações do atendimento',
     'Agendado em'
   ];
 
-  const pagamento = { quitada: 'quitada', a_vencer: 'a vencer' };
+  const pagamento = { quitada: 'saldo quitado', a_vencer: 'a vencer', estoque: 'estoque', juridico_civel: 'jurídico cível' };
   const linhas = agendamentos.map((a) => {
     const doc = (tipo) => a.documentosAssinados.find((d) => d.tipo === tipo);
     const termo = doc('termo');
@@ -103,6 +105,7 @@ export async function GET({ locals }) {
       dataHoraBr(checklist?.assinadoEm),
       sn(a.status === 'realizado'),
       a.presencas.map((p) => `${p.nome} (${ROTULO_VINCULO[p.vinculo] ?? p.vinculo}, ${dataHoraBr(p.createdAt)})`).join(' | '),
+      a.observacoesAtendimento ?? '',
       dataHoraBr(a.createdAt)
     ];
   });

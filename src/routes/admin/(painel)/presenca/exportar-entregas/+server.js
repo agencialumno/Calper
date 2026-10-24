@@ -37,12 +37,13 @@ export async function GET({ url, locals }) {
       i.retirante,
       dataHoraBr(i.entregueEm),
       ROTULO_DOC[i.documentos.termo] ?? 'não enviado',
-      ROTULO_DOC[i.documentos.checklist] ?? 'não enviado'
+      ROTULO_DOC[i.documentos.checklist] ?? 'não enviado',
+      i.observacoes
     ];
   };
 
   const linhas = [
-    ['Situação', 'Bloco', 'Unidade', 'Quem agendou', 'CPF', 'Telefone', 'E-mail', 'É o proprietário', 'Nome do proprietário', 'Data agendada', 'Hora agendada', 'Compareceu', 'Quem retirou/retira', 'Chave entregue em', 'Termo', 'Checklist'],
+    ['Situação', 'Bloco', 'Unidade', 'Quem agendou', 'CPF', 'Telefone', 'E-mail', 'É o proprietário', 'Nome do proprietário', 'Data agendada', 'Hora agendada', 'Compareceu', 'Quem retirou/retira', 'Chave entregue em', 'Termo', 'Checklist', 'Observações do atendimento'],
     ...faltam.map((i) => linha('Ainda não recebeu', i)),
     ...receberam.map((i) => linha('Recebeu a chave', i))
   ];

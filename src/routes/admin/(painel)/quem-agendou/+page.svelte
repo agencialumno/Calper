@@ -3,6 +3,8 @@
   import { formatarCpf } from '$lib/cpf.js';
 
   let { data } = $props();
+  import { autoAtualizar } from '$lib/autoAtualizar.svelte.js';
+  autoAtualizar();
 
   // horário do agendamento: o relógio escolhido é gravado como UTC (ver agenda.js)
   const dataHoraAgendada = (iso) =>

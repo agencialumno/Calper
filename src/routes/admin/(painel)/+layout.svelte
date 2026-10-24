@@ -1,6 +1,8 @@
 <script>
   import { page } from '$app/stores';
   import NotificationBell from '$lib/components/NotificationBell.svelte';
+  import AvatarEquipe from '$lib/components/AvatarEquipe.svelte';
+  import { ROTULO_PERFIL, permissaoNoCaminho } from '$lib/perfis.js';
 
   let { data, children } = $props();
 
@@ -14,13 +16,14 @@
     { href: '/admin/entrega-chaves', label: 'Chaves' },
     { href: '/admin/questionarios', label: 'Questionários' },
     { href: '/admin/documentos', label: 'Documentos' },
-    { href: '/admin/logs', label: 'Logs', soAdmin: true }
-    // Agenda entra em um próximo módulo.
+    { href: '/admin/usuarios', label: 'Usuários' },
+    { href: '/admin/logs', label: 'Logs' }
   ];
 
-  let menu = $derived(nav.filter((i) => !i.soAdmin || data.funcionario.perfil === 'admin'));
+  // cada perfil só vê as abas a que tem acesso (as mesmas regras do servidor, em src/lib/perfis.js)
+  let menu = $derived(nav.filter((i) => permissaoNoCaminho(data.funcionario.perfil, 'GET', i.href) === 'ok'));
 
-  const rotuloPerfil = { admin: 'Admin', gestao: 'Gestão', atendimento: 'Atendimento' };
+  const rotuloPerfil = ROTULO_PERFIL;
 </script>
 
 <div class="min-h-screen flex flex-col md:flex-row bg-[#f6f6f7]">
@@ -51,19 +54,19 @@
     </nav>
 
     <!-- perfil + sair: completo no desktop -->
-    <div class="hidden md:flex mt-auto items-center gap-2.5 px-3 pt-4 border-t border-white/10">
-      <div
-        class="w-8 h-8 rounded-full bg-calper-red text-white flex items-center justify-center text-xs font-bold shrink-0"
-      >
-        {data.funcionario.nome.slice(0, 2).toUpperCase()}
-      </div>
+    <a
+      href="/admin/conta"
+      class="hidden md:flex mt-auto items-center gap-2.5 px-3 pt-4 border-t border-white/10 hover:opacity-90"
+      title="Minha conta: trocar senha e foto"
+    >
+      <AvatarEquipe id={data.funcionario.id} nome={data.funcionario.nome} fotoVersao={data.funcionario.fotoVersao} />
       <div class="min-w-0">
         <div class="text-sm font-semibold text-white truncate">{data.funcionario.nome}</div>
         <div class="text-xs text-gray-400">
           Perfil: {rotuloPerfil[data.funcionario.perfil] ?? data.funcionario.perfil}
         </div>
       </div>
-    </div>
+    </a>
     <form method="POST" action="/admin/logout" class="hidden md:block px-3">
       <button type="submit" class="text-xs font-semibold text-gray-400 hover:text-white mt-2"
         >Sair</button
@@ -75,11 +78,9 @@
       <div class="text-white">
         <NotificationBell notificacoes={data.notificacoes} />
       </div>
-      <div
-        class="w-7 h-7 rounded-full bg-calper-red text-white flex items-center justify-center text-[10px] font-bold shrink-0"
-      >
-        {data.funcionario.nome.slice(0, 2).toUpperCase()}
-      </div>
+      <a href="/admin/conta" aria-label="Minha conta">
+        <AvatarEquipe id={data.funcionario.id} nome={data.funcionario.nome} fotoVersao={data.funcionario.fotoVersao} classe="w-7 h-7 text-[10px]" />
+      </a>
       <form method="POST" action="/admin/logout">
         <button type="submit" class="text-xs font-semibold text-gray-300 px-1">Sair</button>
       </form>
