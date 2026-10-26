@@ -63,19 +63,21 @@ async function main() {
     const saida = createWriteStream(join(pasta, 'dados', `${nome}.ndjson`));
     let total = 0;
     let cursor;
+    // chave primária do modelo (nem todos têm uma coluna "id": ex. FuncionarioFoto usa funcionarioId)
+    const pk = Prisma.dmmf.datamodel.models.find((m) => m.name === nome).fields.find((f) => f.isId).name;
     for (;;) {
       // páginas pequenas: algumas tabelas guardam arquivos em base64 (procuração, PDFs)
       const lote = await delegate(nome).findMany({
         take: 100,
-        orderBy: { id: 'asc' },
-        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {})
+        orderBy: { [pk]: 'asc' },
+        ...(cursor ? { skip: 1, cursor: { [pk]: cursor } } : {})
       });
       if (lote.length === 0) break;
       for (const r of lote) {
         if (!saida.write(JSON.stringify(r) + '\n')) await once(saida, 'drain');
       }
       total += lote.length;
-      cursor = lote[lote.length - 1].id;
+      cursor = lote[lote.length - 1][pk];
     }
     saida.end();
     await once(saida, 'finish');
