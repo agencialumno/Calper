@@ -99,6 +99,7 @@ export async function load(event) {
     agendamento: {
       id: agendamento.id,
       status: agendamento.status,
+      origem: agendamento.origem,
       // quando o último documento foi assinado por todos (entrega concluída)
       concluidaEm: agendamento.documentosAssinados.map((d) => d.assinadoEm).filter(Boolean).sort((x, y) => y - x)[0] ?? null,
       dataHora: agendamento.dataHora,

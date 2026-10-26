@@ -66,13 +66,18 @@
               </a>
               <div class="text-xs text-gray-500 mt-0.5">{formatarDataHora(a.dataHora)}</div>
             </div>
-            <span class="text-xs font-bold px-2 py-0.5 rounded-full {corStatus[a.status] ?? corStatus.cancelado}">
-              {a.status}
-            </span>
+            <div class="flex items-center gap-1.5">
+              {#if a.origem === 'atendimento_direto'}
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700" data-testid="selo-direto">Atendimento direto</span>
+              {/if}
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full {corStatus[a.status] ?? corStatus.cancelado}">
+                {a.status}
+              </span>
+            </div>
           </div>
 
           <div class="text-xs text-gray-600 mt-2">
-            Agendado por {a.nome ?? '—'} · {a.telefone ?? '—'} · {a.email ?? '—'}
+            {#if a.origem === 'atendimento_direto'}Atendimento direto (sem agendamento prévio){:else}Agendado por {a.nome ?? '—'} · {a.telefone ?? '—'} · {a.email ?? '—'}{/if}
             {#if a.ehProprietario === false}· <strong>não é o proprietário</strong>{a.proprietarioNome ? ` (proprietário: ${a.proprietarioNome})` : ''}{/if}
             {#if a.retiranteNome}· Retira: <strong>{a.retiranteNome}</strong>{#if a.temProcuracao} (procuração anexada){/if}{:else}· retirante ainda não confirmado{/if}
           </div>

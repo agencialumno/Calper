@@ -151,9 +151,16 @@
 <div class="p-5 md:p-8 max-w-3xl">
   <a href="/admin/entrega-chaves" class="text-sm text-gray-500 hover:text-calper-dark">← Entrega de chaves</a>
   <h1 class="text-xl font-bold text-calper-dark mt-3 mb-1">Bloco {u.bloco} - nº {u.numero}</h1>
-  <p class="text-sm text-gray-500">Agendado para {formatarDataHora(a.dataHora)}</p>
+  {#if a.origem === 'atendimento_direto'}
+    <p class="text-sm text-gray-500">
+      <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 mr-1" data-testid="selo-direto">Atendimento direto</span>
+      iniciado em {formatarDataHora(a.dataHora)}, sem agendamento prévio
+    </p>
+  {:else}
+    <p class="text-sm text-gray-500">Agendado para {formatarDataHora(a.dataHora)}</p>
+  {/if}
   <p class="text-xs text-gray-500 mb-5">
-    Agendamento feito por <strong>{a.nome ?? '—'}</strong>{a.email ? ` (${a.email})` : ''}
+    {#if a.origem !== 'atendimento_direto'}Agendamento feito por <strong>{a.nome ?? '—'}</strong>{a.email ? ` (${a.email})` : ''}{/if}
     {#if data.retirante}
       · Retira as chaves: <strong>{data.retirante.nome}</strong> ({data.presencas.find((p) => p.vinculo !== 'acompanhante')?.vinculoRotulo ?? ''})
     {/if}

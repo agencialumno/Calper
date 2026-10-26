@@ -189,6 +189,10 @@ model Agendamento {
   conjugeNome        String?
   conjugeEmail       String?
   // Observações livres do atendimento presencial (aparecem no resumo final e no CSV da presença).
+  // "agendamento" = veio do formulário público; "atendimento_direto" = a equipe iniciou o atendimento pela aba Unidades,
+  // sem agendamento prévio (dataHora = momento do início, checkinEm = check-in feito na hora).
+  origem             String   @default("agendamento")
+  checkinEm          DateTime?
   observacoesAtendimento String?
   // Quem agendou fica nos campos *Compareceu acima (intactos). Quem retira as chaves de fato é
   // confirmado no dia, no passo 2 do fluxo de entrega, e gravado aqui.

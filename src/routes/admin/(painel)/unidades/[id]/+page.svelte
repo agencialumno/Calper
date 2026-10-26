@@ -1,4 +1,5 @@
 <script>
+  import IniciarAtendimento from '$lib/components/IniciarAtendimento.svelte';
   import LinkDownload from '$lib/components/LinkDownload.svelte';
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
@@ -66,7 +67,8 @@
     <div>
       <h1 class="text-xl font-bold text-calper-dark">Unidade {u.numero} — Bloco {u.bloco}</h1>
       <p class="text-sm text-gray-500 mt-0.5">{u.empreendimento}</p>
-      <LinkDownload href="/admin/unidades/{u.id}/arquivos" class="text-xs font-bold text-calper-red mt-1 inline-block">
+      <IniciarAtendimento unidadeId={u.id} atendimento={data.atendimento} class="mt-2" />
+      <LinkDownload href="/admin/unidades/{u.id}/arquivos" class="text-xs font-bold text-calper-red mt-2 inline-block">
         Baixar todos os arquivos desta unidade (.zip)
       </LinkDownload>
     </div>

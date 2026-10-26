@@ -3,6 +3,7 @@
 // próprio sistema, mesmo que o e-mail falhe, vá pro spam ou não seja lido.
 import { db } from './db.js';
 import { enviarEmail } from './email.js';
+import { CPF_TECNICO } from '../atendimentoDireto.js';
 
 /**
  * Cria a notificação pro investidor e, se um e-mail for passado, tenta
@@ -10,6 +11,10 @@ import { enviarEmail } from './email.js';
  * fica salva) — só é registrada no log.
  */
 export async function notificarInvestidor({ investidorId, titulo, mensagem, link = null, email = null }) {
+  // o investidor técnico dos atendimentos diretos (sem agendamento) não recebe notificação nem e-mail
+  const destino = await db.investidor.findUnique({ where: { id: investidorId }, select: { cpf: true } });
+  if (destino?.cpf === CPF_TECNICO) return;
+
   await db.notificacao.create({
     data: { destinatarioTipo: 'investidor', investidorId, titulo, mensagem, link }
   });

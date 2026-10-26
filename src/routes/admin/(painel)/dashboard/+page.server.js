@@ -164,7 +164,8 @@ export async function load({ url }) {
       empreendimento: a.unidade.empreendimento.nome,
       tipoNome: a.tipoEvento.nome,
       dataHora: a.dataHora,
-      status: a.status
+      status: a.status,
+      direto: a.origem === 'atendimento_direto'
     }))
   };
 }

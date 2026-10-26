@@ -3,6 +3,7 @@ import readXlsxFile from 'read-excel-file/node';
 import { db } from './db.js';
 import { SLUG_ENTREGA_CHAVES, buscarMurano } from './murano.js';
 import { motivoSemAgendamento } from '../unidadeAgendavel.js';
+import { CPF_TECNICO } from '../atendimentoDireto.js';
 import { ROTULO_CAMPO, ROTULO_QUITACAO } from '../rotulosUnidade.js';
 
 export { ROTULO_CAMPO, ROTULO_QUITACAO };
@@ -290,7 +291,7 @@ async function contagensParaApagar() {
     db.procuracaoUnidade.count(),
     db.presencaEntrega.count(),
     db.historicoUnidade.count(),
-    db.investidor.count(),
+    db.investidor.count({ where: { cpf: { not: CPF_TECNICO } } }), // o técnico dos atendimentos diretos não conta
     db.acompanhante.count(),
     db.emailEnviado.count()
   ]);
@@ -517,7 +518,7 @@ export async function copiaDosDados() {
     db.procuracaoUnidade.findMany({ select: { id: true, unidadeId: true, agendamentoId: true, nome: true, cpf: true, origem: true, createdAt: true } }),
     db.presencaEntrega.findMany(),
     db.historicoUnidade.findMany(),
-    db.investidor.findMany({ select: { id: true, nome: true, cpf: true, primeiroAcesso: true, termoAceitoEm: true, createdAt: true } }),
+    db.investidor.findMany({ where: { cpf: { not: CPF_TECNICO } }, select: { id: true, nome: true, cpf: true, primeiroAcesso: true, termoAceitoEm: true, createdAt: true } }),
     db.acompanhante.findMany({ select: { id: true, agendamentoId: true, nome: true } })
   ]);
   return { geradoEm: new Date().toISOString(), observacao: 'Sem arquivos (PDFs/procurações em base64) e sem senhas.', unidades, agendamentos, documentos, procuracoes, presencas, historico, investidores, acompanhantes };

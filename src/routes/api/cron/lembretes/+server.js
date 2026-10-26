@@ -27,6 +27,7 @@ export async function GET({ request }) {
     where: {
       status: 'confirmado',
       lembreteEnviado: false,
+      origem: { not: 'atendimento_direto' }, // atendimento direto não tem lembrete (não foi agendado)
       dataHora: { gte: amanhaInicio, lte: amanhaFim }
     },
     include: { tipoEvento: true, investidor: true, unidade: true }

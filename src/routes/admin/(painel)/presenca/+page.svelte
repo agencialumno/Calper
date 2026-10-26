@@ -77,7 +77,7 @@
       <div class="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-4 py-3 border-t border-gray-100">
         <a href="/admin/entrega-chaves/{f.agendamentoId}" class="text-sm font-bold text-calper-red md:w-40 shrink-0">{f.unidade}</a>
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-semibold text-calper-dark">{f.agendouNome ?? '—'}</div>
+          <div class="text-sm font-semibold text-calper-dark">{f.agendouNome ?? '—'}{#if f.direto} <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700">Atendimento direto</span>{/if}</div>
           <div class="text-xs text-gray-500">{f.telefone ?? '—'} · {f.email ?? '—'}</div>
         </div>
         <div class="text-xs text-gray-600 md:w-36 shrink-0">agendado para {dataHoraAgendada(f.agendadoPara)}</div>

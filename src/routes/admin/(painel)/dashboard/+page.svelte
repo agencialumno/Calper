@@ -221,7 +221,7 @@
     {#each data.recentes as r (r.id)}
       <div class="card p-4 flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <div class="text-sm font-bold text-calper-dark truncate">{r.unidade}</div>
+          <div class="text-sm font-bold text-calper-dark truncate">{r.unidade}{#if r.direto} <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700">Atendimento direto</span>{/if}</div>
           <div class="text-xs text-gray-500 mt-0.5">{r.tipoNome}</div>
           <div class="text-xs text-gray-400 mt-0.5">{formatarDataHora(r.dataHora)}</div>
         </div>
@@ -254,7 +254,7 @@
         {#each data.recentes as r (r.id)}
           <tr class="border-t border-gray-100">
             <td class="px-5 py-3 font-bold text-calper-dark">{r.unidade}</td>
-            <td class="px-5 py-3 text-gray-600">{r.tipoNome}</td>
+            <td class="px-5 py-3 text-gray-600">{r.tipoNome}{#if r.direto} <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700">Atendimento direto</span>{/if}</td>
             <td class="px-5 py-3 text-gray-400">{formatarDataHora(r.dataHora)}</td>
             <td class="px-5 py-3">
               <span class="text-xs font-bold px-2 py-0.5 rounded-full {statusEstilo[r.status]?.bg} {statusEstilo[r.status]?.fg}">
