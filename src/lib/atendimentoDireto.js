@@ -5,6 +5,9 @@ import { motivoSemAgendamento } from './unidadeAgendavel.js';
 export const ORIGEM_AGENDAMENTO = 'agendamento';
 export const ORIGEM_DIRETO = 'atendimento_direto';
 export const ROTULO_DIRETO = 'Atendimento direto';
+// CPF reservado (inválido de propósito: ninguém entra com ele) do investidor TÉCNICO que satisfaz a relação obrigatória
+// Agendamento → Investidor nos atendimentos diretos. Ele não aparece em listas de investidores nem recebe notificação/e-mail.
+export const CPF_TECNICO = '00000000000';
 
 /**
  * Regras (as mesmas do agendamento público + 1 unidade = 1 agendamento de entrega de chaves):

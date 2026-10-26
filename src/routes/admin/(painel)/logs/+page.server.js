@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
+import { CPF_TECNICO } from '$lib/atendimentoDireto.js';
 import { somenteDigitos } from '$lib/cpf.js';
 
 const POR_PAGINA = 50;
@@ -38,6 +39,7 @@ export async function load({ url, locals }) {
     const [investidores, funcionarios] = await Promise.all([
       db.investidor.findMany({
         where: {
+          cpf: { not: CPF_TECNICO }, // o investidor técnico dos atendimentos diretos não entra na busca
           OR: [
             { nome: { contains: filtros.q, mode: 'insensitive' } },
             ...(digitos ? [{ cpf: { contains: digitos } }] : []),

@@ -5,11 +5,7 @@ import { agoraComoRelogioDeBrasilia } from './agenda.js';
 import { gerarQrToken } from './agendamento.js';
 import { SLUG_ENTREGA_CHAVES, buscarMurano } from './entregaChaves.js';
 import { registrarLog, rotuloFuncionario } from './log.js';
-import { ORIGEM_DIRETO, ROTULO_DIRETO, avaliarAtendimentoDireto } from '../atendimentoDireto.js';
-
-// CPF reservado (inválido de propósito: ninguém consegue entrar com ele) do registro técnico que satisfaz a relação
-// obrigatória Agendamento → Investidor nos atendimentos diretos, em que ainda não se sabe quem é a pessoa.
-const CPF_TECNICO = '00000000000';
+import { CPF_TECNICO, ORIGEM_DIRETO, ROTULO_DIRETO, avaliarAtendimentoDireto } from '../atendimentoDireto.js';
 
 async function investidorTecnico() {
   return (

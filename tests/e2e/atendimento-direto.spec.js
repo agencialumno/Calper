@@ -11,7 +11,9 @@ async function criarUnidades() {
     const livre = await db.unidade.create({ data: { ...base, numero: '902', vistoriaStatus: 'APROVADA', compradores: [{ nome: 'COMPRADOR DIRETO TESTE', principal: true }] } });
     const estoque = await db.unidade.create({ data: { ...base, numero: '901', vistoriaStatus: 'EM ESTOQUE', compradores: [] } });
     const juridico = await db.unidade.create({ data: { ...base, numero: '903', vistoriaStatus: 'JURÍDICO', compradores: [{ nome: 'COMPRADOR JURIDICO TESTE', principal: true }] } });
-    return { livreId: livre.id, estoqueId: estoque.id, juridicoId: juridico.id };
+    const outra = await db.unidade.create({ data: { ...base, numero: '904', vistoriaStatus: 'APROVADA', compradores: [{ nome: 'COMPRADOR QUATRO DIRETO', principal: true }] } });
+    const lembrete = await db.unidade.create({ data: { ...base, numero: '905', vistoriaStatus: 'APROVADA', compradores: [{ nome: 'COMPRADOR CINCO DIRETO', principal: true }] } });
+    return { livreId: livre.id, estoqueId: estoque.id, juridicoId: juridico.id, outraId: outra.id, lembreteId: lembrete.id };
   });
 }
 
@@ -140,4 +142,41 @@ test.describe('Iniciar atendimento direto (sem agendamento)', () => {
     const opcoes = (await page.locator('#unidadeId option').allTextContents()).join('|');
     expect(opcoes).not.toContain('nº 902'); // 1 unidade = 1 agendamento de entrega de chaves
   });
+
+  test('o investidor técnico não aparece em listas nem no dashboard e não recebe notificação nem e-mail', async ({ page }) => {
+    await entrarComoAdmin(page, SUPERVISOR);
+    // existe, mas só como registro técnico (CPF reservado)
+    const tecnico = await comBanco((db) => db.investidor.findUnique({ where: { cpf: '00000000000' } }));
+    expect(tecnico.nome).toContain('Atendimento direto');
+
+    // não aparece no dashboard, na lista de unidades nem na busca dos logs (que procura investidores)
+    for (const caminho of ['/admin/dashboard', '/admin/unidades', '/admin/logs?q=Atendimento', '/admin/quem-agendou']) {
+      await page.goto(caminho, { waitUntil: 'networkidle' });
+      expect(await page.locator('body').innerText(), caminho).not.toContain('(sem agendamento)');
+    }
+
+    // check-in genérico de um atendimento direto: nenhuma notificação/e-mail para o investidor técnico
+    await page.goto(`/admin/unidades/${ids.outraId}`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Iniciar atendimento' }).click();
+    await page.waitForURL(/\/admin\/entrega-chaves\//);
+    const ag = await comBanco((db) => db.agendamento.findFirst({ where: { unidadeId: ids.outraId } }));
+    const r = await page.request.post(`/admin/checkin/${ag.id}?/confirmar`, { form: {}, headers: { 'x-sveltekit-action': 'true', origin: 'http://localhost:5301' } });
+    expect(r.status()).toBeLessThan(500);
+    // o check-in rodou de verdade (o agendamento virou "realizado") e mesmo assim ninguém foi notificado
+    expect((await comBanco((db) => db.agendamento.findUnique({ where: { id: ag.id } }))).status).toBe('realizado');
+    expect(await comBanco((db) => db.notificacao.count({ where: { investidorId: tecnico.id } }))).toBe(0);
+
+    // lembrete de véspera: atendimento direto nunca recebe (mesmo com a data de amanhã)
+    const amanha = new Date(Date.now() + 24 * 3600e3);
+    const lembrete = await comBanco((db) =>
+      db.agendamento.create({
+        data: { unidadeId: ids.lembreteId, tipoEventoId: ag.tipoEventoId, investidorId: tecnico.id, dataHora: amanha, status: 'confirmado', qrToken: 'qr-direto-lembrete', nomeCompareceu: 'Atendimento direto', origem: 'atendimento_direto' }
+      })
+    );
+    const cron = await page.request.get('/api/cron/lembretes');
+    expect(cron.status()).toBe(200);
+    expect(await comBanco((db) => db.notificacao.count({ where: { investidorId: tecnico.id } }))).toBe(0);
+    expect((await comBanco((db) => db.agendamento.findUnique({ where: { id: lembrete.id } }))).lembreteEnviado).toBe(false);
+  });
 });
+
