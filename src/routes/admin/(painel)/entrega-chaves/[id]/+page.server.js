@@ -243,7 +243,6 @@ export const actions = {
           retiranteEmail: email,
           conjugeNome: conjugeNome || null,
           conjugeEmail: conjugeEmail || null,
-          ...(form.has('observacoes') ? { observacoesAtendimento: String(form.get('observacoes') ?? '').trim().slice(0, 2000) || null } : {}),
           ...(procuracaoNova ? { procuracaoBase64: procuracaoNova, procuracaoCpf: cpf } : {})
         }
       }),

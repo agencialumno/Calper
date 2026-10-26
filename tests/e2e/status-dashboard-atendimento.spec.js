@@ -148,20 +148,43 @@ test.describe('atendimento presencial', () => {
     await expect(page.getByTestId('etapa-bloqueada')).toBeVisible();
   });
 
-  test('observações substituem a lista de presença manual e vão para o resumo e para o CSV', async ({ page }) => {
+  test('observações ficam na etapa "Concluído" (não mais em "Quem retira"), editáveis, e vão para o resumo e os 3 CSVs', async ({ page }) => {
     await entrarComoAdmin(page);
     const id = await idAgendamento('Pessoa Compareceu');
+    // observação já salva antes desta mudança (mesmo campo do banco) continua aparecendo
+    await comBanco((db) => db.agendamento.update({ where: { id }, data: { observacoesAtendimento: 'Observação antiga.' } }));
+
+    // etapa "Quem retira": sem campo de observações nem lista de acompanhantes
     await page.goto(`/admin/entrega-chaves/${id}?passo=2`, { waitUntil: 'networkidle' });
+    await expect(page.locator('#observacoes')).toHaveCount(0);
+    await expect(page.getByText('Observações do atendimento')).toHaveCount(0);
     await expect(page.getByPlaceholder('Outra pessoa presente (acompanhante)')).toHaveCount(0);
+    // confirmar quem retira não apaga a observação que já existia
+    await page.locator('input[name=quem]').first().check();
+    await page.getByRole('button', { name: 'Confirmar e continuar' }).click();
+    await expect(page).toHaveURL(/passo=3/);
+    expect((await comBanco((db) => db.agendamento.findUnique({ where: { id } }))).observacoesAtendimento).toBe('Observação antiga.');
+
+    // etapa "Concluído": o campo mostra o que já estava salvo e é editável
+    await page.goto(`/admin/entrega-chaves/${id}?passo=5`, { waitUntil: 'networkidle' });
+    await expect(page.locator('#observacoes')).toHaveValue('Observação antiga.');
     await page.fill('#observacoes', 'Cliente pediu uma via extra das chaves.');
     await page.getByRole('button', { name: 'Salvar observações' }).click();
     await expect(page.getByText('Observações salvas.')).toBeVisible();
     expect((await comBanco((db) => db.agendamento.findUnique({ where: { id } }))).observacoesAtendimento).toBe('Cliente pediu uma via extra das chaves.');
+    // continua lá depois de recarregar
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.locator('#observacoes')).toHaveValue('Cliente pediu uma via extra das chaves.');
+    // apagar o texto e salvar limpa a observação
+    await page.fill('#observacoes', '');
+    await page.getByRole('button', { name: 'Salvar observações' }).click();
+    await expect(page.getByText('Observações salvas.')).toBeVisible();
+    expect((await comBanco((db) => db.agendamento.findUnique({ where: { id } }))).observacoesAtendimento).toBeNull();
+    await page.fill('#observacoes', 'Cliente pediu uma via extra das chaves.');
+    await page.getByRole('button', { name: 'Salvar observações' }).click();
+    await expect(page.getByText('Observações salvas.')).toBeVisible();
 
-    // resumo final
-    await page.goto(`/admin/entrega-chaves/${id}?passo=5`, { waitUntil: 'networkidle' });
-    await expect(page.getByTestId('observacoes-resumo')).toContainText('via extra das chaves');
-    // CSVs
+    // os 3 CSVs
     const presenca = await baixar(page, '/admin/presenca/exportar');
     expect(presenca.corpo.toString('utf8')).toContain('Observações do atendimento');
     expect(presenca.corpo.toString('utf8')).toContain('Cliente pediu uma via extra das chaves.');
@@ -169,6 +192,27 @@ test.describe('atendimento presencial', () => {
     expect(entregas.corpo.toString('utf8')).toContain('Cliente pediu uma via extra das chaves.');
     const dash = await baixar(page, '/admin/dashboard/exportar');
     expect(dash.corpo.toString('utf8')).toContain('Cliente pediu uma via extra das chaves.');
+  });
+
+  test('o colaborador também edita as observações na etapa "Concluído"', async ({ page }) => {
+    await entrarComoAdmin(page, COLABORADOR);
+    const id = await idAgendamento('Pessoa Compareceu');
+    await page.goto(`/admin/entrega-chaves/${id}?passo=5`, { waitUntil: 'networkidle' });
+    await page.fill('#observacoes', 'Anotação do colaborador no resumo.');
+    await page.getByRole('button', { name: 'Salvar observações' }).click();
+    await expect(page.getByText('Observações salvas.')).toBeVisible();
+    expect((await comBanco((db) => db.agendamento.findUnique({ where: { id } }))).observacoesAtendimento).toBe('Anotação do colaborador no resumo.');
+  });
+
+  test('a entrega concluída mostra as observações no resumo e o PDF unificado continua baixando', async ({ page }) => {
+    await entrarComoAdmin(page);
+    const id = await comBanco(async (db) => (await db.agendamento.findFirst({ where: { status: 'realizado', documentosAssinados: { some: {} } } })).id);
+    await comBanco((db) => db.agendamento.update({ where: { id }, data: { observacoesAtendimento: 'Entrega sem pendências.' } }));
+    await page.goto(`/admin/entrega-chaves/${id}?passo=5`, { waitUntil: 'networkidle' });
+    await expect(page.locator('#observacoes')).toHaveValue('Entrega sem pendências.');
+    const pdf = await baixar(page, `/admin/entrega-chaves/${id}/documento/completo`);
+    expect(pdf.status).toBe(200);
+    expect(pdf.tipo).toBe('application/pdf');
   });
 
   test('resumo final de entrega concluída: um aviso verde só, sem a linha repetida', async ({ page }) => {

@@ -413,16 +413,6 @@
         </div>
       </div>
 
-      <!-- observações livres do atendimento: vão para o resumo final e para os CSVs -->
-      <div class="border border-gray-100 rounded-xl p-4 flex flex-col gap-2">
-        <label for="observacoes" class="text-xs font-bold text-gray-500">Observações do atendimento (opcional)</label>
-        <textarea id="observacoes" name="observacoes" rows="3" maxlength="2000" class="input text-sm" placeholder="Ex.: cliente pediu uma via extra das chaves; combinou retornar para a vistoria...">{a.observacoes}</textarea>
-        <div class="flex items-center gap-3 text-xs">
-          <button type="submit" formaction="?/salvarObservacoes" formnovalidate class="font-bold text-calper-red">Salvar observações</button>
-          {#if form?.sucesso === 'observacoes'}<span class="text-green-700 font-semibold">Observações salvas.</span>{/if}
-        </div>
-      </div>
-
       <div class="flex gap-2">
         <a href={href(1)} class="btn-outline text-center flex-1">Voltar</a>
         <div class="flex-1"><SubmitButton loading={enviando}>Confirmar e continuar</SubmitButton></div>
@@ -559,13 +549,23 @@
       {:else}
         <p class="text-sm text-gray-400">Ninguém registrado.</p>
       {/each}
-      {#if a.observacoes}
-        <div class="text-sm font-bold text-calper-dark mt-3">Observações do atendimento</div>
-        <p class="text-sm text-calper-dark whitespace-pre-line border border-gray-100 rounded-xl p-3" data-testid="observacoes-resumo">{a.observacoes}</p>
-      {/if}
+      <!-- observações livres do atendimento: editáveis enquanto o atendimento está nesta etapa; vão para os CSVs -->
+      <form
+        method="POST"
+        action="?/salvarObservacoes"
+        use:enhance={() => async ({ update }) => update({ reset: false })}
+        class="border border-gray-100 rounded-xl p-4 flex flex-col gap-2 mt-3"
+        data-testid="observacoes-resumo"
+      >
+        <label for="observacoes" class="text-sm font-bold text-calper-dark">Observações do atendimento</label>
+        <textarea id="observacoes" name="observacoes" rows="4" maxlength="2000" class="input text-sm" placeholder="Ex.: cliente pediu uma via extra das chaves; combinou retornar para a vistoria...">{a.observacoes}</textarea>
+        <div class="flex items-center gap-3 text-xs">
+          <button type="submit" class="btn-outline !py-2 !px-4 text-sm">Salvar observações</button>
+          {#if form?.sucesso === 'observacoes'}<span class="text-green-700 font-semibold">Observações salvas.</span>{/if}
+        </div>
+      </form>
       <div class="flex gap-2 text-sm text-gray-500 mt-2">
         <a href={href(4)} class="flex-1 text-center">← Voltar</a>
-        <a href={href(2)} class="flex-1 text-center">Editar observações</a>
       </div>
     </div>
   {/if}
