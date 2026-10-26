@@ -78,6 +78,10 @@ async function main() {
   }
 
   const ids = docs.map((d) => d.id);
+  // documentos ainda não assinados: o envelope pode continuar aberto no DocuSign (apagar aqui não o anula)
+  const abertos = docs
+    .filter((d) => d.status !== 'assinado')
+    .map((d) => `Unidade ${d.unidade?.numero ?? '?'}, Bloco ${d.unidade?.bloco ?? '?'} — ${d.tipo} (${d.status}): ${d.docusignEnvelopeId}`);
   const apagados = await db.$transaction(async (tx) => {
     const r = await tx.documentoAssinado.deleteMany({ where: { id: { in: ids } } });
     if (r.count !== ids.length) throw new Error(`Esperava apagar ${ids.length}, apagaria ${r.count}: transação desfeita.`);
@@ -97,7 +101,7 @@ async function main() {
       atorTipo: 'funcionario',
       funcionarioId: admin?.id ?? null,
       acao: 'documentos_assinados_apagados',
-      descricao: `Limpeza dos PDFs assinados de teste (script, a pedido da Calper): ${apagados} documento(s) assinado(s) apagado(s) de ${new Set(docs.map((d) => d.unidadeId)).size} unidade(s) (lista ${codigo}); unidades, investidores, procurações, agendamentos e contas preservados. Os envelopes continuam no DocuSign. Backup anterior em backups/`,
+      descricao: `Limpeza dos PDFs assinados de teste (script, a pedido da Calper): ${apagados} documento(s) assinado(s) apagado(s) de ${new Set(docs.map((d) => d.unidadeId)).size} unidade(s) (lista ${codigo}); unidades, investidores, procurações, agendamentos e contas preservados. Os envelopes continuam no DocuSign. ${abertos.length ? `Envelopes NÃO assinados que continuam ABERTOS no DocuSign de produção (não foram anulados): ${abertos.join('; ')}. ` : ''}Backup anterior em backups/`,
       entidadeTipo: 'DocumentoAssinado'
     }
   });
