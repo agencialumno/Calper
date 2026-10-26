@@ -22,10 +22,17 @@ async function main() {
     db.agendamento.count({ where: { googleEventId: { not: null } } }),
     db.procuracaoUnidade.count()
   ]);
+  // dataHora guarda o relógio de Brasília como se fosse UTC: "hoje" é o dia de Brasília (UTC-3)
+  const inicioHoje = new Date(Date.now() - 3 * 3600 * 1000);
+  inicioHoje.setUTCHours(0, 0, 0, 0);
+  const [deHojeEmDiante, passados] = await Promise.all([
+    db.agendamento.count({ where: { dataHora: { gte: inicioHoje } } }),
+    db.agendamento.count({ where: { dataHora: { lt: inicioHoje } } })
+  ]);
   const semUnidade = await db.documentoAssinado.count({ where: { unidadeId: null } });
 
   console.log(aplicar ? 'APAGANDO:' : 'Seria apagado (nada foi gravado):');
-  console.log(`  agendamentos: ${agendamentos}`);
+  console.log(`  agendamentos: ${agendamentos} (de hoje em diante: ${deHojeEmDiante} | datas passadas: ${passados})`);
   console.log(`  lista de presença: ${presencas} | acompanhantes: ${acompanhantes} | questionários: ${pesquisas}`);
   console.log('Fica intacto:');
   console.log(`  documentos assinados: ${docs} (${docsAssinados} assinados; ficam ligados à unidade) | procurações da unidade: ${procuracoes}`);
