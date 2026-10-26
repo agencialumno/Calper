@@ -1,4 +1,5 @@
 <script>
+  import IniciarAtendimento from '$lib/components/IniciarAtendimento.svelte';
   import { agruparUnidades } from './agrupamento.js';
   import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
   import { OPCOES_QUITACAO } from '$lib/rotulosUnidade.js';
@@ -279,6 +280,7 @@
                             </span>
                           </a>
                           <UnidadeStatus unidade={u} podeEditar={data.podeEditar} />
+                          <IniciarAtendimento unidadeId={u.id} atendimento={u.atendimento} />
                         </li>
                       {/each}
                     </ul>

@@ -14,6 +14,8 @@ export async function buscarSituacaoEntregas({ q = '', de = '', ate = '' } = {})
     select: {
       id: true,
       status: true,
+      origem: true,
+      checkinEm: true,
       createdAt: true,
       dataHora: true,
       nomeCompareceu: true,
@@ -38,6 +40,7 @@ export async function buscarSituacaoEntregas({ q = '', de = '', ate = '' } = {})
     numero: a.unidade.numero,
     unidade: `Bloco ${a.unidade.bloco} - nº ${a.unidade.numero}`,
     agendouNome: a.nomeCompareceu,
+    direto: a.origem === 'atendimento_direto',
     cpf: a.cpfCompareceu,
     telefone: a.telefoneCompareceu,
     email: a.emailCompareceu,
@@ -46,7 +49,8 @@ export async function buscarSituacaoEntregas({ q = '', de = '', ate = '' } = {})
     retirante: a.retiranteNome,
     observacoes: a.observacoesAtendimento ?? '',
     agendadoPara: a.dataHora, // relógio escolhido gravado como UTC (ver agenda.js)
-    compareceu: a.presencas.length > 0,
+    // check-in feito (atendimento direto) também conta como comparecimento
+    compareceu: a.presencas.length > 0 || Boolean(a.checkinEm),
     documentos: Object.fromEntries(['termo', 'checklist'].map((t) => [t, a.documentosAssinados.find((d) => d.tipo === t)?.status ?? null])),
     entregueEm:
       a.status === 'realizado'

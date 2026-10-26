@@ -4,6 +4,8 @@ import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 import { quartosDaUnidade } from '$lib/server/documentos.js';
 import { statusDaUnidade } from '$lib/server/unidadeStatus.js';
 import { podeEditar } from '$lib/perfis.js';
+import { buscarMurano } from '$lib/server/entregaChaves.js';
+import { agendamentosAtivosPorUnidade, atendimentoDaUnidade } from '$lib/server/atendimentoDireto.js';
 
 async function logUnidade(event, acao, texto) {
   const u = await db.unidade.findUnique({ where: { id: event.params.id }, select: { numero: true, bloco: true } });
@@ -44,8 +46,11 @@ export async function load({ params, locals }) {
     orderBy: { createdAt: 'desc' }
   });
 
+  const [murano, ativos] = await Promise.all([buscarMurano(), agendamentosAtivosPorUnidade([unidade.id])]);
+
   return {
     podeEditar: podeEditar(locals.funcionario.perfil),
+    atendimento: atendimentoDaUnidade(unidade, ativos.get(unidade.id), murano?.id),
     documentosSoltos,
     unidade: {
       id: unidade.id,

@@ -69,7 +69,10 @@
               CPF {a.cpf ? formatarCpf(a.cpf) : '—'} · {a.telefone ?? '—'} · {a.email ?? '—'}
             </div>
           </div>
-          <span class="text-xs font-bold px-2.5 py-1 rounded-full {corStatus[a.status] ?? corStatus.cancelado}">{a.status}</span>
+          <div class="flex items-center gap-1.5">
+            {#if a.direto}<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700" data-testid="selo-direto">Atendimento direto</span>{/if}
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full {corStatus[a.status] ?? corStatus.cancelado}">{a.status}</span>
+          </div>
         </div>
 
         <div class="grid sm:grid-cols-3 gap-x-6 gap-y-2 mt-3 text-sm">

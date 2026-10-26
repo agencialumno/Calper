@@ -21,6 +21,7 @@ export async function GET({ locals }) {
     // sem os arquivos (procuração/documento em base64): só o que entra no CSV
     select: {
       status: true,
+      origem: true,
       createdAt: true,
       dataHora: true,
       nomeCompareceu: true,
@@ -69,7 +70,8 @@ export async function GET({ locals }) {
     'Entrega concluída',
     'Presentes',
     'Observações do atendimento',
-    'Agendado em'
+    'Agendado em',
+    'Origem'
   ];
 
   const pagamento = { quitada: 'saldo quitado', a_vencer: 'a vencer', estoque: 'estoque', juridico_civel: 'jurídico cível' };
@@ -106,7 +108,8 @@ export async function GET({ locals }) {
       sn(a.status === 'realizado'),
       a.presencas.map((p) => `${p.nome} (${ROTULO_VINCULO[p.vinculo] ?? p.vinculo}, ${dataHoraBr(p.createdAt)})`).join(' | '),
       a.observacoesAtendimento ?? '',
-      dataHoraBr(a.createdAt)
+      dataHoraBr(a.createdAt),
+      a.origem === 'atendimento_direto' ? 'Atendimento direto' : 'Agendamento'
     ];
   });
 
