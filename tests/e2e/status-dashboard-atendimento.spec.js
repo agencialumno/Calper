@@ -182,7 +182,11 @@ test.describe('atendimento presencial', () => {
     expect((await comBanco((db) => db.agendamento.findUnique({ where: { id } }))).observacoesAtendimento).toBeNull();
     await page.fill('#observacoes', 'Cliente pediu uma via extra das chaves.');
     await page.getByRole('button', { name: 'Salvar observações' }).click();
-    await expect(page.getByText('Observações salvas.')).toBeVisible();
+    // a mensagem "Observações salvas." da gravação anterior ainda está na tela, então ela NÃO prova que esta terminou:
+    // espera o valor chegar ao banco antes de baixar os CSVs (antes, o download corria na frente da gravação)
+    await expect
+      .poll(async () => (await comBanco((db) => db.agendamento.findUnique({ where: { id } }))).observacoesAtendimento)
+      .toBe('Cliente pediu uma via extra das chaves.');
 
     // os 3 CSVs
     const presenca = await baixar(page, '/admin/presenca/exportar');
@@ -232,7 +236,8 @@ test.describe('atendimento presencial', () => {
     await page.getByRole('button', { name: 'Corrigir e-mail' }).click();
     await page.fill('input[name=email]', 'e-mail-certo@example.com');
     await page.getByRole('button', { name: 'Salvar e-mail' }).click();
-    await expect(page.getByText(/E-mail de Pessoa Compareceu corrigido para e-mail-certo@example.com/)).toBeVisible();
+    // o nome na mensagem é o de quem retira (muda conforme os testes anteriores já confirmaram o retirante): não depende dele
+    await expect(page.getByText(/E-mail de .+ corrigido para e-mail-certo@example\.com/)).toBeVisible();
     expect((await comBanco((db) => db.agendamento.findUnique({ where: { id } }))).retiranteEmail).toBe('e-mail-certo@example.com');
 
     // o mesmo e-mail de novo é recusado
