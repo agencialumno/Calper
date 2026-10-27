@@ -26,6 +26,8 @@ export async function load({ locals }) {
       dataHora: a.dataHora,
       status: a.status,
       origem: a.origem,
+      canceladoEm: a.canceladoEm,
+      motivoCancelamento: a.motivoCancelamento,
       nome: a.nomeCompareceu,
       retiranteNome: a.retiranteNome,
       telefone: a.telefoneCompareceu,

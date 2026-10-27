@@ -14,7 +14,7 @@ export async function load({ url }) {
 
   const filtroUnidade = empreendimentoId ? { unidade: { empreendimentoId } } : {};
 
-  const [empreendimentos, agendamentosPeriodo, agendamentosRecentes, emailsPeriodo] = await Promise.all([
+  const [empreendimentos, agendamentosPeriodoBruto, agendamentosRecentes, emailsPeriodo] = await Promise.all([
     db.empreendimento.findMany({ orderBy: { nome: 'asc' } }),
     db.agendamento.findMany({
       where: { createdAt: { gte: inicio, lte: fim }, ...filtroUnidade },
@@ -28,6 +28,10 @@ export async function load({ url }) {
     }),
     db.emailEnviado.findMany({ where: { createdAt: { gte: inicio, lte: fim } } })
   ]);
+
+  // desmarcados (cancelados) não entram nos totais, no gráfico nem em "agendados e não realizados": contam à parte
+  const agendamentosPeriodo = agendamentosPeriodoBruto.filter((a) => a.status !== 'cancelado');
+  const canceladosPeriodo = agendamentosPeriodoBruto.length - agendamentosPeriodo.length;
 
   const pesquisasPeriodo = await db.pesquisaSatisfacao.findMany({
     where: {
@@ -128,6 +132,7 @@ export async function load({ url }) {
     ate: dataValida(ate) ? ate : '',
     intervaloManual,
     atendimentos: {
+      cancelados: canceladosPeriodo,
       realizados: atendimentosRealizados,
       naoRealizados: agendadosNaoRealizados,
       aFazer: agendadosAFazer,

@@ -1,4 +1,5 @@
 <script>
+  import AcoesAgendamento from '$lib/components/AcoesAgendamento.svelte';
   import LinkDownload from '$lib/components/LinkDownload.svelte';
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
@@ -158,6 +159,16 @@
     </p>
   {:else}
     <p class="text-sm text-gray-500">Agendado para {formatarDataHora(a.dataHora)}</p>
+  {/if}
+  {#if a.status === 'cancelado'}
+    <div class="rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 my-3" data-testid="banner-cancelado">
+      <strong>Agendamento desmarcado.</strong>{a.canceladoEm ? ` Em ${new Date(a.canceladoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}.` : ''}
+      {#if a.motivoCancelamento} Motivo: {a.motivoCancelamento}{/if}
+      <div class="text-xs mt-1">O registro foi mantido; o atendimento não pode mais ser alterado.</div>
+    </div>
+  {/if}
+  {#if data.gestao}
+    <AcoesAgendamento class="mb-3" ag={data.gestao.ag} unidades={data.gestao.unidades} agenda={data.gestao.agenda} />
   {/if}
   <p class="text-xs text-gray-500 mb-5">
     {#if a.origem !== 'atendimento_direto'}Agendamento feito por <strong>{a.nome ?? '—'}</strong>{a.email ? ` (${a.email})` : ''}{/if}
