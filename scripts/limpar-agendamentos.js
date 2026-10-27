@@ -6,7 +6,10 @@
 // Uso: node --env-file=.env scripts/limpar-agendamentos.js            (só mostra o que seria apagado)
 //      node --env-file=.env scripts/limpar-agendamentos.js --aplicar  (apaga)
 // Faça um backup antes: node --env-file=.env scripts/backup-banco.js
+// TRAVA: com agendamentos existentes (uso real), o --aplicar é RECUSADO a menos que se passe também --confirmo-dados-reais;
+// a simulação sempre mostra quantos agendamentos seriam afetados.
 import { PrismaClient } from '@prisma/client';
+import { FLAG_DADOS_REAIS, descreverResumo, recusaDadosReais, resumirAgendamentos } from './lib/dados-reais.js';
 
 const db = new PrismaClient();
 const aplicar = process.argv.includes('--aplicar');
@@ -24,7 +27,9 @@ async function main() {
   ]);
   const semUnidade = await db.documentoAssinado.count({ where: { unidadeId: null } });
 
+  const resumo = resumirAgendamentos(await db.agendamento.findMany({ select: { status: true, origem: true, dataHora: true, createdAt: true } }));
   console.log(aplicar ? 'APAGANDO:' : 'Seria apagado (nada foi gravado):');
+  for (const l of descreverResumo(resumo)) console.log(l);
   console.log(`  agendamentos: ${agendamentos}`);
   console.log(`  lista de presença: ${presencas} | acompanhantes: ${acompanhantes} | questionários: ${pesquisas}`);
   console.log('Fica intacto:');
@@ -32,7 +37,9 @@ async function main() {
   console.log('  unidades, usuários, histórico das unidades, notificações e logs.');
   if (semUnidade > 0) throw new Error(`${semUnidade} documento(s) sem unidade vinculada: rode a migração 20261023120000 antes (o vínculo com a unidade é o que preserva o documento).`);
   if (comGoogle > 0) console.log(`  ATENÇÃO: ${comGoogle} agendamento(s) têm evento no Google Agenda; os eventos NÃO são removidos de lá.`);
-  if (!aplicar) return console.log('\nRode de novo com --aplicar para apagar.');
+  if (!aplicar) return console.log(`\nRode de novo com --aplicar para apagar${resumo.temDadosReais ? ` (com agendamentos existentes, também ${FLAG_DADOS_REAIS})` : ''}.`);
+  const recusa = recusaDadosReais(resumo, process.argv);
+  if (recusa) throw new Error(recusa);
 
   await db.$transaction(async (tx) => {
     await tx.presencaEntrega.deleteMany();

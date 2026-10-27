@@ -52,12 +52,17 @@ export function limiteDoSlot(config, dia, horario) {
 }
 
 /** Quantos agendamentos de entrega de chaves (não cancelados) já ocupam cada horário nos dias dados. */
-export async function ocupacaoPorSlot(datas, cliente = db) {
+export async function ocupacaoPorSlot(datas, cliente = db, { ignorarAgendamentoId = null } = {}) {
   if (!datas.length) return new Map();
   const inicio = new Date(`${datas.reduce((a, b) => (a < b ? a : b))}T00:00:00.000Z`);
   const fim = new Date(`${datas.reduce((a, b) => (a > b ? a : b))}T23:59:59.999Z`);
   const ags = await cliente.agendamento.findMany({
-    where: { tipoEvento: { slug: SLUG_ENTREGA_CHAVES }, status: { not: 'cancelado' }, dataHora: { gte: inicio, lte: fim } },
+    where: {
+      tipoEvento: { slug: SLUG_ENTREGA_CHAVES },
+      status: { not: 'cancelado' },
+      dataHora: { gte: inicio, lte: fim },
+      ...(ignorarAgendamentoId ? { id: { not: ignorarAgendamentoId } } : {}) // remarcar: o próprio agendamento não ocupa a vaga que ele vai deixar
+    },
     select: { dataHora: true }
   });
   const mapa = new Map();
@@ -90,7 +95,7 @@ export async function agendaPublica(agora = new Date()) {
  * Confere (dentro de uma transação) se o dia está aberto e se o horário ainda tem vaga.
  * Devolve { ok: true } ou { ok: false, motivo }.
  */
-export async function conferirVaga(cliente, data, horario) {
+export async function conferirVaga(cliente, data, horario, { ignorarAgendamentoId = null } = {}) {
   if (!dataValida(data) || !horarioValido(horario)) return { ok: false, motivo: 'Escolha uma data e um horário válidos.' };
   const [config, dia] = await Promise.all([
     cliente.agendaConfig.findUnique({ where: { id: 'padrao' } }).then((c) => ({
@@ -102,7 +107,7 @@ export async function conferirVaga(cliente, data, horario) {
   if (!dia?.aberto) return { ok: false, motivo: 'Esta data não está disponível para agendamento.' };
   if (!config.horarios.includes(horario)) return { ok: false, motivo: 'Este horário não está disponível.' };
   const limite = limiteDoSlot(config, dia, horario);
-  const ocupados = (await ocupacaoPorSlot([data], cliente)).get(`${data} ${horario}`) ?? 0;
+  const ocupados = (await ocupacaoPorSlot([data], cliente, { ignorarAgendamentoId })).get(`${data} ${horario}`) ?? 0;
   if (ocupados >= limite) return { ok: false, motivo: 'Este horário acabou de lotar. Escolha outro horário.' };
   return { ok: true };
 }

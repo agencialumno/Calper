@@ -82,6 +82,12 @@
             {#if a.retiranteNome}· Retira: <strong>{a.retiranteNome}</strong>{#if a.temProcuracao} (procuração anexada){/if}{:else}· retirante ainda não confirmado{/if}
           </div>
 
+          {#if a.status === 'cancelado'}
+            <!-- desmarcado: o registro fica, mas não há atendimento para iniciar -->
+            <div class="mt-3 text-xs text-gray-500" data-testid="card-cancelado">
+              Desmarcado{a.motivoCancelamento ? ` — motivo: ${a.motivoCancelamento}` : ''}. <a href="/admin/entrega-chaves/{a.id}" class="font-bold text-calper-red">Ver registro</a>
+            </div>
+          {:else}
           <div class="flex items-center gap-3 mt-3 text-xs font-bold">
             <!-- entrega concluída: abre direto o resumo (passo 5) com os PDFs, sem reabrir o fluxo -->
             <a
@@ -101,6 +107,7 @@
               {/each}
             {/if}
           </div>
+          {/if}
 
           <div class="mt-3">
             <UnidadeStatus unidade={u} podeEditar={data.podeEditar} />

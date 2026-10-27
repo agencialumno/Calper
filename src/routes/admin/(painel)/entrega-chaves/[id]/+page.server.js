@@ -19,6 +19,9 @@ import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
 import { montarChecklist, parseChecklist } from '$lib/documentosPadrao.js';
 import { statusDaUnidade } from '$lib/server/unidadeStatus.js';
 import { podeEditar } from '$lib/perfis.js';
+import { agendaPublica } from '$lib/server/agenda.js';
+import { bloqueiosDoAgendamento, unidadesParaTroca } from '$lib/server/gestaoAgendamento.js';
+import { podeGerirAgendamentos } from '$lib/gestaoAgendamento.js';
 
 async function buscarAgendamento(id) {
   const agendamento = await db.agendamento.findUnique({
@@ -96,10 +99,33 @@ export async function load(event) {
     documentos,
     // quem ainda não assinou (nome/e-mail), por documento — vem da consulta ao DocuSign feita acima
     pendentes: pendentesPorDocumento,
+    // Alterar / Remarcar / Desmarcar (só admin e supervisor veem)
+    gestao: podeGerirAgendamentos(locals.funcionario.perfil)
+      ? {
+          ag: {
+            id: agendamento.id,
+            nome: agendamento.nomeCompareceu,
+            unidade: `Bloco ${u.bloco} - nº ${u.numero}`,
+            dataHora: agendamento.dataHora,
+            status: agendamento.status,
+            bloqueios: bloqueiosDoAgendamento({
+              ...agendamento,
+              _count: { presencas: agendamento.presencas.length, documentosAssinados: agendamento.documentosAssinados.length }
+            }),
+            trocouUnidade: agendamento.unidadeOriginalId && agendamento.unidadeOriginalId !== u.id ? { de: (await db.unidade.findUnique({ where: { id: agendamento.unidadeOriginalId }, select: { bloco: true, numero: true } }).then((x) => (x ? `Bloco ${x.bloco} - nº ${x.numero}` : '—'))) } : null,
+            temIdentidadeEnviada: Boolean(agendamento.documentoBase64),
+            temProcuracaoEnviada: Boolean(agendamento.procuracaoBase64)
+          },
+          unidades: await unidadesParaTroca(),
+          agenda: await agendaPublica()
+        }
+      : null,
     agendamento: {
       id: agendamento.id,
       status: agendamento.status,
       origem: agendamento.origem,
+      canceladoEm: agendamento.canceladoEm,
+      motivoCancelamento: agendamento.motivoCancelamento,
       // quando o último documento foi assinado por todos (entrega concluída)
       concluidaEm: agendamento.documentosAssinados.map((d) => d.assinadoEm).filter(Boolean).sort((x, y) => y - x)[0] ?? null,
       dataHora: agendamento.dataHora,
@@ -175,6 +201,7 @@ export const actions = {
   confirmarRetirante: async (event) => {
     const { request, params, locals } = event;
     const agendamento = await buscarAgendamento(params.id);
+    if (agendamento.status === 'cancelado') return fail(400, { erro: 'Este agendamento foi cancelado: o atendimento não pode ser alterado.' });
     const form = await request.formData();
 
     const quem = String(form.get('quem') ?? '');
@@ -305,6 +332,7 @@ export const actions = {
   salvarObservacoes: async (event) => {
     const { request, params, locals } = event;
     const agendamento = await buscarAgendamento(params.id);
+    if (agendamento.status === 'cancelado') return fail(400, { erro: 'Este agendamento foi cancelado: o atendimento não pode ser alterado.' });
     const form = await request.formData();
     const observacoes = String(form.get('observacoes') ?? '').trim().slice(0, 2000);
     await db.agendamento.update({ where: { id: agendamento.id }, data: { observacoesAtendimento: observacoes || null } });
@@ -326,6 +354,7 @@ export const actions = {
   corrigirEmail: async (event) => {
     const { request, params, locals } = event;
     const agendamento = await buscarAgendamento(params.id);
+    if (agendamento.status === 'cancelado') return fail(400, { erro: 'Este agendamento foi cancelado: o atendimento não pode ser alterado.' });
     const form = await request.formData();
     const ehConjuge = String(form.get('quem') ?? 'cliente') === 'conjuge';
     const novo = String(form.get('email') ?? '').trim();

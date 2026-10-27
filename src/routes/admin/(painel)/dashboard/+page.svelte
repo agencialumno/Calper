@@ -87,6 +87,9 @@
         <div class="text-xs text-gray-400 mt-0.5">ainda vão acontecer</div>
       </div>
     </div>
+    <p class="text-xs text-gray-500 -mt-2 mb-4" data-testid="kpi-cancelados">
+      Desmarcados no período: <strong>{data.atendimentos.cancelados}</strong> (não entram nas contagens acima)
+    </p>
     <div class="card p-5 md:p-6 overflow-x-auto">
       <div class="flex items-center justify-between gap-3 mb-5 flex-wrap">
         <div class="text-sm font-bold text-calper-dark">Atendimentos por data</div>

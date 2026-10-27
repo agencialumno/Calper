@@ -7,9 +7,13 @@
 // O código da lista aparece no fim da simulação: ele garante que o que será apagado é EXATAMENTE a lista que foi
 // confirmada (se algo mudou no meio, o script recusa). Faça um backup antes: node --env-file=.env scripts/backup-banco.js
 //
+// TRAVA: com agendamentos existentes (uso real), o --aplicar é RECUSADO a menos que se passe também --confirmo-dados-reais;
+// a simulação mostra quantos agendamentos existem e quantos documentos estão ligados a eles.
+//
 // ATENÇÃO: apagar aqui NÃO apaga no DocuSign. Os envelopes continuam na conta do DocuSign (veja a lista de envelopes).
 import { createHash } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
+import { FLAG_DADOS_REAIS, descreverResumo, recusaDadosReais, resumirAgendamentos } from './lib/dados-reais.js';
 
 const db = new PrismaClient();
 const aplicar = process.argv.includes('--aplicar');
@@ -67,12 +71,18 @@ async function main() {
   console.log(`DocuSign: ${envelopes.length} envelope(s) distinto(s) — ${docs.length} de ${docs.length} documento(s) têm envelope. Apagar aqui NÃO apaga no DocuSign.`);
   console.log(`Código da lista: ${codigo}`);
 
+  const resumo = resumirAgendamentos(await db.agendamento.findMany({ select: { status: true, origem: true, dataHora: true, createdAt: true } }));
+  const ligados = docs.filter((d) => d.agendamentoId).length;
+  for (const l of descreverResumo(resumo)) console.log(l);
+  console.log(`  documentos ligados a agendamentos: ${ligados} de ${docs.length}`);
   const antes = await contagens();
   if (!aplicar) {
     console.log('\nContagens das demais tabelas (não serão alteradas):', JSON.stringify(antes));
-    console.log(`\nPara apagar: node --env-file=.env scripts/limpar-documentos-assinados.js --aplicar --lista=${codigo}`);
+    console.log(`\nPara apagar: node --env-file=.env scripts/limpar-documentos-assinados.js --aplicar --lista=${codigo}${resumo.temDadosReais ? ` ${FLAG_DADOS_REAIS}` : ''}`);
     return;
   }
+  const recusa = recusaDadosReais(resumo, process.argv);
+  if (recusa) throw new Error(recusa);
   if (listaInformada !== codigo) {
     throw new Error(`Recusado: --lista=${listaInformada ?? '(ausente)'} não confere com a lista atual (${codigo}). Rode a simulação de novo e confirme a lista.`);
   }

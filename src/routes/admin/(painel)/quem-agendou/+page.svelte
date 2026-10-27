@@ -1,4 +1,5 @@
 <script>
+  import AcoesAgendamento from '$lib/components/AcoesAgendamento.svelte';
   import LinkDownload from '$lib/components/LinkDownload.svelte';
   import { formatarCpf } from '$lib/cpf.js';
 
@@ -96,6 +97,14 @@
             {/if}
           </div>
         </div>
+        {#if a.status === 'cancelado'}
+          <div class="mt-3 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 px-3 py-2" data-testid="info-cancelamento">
+            Desmarcado{a.canceladoEm ? ` em ${quandoAgendou(a.canceladoEm)}` : ''}{a.motivoCancelamento ? ` — motivo: ${a.motivoCancelamento}` : ''}
+          </div>
+        {/if}
+        {#if data.podeGerir}
+          <AcoesAgendamento class="mt-3" ag={a} unidades={data.unidadesLivres} agenda={data.agenda} />
+        {/if}
         <div class="text-[11px] text-gray-400 mt-3">Agendou em {quandoAgendou(a.agendadoEm)}</div>
       </div>
     {:else}

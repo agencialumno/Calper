@@ -119,6 +119,7 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
     include: { unidade: true, presencas: true, documentosAssinados: true }
   });
   if (!agendamento) return { erro: 'Agendamento não encontrado.' };
+  if (agendamento.status === 'cancelado') return { erro: 'Este agendamento foi cancelado: não dá para enviar documentos.' };
 
   const doc = (t) => agendamento.documentosAssinados.find((d) => d.tipo === t);
   const existente = doc(tipo);

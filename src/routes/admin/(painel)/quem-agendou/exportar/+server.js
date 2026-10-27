@@ -17,6 +17,8 @@ export async function GET({ url, locals }) {
       dataHora: true,
       status: true,
       origem: true,
+      canceladoEm: true,
+      motivoCancelamento: true,
       nomeCompareceu: true,
       cpfCompareceu: true,
       telefoneCompareceu: true,
@@ -29,7 +31,7 @@ export async function GET({ url, locals }) {
   });
 
   const linhas = [
-    ['Agendado em', 'Nome', 'CPF', 'Telefone', 'E-mail', 'Bloco', 'Unidade', 'Data agendada', 'Hora agendada', 'É o proprietário', 'Nome do proprietário', 'Procuração anexada', 'Status', 'Origem'],
+    ['Agendado em', 'Nome', 'CPF', 'Telefone', 'E-mail', 'Bloco', 'Unidade', 'Data agendada', 'Hora agendada', 'É o proprietário', 'Nome do proprietário', 'Procuração anexada', 'Status', 'Origem', 'Desmarcado em', 'Motivo do cancelamento'],
     ...agendamentos.map((a) => {
       const { data, hora } = dataHoraAgendada(a.dataHora);
       return [
@@ -46,7 +48,9 @@ export async function GET({ url, locals }) {
         a.proprietarioNome,
         sn(Boolean(a.procuracaoCpf)),
         a.status,
-        a.origem === 'atendimento_direto' ? 'Atendimento direto' : 'Agendamento'
+        a.origem === 'atendimento_direto' ? 'Atendimento direto' : 'Agendamento',
+        dataHoraBr(a.canceladoEm),
+        a.motivoCancelamento ?? ''
       ];
     })
   ];

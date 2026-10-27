@@ -22,6 +22,8 @@ export async function GET({ locals }) {
     select: {
       status: true,
       origem: true,
+      canceladoEm: true,
+      motivoCancelamento: true,
       createdAt: true,
       dataHora: true,
       nomeCompareceu: true,
@@ -71,7 +73,9 @@ export async function GET({ locals }) {
     'Presentes',
     'Observações do atendimento',
     'Agendado em',
-    'Origem'
+    'Origem',
+    'Desmarcado em',
+    'Motivo do cancelamento'
   ];
 
   const pagamento = { quitada: 'saldo quitado', a_vencer: 'a vencer', estoque: 'estoque', juridico_civel: 'jurídico cível' };
@@ -109,7 +113,9 @@ export async function GET({ locals }) {
       a.presencas.map((p) => `${p.nome} (${ROTULO_VINCULO[p.vinculo] ?? p.vinculo}, ${dataHoraBr(p.createdAt)})`).join(' | '),
       a.observacoesAtendimento ?? '',
       dataHoraBr(a.createdAt),
-      a.origem === 'atendimento_direto' ? 'Atendimento direto' : 'Agendamento'
+      a.origem === 'atendimento_direto' ? 'Atendimento direto' : 'Agendamento',
+      dataHoraBr(a.canceladoEm),
+      a.motivoCancelamento ?? ''
     ];
   });
 

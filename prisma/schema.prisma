@@ -193,6 +193,13 @@ model Agendamento {
   // sem agendamento prévio (dataHora = momento do início, checkinEm = check-in feito na hora).
   origem             String   @default("agendamento")
   checkinEm          DateTime?
+  // Cancelamento feito pela equipe (Quem agendou / detalhe do agendamento): o registro NUNCA é apagado, só vira "cancelado".
+  canceladoPorId     String?   // Funcionario.id de quem desmarcou
+  canceladoEm        DateTime?
+  motivoCancelamento String?
+  // Se a equipe trocou a unidade do agendamento, a unidade em que ele foi feito originalmente: o documento de identidade e a
+  // procuração enviados no agendamento pertencem a ela (continuam guardados; a unidade nova precisa de novo envio).
+  unidadeOriginalId  String?
   observacoesAtendimento String?
   // Quem agendou fica nos campos *Compareceu acima (intactos). Quem retira as chaves de fato é
   // confirmado no dia, no passo 2 do fluxo de entrega, e gravado aqui.
