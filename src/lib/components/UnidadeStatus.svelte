@@ -3,6 +3,7 @@
   // Mostra as etiquetas (Tipologia, Grupo, Status-Quitação, Vistoria de Unidade, Escritura Atual), um "ver mais" com
   // os demais dados da base e, para admin/supervisor, a edição direta dos status.
   import { invalidateAll } from '$app/navigation';
+  import { corEscrituraAtual } from '$lib/coresEscritura.js';
   import {
     OPCOES_ESCRITURA_ATUAL,
     OPCOES_QUITACAO,
@@ -87,7 +88,9 @@
       <span class="px-2.5 py-1 rounded-full {corVistoria(unidade.vistoriaStatus)}">Vistoria: {capitalizar(unidade.vistoriaStatus)}</span>
     {/if}
     {#if unidade.escrituraAtual}
-      <span class="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">Escritura: {capitalizar(unidade.escrituraAtual)}</span>
+      <!-- a cor sai do valor ATUAL (mapa único em coresEscritura.js): muda na hora quando o status é editado -->
+      {@const corEscritura = corEscrituraAtual(unidade.escrituraAtual)}
+      <span class="px-2.5 py-1 rounded-full {corEscritura.classe}" data-testid="tag-escritura" data-cor={corEscritura.cor}>Escritura: {capitalizar(unidade.escrituraAtual)}</span>
     {/if}
 
     <span class="flex items-center gap-3 ml-1 font-semibold">
