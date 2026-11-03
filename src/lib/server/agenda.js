@@ -1,5 +1,5 @@
 import { db } from './db.js';
-import { SLUG_ENTREGA_CHAVES } from './entregaChaves.js';
+import { SERVICO_PADRAO, slugDoServico } from '../servicos.js';
 
 // Agenda de entrega de chaves: quais dias estão abertos e quantos agendamentos cabem por hora.
 // Tudo editável pela equipe em /admin/agenda (AgendaConfig + AgendaDia).
@@ -51,14 +51,17 @@ export function limiteDoSlot(config, dia, horario) {
   return config.limitePorHora;
 }
 
-/** Quantos agendamentos de entrega de chaves (não cancelados) já ocupam cada horário nos dias dados. */
-export async function ocupacaoPorSlot(datas, cliente = db, { ignorarAgendamentoId = null } = {}) {
+/**
+ * Quantos agendamentos (não cancelados) do serviço já ocupam cada horário nos dias dados. As vagas são contadas por
+ * serviço (entrega de chaves e vistoria não dividem o limite): os dois começam com os mesmos horários e limites.
+ */
+export async function ocupacaoPorSlot(datas, cliente = db, { ignorarAgendamentoId = null, servico = SERVICO_PADRAO } = {}) {
   if (!datas.length) return new Map();
   const inicio = new Date(`${datas.reduce((a, b) => (a < b ? a : b))}T00:00:00.000Z`);
   const fim = new Date(`${datas.reduce((a, b) => (a > b ? a : b))}T23:59:59.999Z`);
   const ags = await cliente.agendamento.findMany({
     where: {
-      tipoEvento: { slug: SLUG_ENTREGA_CHAVES },
+      tipoEvento: { slug: slugDoServico(servico) },
       status: { not: 'cancelado' },
       dataHora: { gte: inicio, lte: fim },
       ...(ignorarAgendamentoId ? { id: { not: ignorarAgendamentoId } } : {}) // remarcar: o próprio agendamento não ocupa a vaga que ele vai deixar
@@ -75,13 +78,13 @@ export async function ocupacaoPorSlot(datas, cliente = db, { ignorarAgendamentoI
 }
 
 /** Dias abertos (de hoje em diante) com a vaga restante de cada horário, pro formulário público. */
-export async function agendaPublica(agora = new Date()) {
+export async function agendaPublica(agora = new Date(), { servico = SERVICO_PADRAO } = {}) {
   const hoje = agora.toISOString().slice(0, 10);
   const [config, dias] = await Promise.all([
     obterConfig(),
     db.agendaDia.findMany({ where: { aberto: true, data: { gte: hoje } }, orderBy: { data: 'asc' } })
   ]);
-  const ocupacao = await ocupacaoPorSlot(dias.map((d) => d.data));
+  const ocupacao = await ocupacaoPorSlot(dias.map((d) => d.data), db, { servico });
   return dias
     .map((d) => ({
       data: d.data,
@@ -95,7 +98,7 @@ export async function agendaPublica(agora = new Date()) {
  * Confere (dentro de uma transação) se o dia está aberto e se o horário ainda tem vaga.
  * Devolve { ok: true } ou { ok: false, motivo }.
  */
-export async function conferirVaga(cliente, data, horario, { ignorarAgendamentoId = null } = {}) {
+export async function conferirVaga(cliente, data, horario, { ignorarAgendamentoId = null, servico = SERVICO_PADRAO } = {}) {
   if (!dataValida(data) || !horarioValido(horario)) return { ok: false, motivo: 'Escolha uma data e um horário válidos.' };
   const [config, dia] = await Promise.all([
     cliente.agendaConfig.findUnique({ where: { id: 'padrao' } }).then((c) => ({
@@ -107,7 +110,7 @@ export async function conferirVaga(cliente, data, horario, { ignorarAgendamentoI
   if (!dia?.aberto) return { ok: false, motivo: 'Esta data não está disponível para agendamento.' };
   if (!config.horarios.includes(horario)) return { ok: false, motivo: 'Este horário não está disponível.' };
   const limite = limiteDoSlot(config, dia, horario);
-  const ocupados = (await ocupacaoPorSlot([data], cliente, { ignorarAgendamentoId })).get(`${data} ${horario}`) ?? 0;
+  const ocupados = (await ocupacaoPorSlot([data], cliente, { ignorarAgendamentoId, servico })).get(`${data} ${horario}`) ?? 0;
   if (ocupados >= limite) return { ok: false, motivo: 'Este horário acabou de lotar. Escolha outro horário.' };
   return { ok: true };
 }

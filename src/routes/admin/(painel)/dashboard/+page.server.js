@@ -49,13 +49,13 @@ export async function load({ url }) {
   const inicioAt = dataValida(de) ? new Date(`${de}T00:00:00.000Z`) : new Date(agoraRelogio.getTime() - periodo * 86400000);
   const fimAt = dataValida(ate) ? new Date(`${ate}T23:59:59.999Z`) : agoraRelogio;
   const atendimentosPeriodo = await db.agendamento.findMany({
-    where: { dataHora: { gte: inicioAt, lte: fimAt }, status: { not: 'cancelado' }, ...filtroUnidade },
+    where: { dataHora: { gte: inicioAt, lte: fimAt }, status: { not: 'cancelado' }, tipoEvento: { slug: 'entrega-chaves' }, ...filtroUnidade },
     select: { dataHora: true, status: true }
   });
   const atendimentosRealizados = atendimentosPeriodo.filter((a) => a.status === 'realizado').length;
   // agendou, o horário já passou e a entrega não foi concluída
   const agendadosNaoRealizados = atendimentosPeriodo.filter((a) => a.status === 'confirmado' && a.dataHora < agoraRelogio).length;
-  const agendadosAFazer = await db.agendamento.count({ where: { status: 'confirmado', dataHora: { gte: agoraRelogio }, ...filtroUnidade } });
+  const agendadosAFazer = await db.agendamento.count({ where: { status: 'confirmado', dataHora: { gte: agoraRelogio }, tipoEvento: { slug: 'entrega-chaves' }, ...filtroUnidade } });
 
   const diasAt = Math.max(1, Math.ceil((fimAt.getTime() - inicioAt.getTime()) / 86400000));
   const numBucketsAt = Math.min(12, diasAt);

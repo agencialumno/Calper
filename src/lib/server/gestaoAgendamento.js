@@ -1,11 +1,12 @@
 import { db } from './db.js';
 import { conferirVaga, dataHoraDoSlot } from './agenda.js';
-import { SLUG_ENTREGA_CHAVES, buscarMurano } from './entregaChaves.js';
+import { buscarMurano } from './entregaChaves.js';
+import { SERVICOS, blocoPermitido, servicoDoSlug, slugDoServico } from '../servicos.js';
 import { registrarLog, rotuloFuncionario } from './log.js';
 import { motivoSemAgendamento } from '../unidadeAgendavel.js';
 import { motivoBloqueio, podeGerirAgendamentos, rotuloDataHora, validarMotivo } from '../gestaoAgendamento.js';
 
-// Alterar (trocar a unidade), Remarcar (data/hora) e Desmarcar (cancelar) agendamentos de entrega de chaves.
+// Alterar (trocar a unidade), Remarcar (data/hora) e Desmarcar (cancelar) agendamentos de entrega de chaves e de vistoria.
 // Só admin e supervisor. Tudo dentro de transação serializável, com a regra "1 unidade = 1 agendamento de entrega de
 // chaves" conferida de novo lá dentro (clique duplo, duas pessoas ao mesmo tempo). NENHUM registro é apagado.
 // Não envia e-mail nem notificação ao investidor (ver a descrição do PR).
@@ -15,6 +16,10 @@ const ESTADO_AGENDAMENTO = {
   unidade: { select: { id: true, bloco: true, numero: true, empreendimentoId: true } },
   _count: { select: { presencas: true, documentosAssinados: true } }
 };
+
+/** Serviço do agendamento (pelo TipoEvento) e o nome dele em minúsculas, para as mensagens. */
+const servicoDe = (ag) => servicoDoSlug(ag.tipoEvento?.slug);
+const nomeServico = (ag) => SERVICOS[servicoDe(ag)].minusculo;
 
 const rotuloUnidade = (u) => `Unidade ${u.numero}, Bloco ${u.bloco}`;
 
@@ -73,15 +78,16 @@ export async function alterarUnidade(event, { agendamentoId, novaUnidadeId }) {
     if (nova.id === ag.unidadeId) return { erro: 'Essa já é a unidade do agendamento.' };
     // as mesmas travas do agendamento público
     const murano = await buscarMurano();
-    if (!murano || nova.empreendimentoId !== murano.id) return { erro: 'A unidade nova não é do empreendimento da entrega de chaves.' };
+    if (!murano || nova.empreendimentoId !== murano.id) return { erro: `A unidade nova não é do empreendimento d${SERVICOS[servicoDe(ag)].artigo} ${nomeServico(ag)}.` };
     const fora = motivoSemAgendamento({ vistoriaStatus: nova.vistoriaStatus ?? null, compradores: nova.compradores });
     if (fora) return { erro: `A unidade nova está fora do agendamento (${fora}).` };
+    if (!blocoPermitido(servicoDe(ag), nova.bloco)) return { erro: `A unidade nova é de um bloco em que ${nomeServico(ag)} não é atendid${SERVICOS[servicoDe(ag)].artigo}.` };
     // 1 unidade = 1 agendamento ativo do mesmo tipo (conferido DENTRO da transação)
     const ja = await tx.agendamento.findFirst({
       where: { unidadeId: nova.id, tipoEventoId: ag.tipoEventoId, status: { not: 'cancelado' }, id: { not: ag.id } },
       select: { id: true }
     });
-    if (ja) return { erro: 'A unidade nova já tem agendamento de entrega de chaves. Escolha outra.' };
+    if (ja) return { erro: `A unidade nova já tem agendamento de ${nomeServico(ag)}. Escolha outra.` };
 
     const veioDe = ag.unidade;
     await tx.agendamento.update({
@@ -89,8 +95,8 @@ export async function alterarUnidade(event, { agendamentoId, novaUnidadeId }) {
       data: { unidadeId: nova.id, unidadeOriginalId: ag.unidadeOriginalId ?? veioDe.id }
     });
     const quando = rotuloDataHora(ag.dataHora);
-    await historico(tx, veioDe.id, `Agendamento de entrega de chaves (${quando}) transferido para a ${rotuloUnidade(nova)} pela equipe; esta unidade voltou a ficar disponível`, funcionario.id);
-    await historico(tx, nova.id, `Agendamento de entrega de chaves (${quando}) recebido da ${rotuloUnidade(veioDe)} por troca feita pela equipe`, funcionario.id);
+    await historico(tx, veioDe.id, `Agendamento de ${nomeServico(ag)} (${quando}) transferido para a ${rotuloUnidade(nova)} pela equipe; esta unidade voltou a ficar disponível`, funcionario.id);
+    await historico(tx, nova.id, `Agendamento de ${nomeServico(ag)} (${quando}) recebido da ${rotuloUnidade(veioDe)} por troca feita pela equipe`, funcionario.id);
     const temArquivos = Boolean(ag.documentoBase64) || Boolean(ag.procuracaoBase64);
     return { ok: true, ag, veioDe, nova, quando, temArquivos };
   });
@@ -101,7 +107,7 @@ export async function alterarUnidade(event, { agendamentoId, novaUnidadeId }) {
     event,
     atorTipo: 'funcionario',
     acao: 'agendamento_unidade_alterada',
-    descricao: `${rotuloFuncionario(funcionario)} trocou a unidade do agendamento de ${ag.nomeCompareceu ?? '—'} (${quando}): de ${rotuloUnidade(veioDe)} para ${rotuloUnidade(nova)}`,
+    descricao: `${rotuloFuncionario(funcionario)} trocou a unidade do agendamento de ${nomeServico(ag)} de ${ag.nomeCompareceu ?? '—'} (${quando}): de ${rotuloUnidade(veioDe)} para ${rotuloUnidade(nova)}`,
     entidadeTipo: 'Agendamento',
     entidadeId: ag.id
   });
@@ -127,13 +133,13 @@ export async function remarcar(event, { agendamentoId, data, horario }) {
     if (Number.isNaN(novaDataHora.getTime())) return { erro: 'Escolha uma data e um horário válidos.' };
     if (novaDataHora.getTime() === ag.dataHora.getTime()) return { erro: 'Esse já é o dia e o horário do agendamento.' };
     // só horários válidos da agenda atual (dia aberto, horário existente) e com vaga — sem contar o próprio agendamento
-    const vaga = await conferirVaga(tx, String(data), String(horario), { ignorarAgendamentoId: ag.id });
+    const vaga = await conferirVaga(tx, String(data), String(horario), { ignorarAgendamentoId: ag.id, servico: servicoDe(ag) });
     if (!vaga.ok) return { erro: vaga.motivo };
 
     await tx.agendamento.update({ where: { id: ag.id }, data: { dataHora: novaDataHora, lembreteEnviado: false } });
     const antes = rotuloDataHora(ag.dataHora);
     const depois = rotuloDataHora(novaDataHora);
-    await historico(tx, ag.unidadeId, `Agendamento de entrega de chaves remarcado pela equipe: de ${antes} para ${depois}`, funcionario.id);
+    await historico(tx, ag.unidadeId, `Agendamento de ${nomeServico(ag)} remarcado pela equipe: de ${antes} para ${depois}`, funcionario.id);
     return { ok: true, ag, antes, depois };
   });
   if (!resultado.ok) return resultado;
@@ -143,7 +149,7 @@ export async function remarcar(event, { agendamentoId, data, horario }) {
     event,
     atorTipo: 'funcionario',
     acao: 'agendamento_remarcado',
-    descricao: `${rotuloFuncionario(funcionario)} remarcou o agendamento de ${ag.nomeCompareceu ?? '—'} (${rotuloUnidade(ag.unidade)}): de ${antes} para ${depois}`,
+    descricao: `${rotuloFuncionario(funcionario)} remarcou o agendamento de ${nomeServico(ag)} de ${ag.nomeCompareceu ?? '—'} (${rotuloUnidade(ag.unidade)}): de ${antes} para ${depois}`,
     entidadeTipo: 'Agendamento',
     entidadeId: ag.id
   });
@@ -171,7 +177,7 @@ export async function desmarcar(event, { agendamentoId, motivo }) {
       where: { id: ag.id },
       data: { status: 'cancelado', canceladoPorId: funcionario.id, canceladoEm: new Date(), motivoCancelamento: m.motivo }
     });
-    await historico(tx, ag.unidadeId, `Agendamento de entrega de chaves (${rotuloDataHora(ag.dataHora)}) desmarcado pela equipe. Motivo: ${m.motivo}. A unidade voltou a ficar disponível`, funcionario.id);
+    await historico(tx, ag.unidadeId, `Agendamento de ${nomeServico(ag)} (${rotuloDataHora(ag.dataHora)}) desmarcado pela equipe. Motivo: ${m.motivo}. A unidade voltou a ficar disponível`, funcionario.id);
     return { ok: true, ag };
   });
   if (!resultado.ok) return resultado;
@@ -181,7 +187,7 @@ export async function desmarcar(event, { agendamentoId, motivo }) {
     event,
     atorTipo: 'funcionario',
     acao: 'agendamento_desmarcado',
-    descricao: `${rotuloFuncionario(funcionario)} desmarcou o agendamento de ${ag.nomeCompareceu ?? '—'} — ${rotuloUnidade(ag.unidade)}, ${rotuloDataHora(ag.dataHora)}. Motivo: ${m.motivo}`,
+    descricao: `${rotuloFuncionario(funcionario)} desmarcou o agendamento de ${nomeServico(ag)} de ${ag.nomeCompareceu ?? '—'} — ${rotuloUnidade(ag.unidade)}, ${rotuloDataHora(ag.dataHora)}. Motivo: ${m.motivo}`,
     entidadeTipo: 'Agendamento',
     entidadeId: ag.id
   });
@@ -195,11 +201,11 @@ export function bloqueiosDoAgendamento(ag) {
 }
 
 /** Unidades que podem receber um agendamento: Murano, dentro do agendamento e sem agendamento ativo do tipo. */
-export async function unidadesParaTroca() {
+export async function unidadesParaTroca(servico = 'entrega-chaves') {
   const [murano, ocupadas] = await Promise.all([
     buscarMurano(),
     db.agendamento.findMany({
-      where: { tipoEvento: { slug: SLUG_ENTREGA_CHAVES }, status: { not: 'cancelado' } },
+      where: { tipoEvento: { slug: slugDoServico(servico) }, status: { not: 'cancelado' } },
       select: { unidadeId: true }
     })
   ]);
@@ -211,7 +217,7 @@ export async function unidadesParaTroca() {
     orderBy: [{ bloco: 'asc' }, { numero: 'asc' }]
   });
   return unidades
-    .filter((u) => !ocupadasSet.has(u.id) && !motivoSemAgendamento({ vistoriaStatus: u.vistoriaStatus ?? null, compradores: u.compradores }))
+    .filter((u) => blocoPermitido(servico, u.bloco) && !ocupadasSet.has(u.id) && !motivoSemAgendamento({ vistoriaStatus: u.vistoriaStatus ?? null, compradores: u.compradores }))
     .map((u) => ({ id: u.id, rotulo: `Bloco ${u.bloco} - nº ${u.numero}` }))
     .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR', { numeric: true }));
 }

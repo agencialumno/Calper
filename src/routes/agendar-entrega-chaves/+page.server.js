@@ -4,7 +4,8 @@ import { cpfValido, emailValido, somenteDigitos } from '$lib/cpf.js';
 import { gerarSenhaTemporaria, hashSenha } from '$lib/server/auth.js';
 import { TIPOS_PROCURACAO, arquivoParaBase64, gerarQrToken } from '$lib/server/agendamento.js';
 import { agendaPublica, conferirVaga, dataHoraDoSlot } from '$lib/server/agenda.js';
-import { SLUG_ENTREGA_CHAVES, buscarMurano } from '$lib/server/entregaChaves.js';
+import { buscarMurano } from '$lib/server/entregaChaves.js';
+import { LISTA_SERVICOS, SERVICOS, SERVICO_PADRAO, blocoPermitido, rotuloDoServico, servicoValido } from '$lib/servicos.js';
 import { notificarFuncionarios } from '$lib/server/notificacao.js';
 import { registrarLog } from '$lib/server/log.js';
 import { formatarCpf } from '$lib/cpf.js';
@@ -12,7 +13,11 @@ import { unidadeAgendavel } from '$lib/unidadeAgendavel.js';
 
 // Rota pública (sem login): agendamento de entrega de chaves do Murano.
 
-async function carregarUnidades(empreendimentoId, tipoEventoId) {
+// Unidades que o cliente pode escolher em cada serviço. Mesmas travas de hoje (Murano, com comprador, fora de estoque,
+// jurídico e notificação). Entrega de chaves: some a unidade que já tem entrega agendada. Vistoria: o cliente só agenda
+// a PRIMEIRA vistoria — qualquer vistoria que não foi cancelada (inclusive uma não aceita) tira a unidade da lista; a
+// revistoria é aberta só pela equipe.
+async function carregarUnidades(empreendimentoId, tiposPorServico) {
   const unidades = await db.unidade.findMany({
     where: { empreendimentoId },
     select: {
@@ -21,37 +26,45 @@ async function carregarUnidades(empreendimentoId, tipoEventoId) {
       numero: true,
       compradores: true,
       vistoriaStatus: true,
-      agendamentos: {
-        where: { tipoEventoId, status: { not: 'cancelado' } },
-        select: { id: true },
-        take: 1
-      }
+      agendamentos: { where: { status: { not: 'cancelado' } }, select: { tipoEventoId: true } }
     }
   });
-  return unidades
-    // unidade já agendada não aparece mais na lista (não dá pra agendar a mesma unidade duas vezes)
-    .filter((u) => u.agendamentos.length === 0)
-    // estoque, jurídico, em notificação ou sem comprador na base: nada a entregar, não aparece
+  const ordenadas = unidades
     .filter(unidadeAgendavel)
-    .map((u) => ({ id: u.id, bloco: u.bloco, numero: u.numero }))
     .sort(
       (a, b) =>
         a.bloco.localeCompare(b.bloco, 'pt-BR', { numeric: true }) ||
         a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true })
     );
+  return Object.fromEntries(
+    LISTA_SERVICOS.map((sv) => [
+      sv.valor,
+      ordenadas
+        .filter((u) => blocoPermitido(sv.valor, u.bloco))
+        .filter((u) => !u.agendamentos.some((a) => a.tipoEventoId === tiposPorServico[sv.valor]?.id))
+        .map((u) => ({ id: u.id, bloco: u.bloco, numero: u.numero }))
+    ])
+  );
 }
 
-export async function load() {
-  const [murano, tipoEvento] = await Promise.all([
-    buscarMurano(),
-    db.tipoEvento.findUnique({ where: { slug: SLUG_ENTREGA_CHAVES } })
-  ]);
+async function tiposDosServicos() {
+  const tipos = await db.tipoEvento.findMany({ where: { slug: { in: LISTA_SERVICOS.map((s) => s.slug) } } });
+  return Object.fromEntries(LISTA_SERVICOS.map((sv) => [sv.valor, tipos.find((t) => t.slug === sv.slug) ?? null]));
+}
+
+export async function load({ url }) {
+  const [murano, tipos] = await Promise.all([buscarMurano(), tiposDosServicos()]);
+  const servicosDisponiveis = LISTA_SERVICOS.filter((sv) => tipos[sv.valor]).map((sv) => ({ valor: sv.valor, rotulo: sv.rotulo }));
 
   return {
-    disponivel: Boolean(murano && tipoEvento),
-    unidades: murano && tipoEvento ? await carregarUnidades(murano.id, tipoEvento.id) : [],
-    // dias abertos e horários com vaga, definidos pela equipe em /admin/agenda
-    agenda: await agendaPublica()
+    disponivel: Boolean(murano && tipos[SERVICO_PADRAO]),
+    servicos: servicosDisponiveis,
+    // ?servico=vistoria abre o formulário já com a vistoria escolhida; sem nada, continua a entrega de chaves
+    servicoInicial: servicoValido(url.searchParams.get('servico')),
+    // lista de unidades e agenda de cada serviço (trocar o serviço filtra na hora, sem recarregar)
+    unidadesPorServico: murano ? await carregarUnidades(murano.id, tipos) : Object.fromEntries(LISTA_SERVICOS.map((s) => [s.valor, []])),
+    // dias abertos e horários com vaga POR SERVIÇO, definidos pela equipe em /admin/agenda
+    agendaPorServico: Object.fromEntries(await Promise.all(LISTA_SERVICOS.map(async (sv) => [sv.valor, await agendaPublica(new Date(), { servico: sv.valor })])))
   };
 }
 
@@ -66,6 +79,7 @@ export const actions = {
       email: String(form.get('email') ?? '').trim(),
       ehProprietario: String(form.get('ehProprietario') ?? ''),
       proprietarioNome: String(form.get('proprietarioNome') ?? '').trim(),
+      servico: servicoValido(form.get('servico')),
       unidadeId: String(form.get('unidadeId') ?? ''),
       data: String(form.get('data') ?? ''),
       horario: String(form.get('horario') ?? '')
@@ -104,25 +118,29 @@ export const actions = {
       if (!documentoIdentidadeBase64) return erro('Anexe o documento de identidade de quem vai assinar/comparecer.');
     }
 
+    const servico = valores.servico;
+    const rotuloServico = rotuloDoServico(servico);
+    const rotuloMin = SERVICOS[servico].minusculo;
+    const ehVistoria = servico === 'vistoria';
     const [murano, tipoEvento] = await Promise.all([
       buscarMurano(),
-      db.tipoEvento.findUnique({ where: { slug: SLUG_ENTREGA_CHAVES } })
+      db.tipoEvento.findUnique({ where: { slug: SERVICOS[servico].slug } })
     ]);
     if (!murano || !tipoEvento) return erro('Agendamento indisponível no momento.');
 
     const unidade = await db.unidade.findFirst({
       where: { id: valores.unidadeId, empreendimentoId: murano.id }
     });
-    if (!unidade || !unidadeAgendavel(unidade)) return erro('Escolha uma unidade da lista.');
+    if (!unidade || !unidadeAgendavel(unidade) || !blocoPermitido(servico, unidade.bloco)) return erro('Escolha uma unidade da lista.');
 
     // revalida no envio — outra pessoa pode ter agendado a unidade enquanto o formulário estava aberto
     const jaAgendada = await db.agendamento.findFirst({
       where: { unidadeId: unidade.id, tipoEventoId: tipoEvento.id, status: { not: 'cancelado' } }
     });
-    if (jaAgendada) return erro('Esta unidade já tem entrega de chaves agendada. Escolha outra.');
+    if (jaAgendada) return erro(`Esta unidade já tem ${rotuloMin} agendada. Escolha outra.`);
 
     const dataHora = dataHoraDoSlot(valores.data, valores.horario);
-    const vaga = await conferirVaga(db, valores.data, valores.horario);
+    const vaga = await conferirVaga(db, valores.data, valores.horario, { servico });
     if (!vaga.ok) return erro(vaga.motivo);
 
     // Investidor mínimo só pra satisfazer a relação obrigatória. Se o CPF já existe, reaproveita
@@ -140,12 +158,12 @@ export const actions = {
     try {
       agendamento = await db.$transaction(
         async (tx) => {
-          const v = await conferirVaga(tx, valores.data, valores.horario);
+          const v = await conferirVaga(tx, valores.data, valores.horario, { servico });
           if (!v.ok) throw new Error(v.motivo);
           const ja = await tx.agendamento.findFirst({
             where: { unidadeId: unidade.id, tipoEventoId: tipoEvento.id, status: { not: 'cancelado' } }
           });
-          if (ja) throw new Error('Esta unidade já tem entrega de chaves agendada. Escolha outra.');
+          if (ja) throw new Error(`Esta unidade já tem ${rotuloMin} agendada. Escolha outra.`);
           return tx.agendamento.create({
             data: {
               unidadeId: unidade.id,
@@ -153,6 +171,7 @@ export const actions = {
               investidorId: investidor.id,
               dataHora,
               status: 'confirmado',
+              vistoriaNumero: 1, // o cliente só agenda a 1ª vistoria; as revistorias (2, 3...) são abertas pela equipe
               qrToken: gerarQrToken(),
               nomeCompareceu: valores.nome,
               cpfCompareceu: cpf,
@@ -190,7 +209,7 @@ export const actions = {
       data: {
         unidadeId: unidade.id,
         tipo: 'outro',
-        descricao: `Entrega de chaves agendada para ${valores.data} às ${valores.horario} (${valores.nome})${procuracaoBase64 ? ` — procuração e documento de identidade anexados, proprietário: ${valores.proprietarioNome}` : ''}`
+        descricao: `${rotuloServico} agendada para ${valores.data} às ${valores.horario} (${valores.nome})${procuracaoBase64 ? ` — procuração e documento de identidade anexados, proprietário: ${valores.proprietarioNome}` : ''}`
       }
     });
     await registrarLog({
@@ -198,19 +217,20 @@ export const actions = {
       atorTipo: 'investidor',
       investidorId: investidor.id,
       acao: 'agendamento_criado',
-      descricao: `${valores.nome} (CPF ${formatarCpf(cpf)}) agendou entrega de chaves pelo formulário público para ${valores.data} às ${valores.horario} — Unidade ${unidade.numero}, Bloco ${unidade.bloco}`,
+      descricao: `${valores.nome} (CPF ${formatarCpf(cpf)}) agendou ${rotuloMin} pelo formulário público para ${valores.data} às ${valores.horario} — Unidade ${unidade.numero}, Bloco ${unidade.bloco}`,
       entidadeTipo: 'Agendamento',
       entidadeId: agendamento.id
     });
     await notificarFuncionarios({
-      titulo: 'Nova entrega de chaves agendada',
+      titulo: `Nova ${rotuloMin} agendada`,
       mensagem: `${valores.nome} agendou para ${valores.data} às ${valores.horario} (Unidade ${unidade.numero} — Bloco ${unidade.bloco}).`,
-      link: '/admin/entrega-chaves'
+      link: ehVistoria ? '/admin/quem-agendou' : '/admin/entrega-chaves'
     });
 
     return {
       sucesso: true,
       resumo: {
+        servico: rotuloServico,
         nome: valores.nome,
         unidade: `Bloco ${unidade.bloco} - nº ${unidade.numero}`,
         data: valores.data,
