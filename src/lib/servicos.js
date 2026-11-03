@@ -22,8 +22,8 @@ export const servicoDoSlug = (slug) => servicoValido(slug);
 
 /**
  * Blocos em que cada serviço pode ser agendado — o único lugar que define isso. Vistoria é só do Bloco 3.
- * `null` = sem restrição de bloco (como a entrega de chaves sempre foi). Para restringir a entrega ao Bloco 2 basta
- * trocar para ['2'] (hoje os testes e2e da entrega usam unidades de outros blocos, por isso fica sem restrição).
+ * `null` = sem restrição de bloco. Entrega de chaves: sem restrição, exceto os blocos de BLOCOS_BLOQUEADOS_POR_SERVICO
+ * (o Bloco 3 ainda não tem entrega de chaves; os testes e2e da entrega usam os blocos 8 e 9, por isso não é "só Bloco 2").
  * Os números de unidade se repetem entre blocos: tudo que usa o mapa compara bloco + número, nunca só o número.
  */
 export const BLOCOS_POR_SERVICO = {
@@ -31,8 +31,18 @@ export const BLOCOS_POR_SERVICO = {
   vistoria: ['3']
 };
 
+export const BLOCOS_BLOQUEADOS_POR_SERVICO = {
+  'entrega-chaves': ['3'],
+  vistoria: []
+};
+
+export const MENSAGEM_BLOCO3_ENTREGA = 'Ainda não é possível agendar a entrega de chaves para o Bloco 3.';
+export const AVISO_BLOCO_VISTORIA = 'A vistoria está disponível apenas para o Bloco 3. O período de vistoria do Bloco 2 já passou.';
+
 /** A unidade (com `bloco`) pode receber esse serviço? */
 export function blocoPermitido(servico, bloco) {
-  const blocos = BLOCOS_POR_SERVICO[servicoValido(servico)];
-  return !blocos || blocos.includes(String(bloco ?? '').trim());
+  const sv = servicoValido(servico);
+  const b = String(bloco ?? '').trim();
+  const blocos = BLOCOS_POR_SERVICO[sv];
+  return (!blocos || blocos.includes(b)) && !BLOCOS_BLOQUEADOS_POR_SERVICO[sv].includes(b);
 }

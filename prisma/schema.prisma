@@ -441,3 +441,15 @@ model AgendaDia {
   limitesPorHorario Json?    // { "09:00": 2, "10:00": 0 } — sobrepõe o limite do dia (0 = horário fechado)
   atualizadoEm      DateTime @updatedAt
 }
+
+// Dias abertos para agendar VISTORIA — tabela própria (AgendaDia.data é único e é da entrega de chaves).
+// Nasce vazia: nenhum dia de vistoria fica aberto até a equipe abrir em /admin/agenda-vistoria. Mesma forma do AgendaDia;
+// horários e limite padrão por hora vêm do AgendaConfig (os limites do dia/horário aqui são só da vistoria).
+model AgendaDiaVistoria {
+  id                String   @id @default(cuid())
+  data              String   @unique // "YYYY-MM-DD"
+  aberto            Boolean  @default(true)
+  limitePorHora     Int?
+  limitesPorHorario Json?
+  atualizadoEm      DateTime @updatedAt
+}

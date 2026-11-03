@@ -44,3 +44,14 @@ describe('mapa serviço → blocos', () => {
     expect(blocoPermitido('entrega-chaves', '9')).toBe(true);
   });
 });
+
+import { AVISO_BLOCO_VISTORIA, MENSAGEM_BLOCO3_ENTREGA } from '../../src/lib/servicos.js';
+describe('Bloco 3', () => {
+  it('a entrega não atende o Bloco 3 e a vistoria só atende ele', () => {
+    expect(blocoPermitido('entrega-chaves', '3')).toBe(false);
+    expect(blocoPermitido('entrega-chaves', '2')).toBe(true);
+    expect(blocoPermitido('vistoria', ' 3 ')).toBe(true);
+    expect(MENSAGEM_BLOCO3_ENTREGA).toBe('Ainda não é possível agendar a entrega de chaves para o Bloco 3.');
+    expect(AVISO_BLOCO_VISTORIA).toContain('apenas para o Bloco 3');
+  });
+});

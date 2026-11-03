@@ -13,6 +13,7 @@
     { href: '/admin/checkin', label: 'Check-in', soMobile: true },
     { href: '/admin/atualizacoes', label: 'Atualizações' },
     { href: '/admin/agenda', label: 'Agenda' },
+    { href: '/admin/agenda-vistoria', label: 'Agenda vistoria' },
     { href: '/admin/entrega-chaves', label: 'Chaves' },
     { href: '/admin/questionarios', label: 'Questionários' },
     { href: '/admin/documentos', label: 'Documentos' },

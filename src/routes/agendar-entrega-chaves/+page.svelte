@@ -2,19 +2,9 @@
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
+  import { MENSAGEM_BLOCO3_ENTREGA, blocoPermitido } from '$lib/servicos.js';
 
   let { data, form } = $props();
-
-  // serviço escolhido: filtra as unidades e as vagas (a entrega de chaves continua sendo o padrão)
-  let servico = $state(form?.valores?.servico ?? data.servicoInicial);
-  const unidadesDoServico = $derived(data.unidadesPorServico[servico] ?? []);
-  const agenda = $derived(data.agendaPorServico[servico] ?? []);
-  const rotuloServico = $derived(data.servicos.find((s) => s.valor === servico)?.rotulo ?? 'Entrega de chaves');
-  let unidadeEscolhida = $state(form?.valores?.unidadeId ?? '');
-  // trocar de serviço limpa a unidade escolhida se ela não for elegível no novo serviço
-  $effect(() => {
-    if (!unidadesDoServico.some((u) => u.id === unidadeEscolhida)) unidadeEscolhida = '';
-  });
 
   let ehProprietario = $state(form?.valores?.ehProprietario ?? '');
   // valores digitados (voltam preenchidos se o servidor devolver um erro)
@@ -25,11 +15,14 @@
   let proprietarioNomeV = $state(form?.valores?.proprietarioNome ?? '');
   let dataEscolhida = $state(form?.valores?.data ?? '');
   let horarioEscolhido = $state(form?.valores?.horario ?? '');
-  const horariosDoDia = $derived(agenda.find((d) => d.data === dataEscolhida)?.horarios ?? []);
+  const horariosDoDia = $derived(data.agenda.find((d) => d.data === dataEscolhida)?.horarios ?? []);
   // trocar de dia limpa o horário se ele não existir (ou estiver indisponível) no novo dia
   $effect(() => {
     if (!horariosDoDia.some((h) => h.horario === horarioEscolhido && h.restantes > 0)) horarioEscolhido = '';
   });
+  // unidade escolhida: o Bloco 3 ainda não tem entrega de chaves (o servidor também recusa)
+  let unidadeEscolhida = $state(form?.valores?.unidadeId ?? '');
+  const bloco3 = $derived(!blocoPermitido('entrega-chaves', data.unidades.find((u) => u.id === unidadeEscolhida)?.bloco));
   let enviando = $state(false);
   let modalEl = $state(null);
   let modalFechado = $state(false);
@@ -74,7 +67,7 @@
 
   function aoSubmeter({ cancel }) {
     tentouEnviar = true;
-    if (faltaProcuracao || faltaIdentidade) {
+    if (bloco3 || faltaProcuracao || faltaIdentidade) {
       cancel();
       return;
     }
@@ -91,12 +84,12 @@
 </script>
 
 <svelte:head>
-  <title>Agendar {rotuloServico.toLowerCase()} — Calper</title>
+  <title>Agendar entrega de chaves — Calper</title>
 </svelte:head>
 
 <div class="max-w-xl mx-auto p-5 md:p-10">
   <img src="/logo.png" alt="Calper" class="h-14 w-auto mb-6" />
-  <h1 class="text-xl md:text-2xl font-bold text-calper-dark mb-1">Agendar {rotuloServico.toLowerCase()}</h1>
+  <h1 class="text-xl md:text-2xl font-bold text-calper-dark mb-1">Agendar entrega de chaves</h1>
   <p class="text-sm text-gray-500 mb-6">Murano Residencial</p>
 
   {#if form?.sucesso}
@@ -118,10 +111,6 @@
         <p class="text-sm text-gray-500 mb-5">Guarde os dados abaixo.</p>
 
         <dl class="flex flex-col gap-3 text-sm mb-5">
-          <div class="flex justify-between gap-4">
-            <dt class="text-gray-500">Serviço</dt>
-            <dd class="font-bold text-calper-dark text-right" data-testid="resumo-servico">{form.resumo.servico}</dd>
-          </div>
           <div class="flex justify-between gap-4">
             <dt class="text-gray-500">Unidade</dt>
             <dd class="font-bold text-calper-dark text-right">{form.resumo.unidade}</dd>
@@ -158,7 +147,7 @@
       <div class="card p-6 md:p-8">
         <div class="text-lg font-bold text-calper-dark mb-2">Agendamento confirmado</div>
         <p class="text-sm text-gray-600">
-          {form.resumo.servico}: {form.resumo.unidade} — {formatarDataBr(form.resumo.data)} às {form.resumo.horario} ({form.resumo.nome}).
+          {form.resumo.unidade} — {formatarDataBr(form.resumo.data)} às {form.resumo.horario} ({form.resumo.nome}).
         </p>
         <p class="text-xs text-gray-400 mt-3">Apresente seu documento com foto à equipe Calper no dia.</p>
       </div>
@@ -175,15 +164,6 @@
       {#if form?.erro}
         <AvisoSutil>{form.erro}</AvisoSutil>
       {/if}
-
-      <div>
-        <label for="servico" class="block text-sm font-semibold text-calper-dark mb-1.5">Serviço</label>
-        <select id="servico" name="servico" class="input" bind:value={servico} required>
-          {#each data.servicos as sv (sv.valor)}
-            <option value={sv.valor}>{sv.rotulo}</option>
-          {/each}
-        </select>
-      </div>
 
       <div>
         <label for="nome" class="block text-sm font-semibold text-calper-dark mb-1.5">Nome do investidor</label>
@@ -217,12 +197,15 @@
         <label for="unidadeId" class="block text-sm font-semibold text-calper-dark mb-1.5">Unidade</label>
         <select id="unidadeId" name="unidadeId" class="input" bind:value={unidadeEscolhida} required>
           <option value="">selecione</option>
-          {#each unidadesDoServico as u (u.id)}
-            <option value={u.id}>
+          {#each data.unidades as u (u.id)}
+            <option value={u.id} selected={form?.valores?.unidadeId === u.id}>
               Bloco {u.bloco} - nº {u.numero}
             </option>
           {/each}
         </select>
+        {#if bloco3}
+          <div class="mt-2"><AvisoSutil>{MENSAGEM_BLOCO3_ENTREGA}</AvisoSutil></div>
+        {/if}
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -230,7 +213,7 @@
           <label for="data" class="block text-sm font-semibold text-calper-dark mb-1.5">Data</label>
           <select id="data" name="data" class="input" bind:value={dataEscolhida} required>
             <option value="">selecione</option>
-            {#each agenda as d (d.data)}
+            {#each data.agenda as d (d.data)}
               <option value={d.data}>{formatarDataBr(d.data)}</option>
             {/each}
           </select>
@@ -247,7 +230,7 @@
           </select>
         </div>
       </div>
-      {#if agenda.length === 0}
+      {#if data.agenda.length === 0}
         <AvisoSutil>No momento não há datas abertas para agendamento. Tente novamente mais tarde.</AvisoSutil>
       {/if}
 

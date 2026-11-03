@@ -29,7 +29,7 @@
 </svelte:head>
 
 <div class="p-5 md:p-8 max-w-4xl">
-  <h1 class="text-2xl font-extrabold text-calper-dark">Agenda de entrega de chaves e vistoria</h1>
+  <h1 class="text-2xl font-extrabold text-calper-dark">Agenda de entrega de chaves</h1>
   <p class="text-[11px] text-gray-400 mb-3" data-testid="auto-atualizacao">
     Atualiza sozinha a cada 20 s · última atualização {auto.em.toLocaleTimeString('pt-BR')}
   </p>
@@ -102,14 +102,13 @@
             <input id="lim-{d.id}" name="limitePorHora" type="number" min="0" max="99" class="input !py-2 text-sm" value={d.limitePorHora ?? ''} placeholder="padrão ({data.config.limitePorHora})" />
           </div>
           <div>
-            <div class="text-xs font-semibold text-gray-500 mb-1">Por horário (vazio = usa o limite do dia) — ocupados / limite (as vagas são contadas por serviço)</div>
+            <div class="text-xs font-semibold text-gray-500 mb-1">Por horário (vazio = usa o limite do dia) — ocupados / limite</div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {#each d.horarios as h (h.horario)}
                 <label class="rounded-xl border border-gray-200 px-3 py-2 text-sm">
                   <span class="flex items-center justify-between text-xs text-gray-500 mb-1">
                     <span class="font-bold text-calper-dark">{h.horario}</span>
-                    <span class={h.ocupados >= h.limite ? 'font-bold text-calper-red' : ''} title="Entrega de chaves">E {h.ocupados}/{h.limite}</span>
-                    <span class={h.ocupadosVistoria >= h.limite ? 'font-bold text-calper-red' : ''} title="Vistoria">V {h.ocupadosVistoria}/{h.limite}</span>
+                    <span class={h.ocupados >= h.limite ? 'font-bold text-calper-red' : ''}>{h.ocupados}/{h.limite}</span>
                   </span>
                   <input name="limite_{h.horario}" type="number" min="0" max="99" class="input !py-1.5 text-sm" value={h.sobreposto ? h.limite : ''} placeholder={String(h.limite)} />
                 </label>

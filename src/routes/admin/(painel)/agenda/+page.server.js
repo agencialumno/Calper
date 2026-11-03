@@ -3,14 +3,13 @@ import { db } from '$lib/server/db.js';
 import { dataValida, horarioValido, limiteDoSlot, obterConfig, ocupacaoPorSlot } from '$lib/server/agenda.js';
 import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 
-// Configuração da agenda de entrega de chaves e de vistoria (mesmos dias, horários e limites; as vagas são contadas por serviço): dias abertos, horários e quantos agendamentos por hora.
+// Configuração da agenda de entrega de chaves: dias abertos, horários e quantos agendamentos por hora.
 
 const dataBr = (d) => d.split('-').reverse().join('/');
 
 export async function load() {
   const [config, dias] = await Promise.all([obterConfig(), db.agendaDia.findMany({ orderBy: { data: 'asc' } })]);
-  const datas = dias.map((d) => d.data);
-  const [ocupacao, ocupacaoVistoria] = await Promise.all([ocupacaoPorSlot(datas), ocupacaoPorSlot(datas, db, { servico: 'vistoria' })]);
+  const ocupacao = await ocupacaoPorSlot(dias.map((d) => d.data));
   return {
     config,
     dias: dias.map((d) => ({
@@ -21,7 +20,6 @@ export async function load() {
       horarios: config.horarios.map((h) => ({
         horario: h,
         ocupados: ocupacao.get(`${d.data} ${h}`) ?? 0,
-        ocupadosVistoria: ocupacaoVistoria.get(`${d.data} ${h}`) ?? 0,
         limite: limiteDoSlot(config, d, h),
         sobreposto: Number.isInteger(d.limitesPorHorario?.[h])
       }))
@@ -125,8 +123,8 @@ export const actions = {
     const id = String(form.get('id') ?? '');
     const dia = await db.agendaDia.findUnique({ where: { id } });
     if (!dia) return fail(404, { erro: 'Dia não encontrado.' });
-    const [ocupacao, ocupacaoVistoria] = await Promise.all([ocupacaoPorSlot([dia.data]), ocupacaoPorSlot([dia.data], db, { servico: 'vistoria' })]);
-    if ([...ocupacao.values(), ...ocupacaoVistoria.values()].some((n) => n > 0)) {
+    const ocupacao = await ocupacaoPorSlot([dia.data]);
+    if ([...ocupacao.values()].some((n) => n > 0)) {
       return fail(400, { erro: 'Esse dia já tem agendamentos: feche o dia em vez de removê-lo.' });
     }
     await db.agendaDia.delete({ where: { id } });

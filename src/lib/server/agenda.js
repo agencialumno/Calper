@@ -1,5 +1,5 @@
 import { db } from './db.js';
-import { SERVICO_PADRAO, slugDoServico } from '../servicos.js';
+import { SERVICO_PADRAO, servicoValido, slugDoServico } from '../servicos.js';
 
 // Agenda de entrega de chaves: quais dias estão abertos e quantos agendamentos cabem por hora.
 // Tudo editável pela equipe em /admin/agenda (AgendaConfig + AgendaDia).
@@ -10,6 +10,9 @@ import { SERVICO_PADRAO, slugDoServico } from '../servicos.js';
 
 export const HORARIOS_PADRAO = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
 const LIMITE_PADRAO = 4;
+
+/** Tabela dos dias abertos do serviço: a entrega usa AgendaDia (como sempre); a vistoria tem a sua, começando vazia. */
+export const tabelaDeDias = (cliente, servico) => (servicoValido(servico) === 'vistoria' ? cliente.agendaDiaVistoria : cliente.agendaDia);
 
 export const dataHoraDoSlot = (data, horario) => new Date(`${data}T${horario}:00.000Z`);
 
@@ -82,7 +85,7 @@ export async function agendaPublica(agora = new Date(), { servico = SERVICO_PADR
   const hoje = agora.toISOString().slice(0, 10);
   const [config, dias] = await Promise.all([
     obterConfig(),
-    db.agendaDia.findMany({ where: { aberto: true, data: { gte: hoje } }, orderBy: { data: 'asc' } })
+    tabelaDeDias(db, servico).findMany({ where: { aberto: true, data: { gte: hoje } }, orderBy: { data: 'asc' } })
   ]);
   const ocupacao = await ocupacaoPorSlot(dias.map((d) => d.data), db, { servico });
   return dias
@@ -105,7 +108,7 @@ export async function conferirVaga(cliente, data, horario, { ignorarAgendamentoI
       limitePorHora: c?.limitePorHora ?? LIMITE_PADRAO,
       horarios: Array.isArray(c?.horarios) ? c.horarios : HORARIOS_PADRAO
     })),
-    cliente.agendaDia.findUnique({ where: { data } })
+    tabelaDeDias(cliente, servico).findUnique({ where: { data } })
   ]);
   if (!dia?.aberto) return { ok: false, motivo: 'Esta data não está disponível para agendamento.' };
   if (!config.horarios.includes(horario)) return { ok: false, motivo: 'Este horário não está disponível.' };
