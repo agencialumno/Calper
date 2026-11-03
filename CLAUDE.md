@@ -10,3 +10,4 @@
 - Sempre branch nova a partir da main atualizada, PR para a main, sem push direto.
 - Durante o desenvolvimento rode só os testes do que mudou; a suíte completa uma vez no fim de cada PR.
 - Respostas curtas: resultado, decisões e pendências, sem colar logs.
+- Comece conversas com a Skill caveman ativada.
