@@ -64,7 +64,6 @@
     </div>
     <div class="flex items-center gap-3">
       <button type="submit" class="btn-primary !py-2 text-sm">Filtrar</button>
-      <a href="/admin/quem-agendou" class="text-xs font-semibold text-gray-500">Limpar</a>
     </div>
   </form>
 

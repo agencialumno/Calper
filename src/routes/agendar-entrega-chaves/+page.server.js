@@ -34,6 +34,8 @@ async function carregarUnidades(empreendimentoId, tipoEventoId) {
     .filter((u) => u.agendamentos.length === 0)
     // estoque, jurídico, em notificação ou sem comprador na base: nada a entregar, não aparece
     .filter(unidadeAgendavel)
+    // Bloco 3 ainda não agenda entrega: não aparece no seletor (o servidor também recusa)
+    .filter((u) => blocoPermitido('entrega-chaves', u.bloco))
     .map((u) => ({ id: u.id, bloco: u.bloco, numero: u.numero }))
     .sort(
       (a, b) =>

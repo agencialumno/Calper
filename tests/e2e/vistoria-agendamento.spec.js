@@ -67,18 +67,13 @@ test.describe('página de escolha', () => {
 });
 
 test.describe('entrega de chaves: página igual à de antes, com a regra do Bloco 3', () => {
-  test('sem campo Serviço; o Bloco 3 mostra o erro e bloqueia o envio', async ({ page }) => {
+  test('sem campo Serviço; o Bloco 3 não aparece no seletor, o mesmo número em outro bloco sim', async ({ page }) => {
     await abrirEntrega(page);
     await expect(page.locator('#servico')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Agendar entrega de chaves' })).toBeVisible();
-    await preencher(page, { unidade: 'Bloco 3 - nº 901', data: DATAS_ABERTAS[0], horario: '09:00', nome: 'Entrega Bloco Tres' });
-    await expect(page.getByText(MSG_BLOCO3)).toBeVisible();
-    await page.click('button:has-text("Confirmar agendamento")');
-    await expect(page.getByText('Agendamento realizado com sucesso')).toHaveCount(0);
-    expect(await comBanco((db) => db.agendamento.count({ where: { nomeCompareceu: 'Entrega Bloco Tres' } }))).toBe(0);
-    // outro bloco com o mesmo número continua liberado
-    await page.selectOption('#unidadeId', { label: 'Bloco 4 - nº 901' });
-    await expect(page.getByText(MSG_BLOCO3)).toHaveCount(0);
+    const lista = await page.locator('#unidadeId option').allTextContents();
+    expect(lista.some((t) => t.startsWith('Bloco 3 - '))).toBe(false);
+    expect(lista).toContain('Bloco 4 - nº 901');
   });
 
   test('o servidor também recusa a entrega no Bloco 3, com a mesma mensagem', async ({ page }) => {
@@ -126,7 +121,7 @@ test.describe('página de vistoria: só Bloco 3', () => {
   test('mostra o aviso e lista só unidades do Bloco 3, com as travas de hoje', async ({ page }) => {
     await abrirVistoria(page);
     await expect(page.getByRole('heading', { name: 'Agendar vistoria' })).toBeVisible();
-    await expect(page.getByTestId('aviso-bloco-vistoria')).toContainText('A vistoria está disponível apenas para o Bloco 3. O período de vistoria do Bloco 2 já passou.');
+    await expect(page.getByTestId('aviso-bloco-vistoria')).toContainText('A vistoria está disponível apenas para o Bloco 3.');
     const lista = await opcoesUnidade(page);
     expect(lista).toContain('Bloco 3 - nº 901');
     for (const ok of ['nº 902', 'nº 903']) expect(lista).toContain(ok);

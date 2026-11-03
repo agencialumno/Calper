@@ -37,7 +37,7 @@ export const BLOCOS_BLOQUEADOS_POR_SERVICO = {
 };
 
 export const MENSAGEM_BLOCO3_ENTREGA = 'Ainda não é possível agendar a entrega de chaves para o Bloco 3.';
-export const AVISO_BLOCO_VISTORIA = 'A vistoria está disponível apenas para o Bloco 3. O período de vistoria do Bloco 2 já passou.';
+export const AVISO_BLOCO_VISTORIA = 'A vistoria está disponível apenas para o Bloco 3.';
 
 /** A unidade (com `bloco`) pode receber esse serviço? */
 export function blocoPermitido(servico, bloco) {

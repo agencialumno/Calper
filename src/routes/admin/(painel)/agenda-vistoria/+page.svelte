@@ -29,13 +29,13 @@
 </svelte:head>
 
 <div class="p-5 md:p-8 max-w-4xl">
-  <h1 class="text-2xl font-extrabold text-calper-dark">Agenda de vistoria</h1>
-  <p class="text-[11px] text-gray-400 mb-3" data-testid="auto-atualizacao">
-    Atualiza sozinha a cada 20 s · última atualização {auto.em.toLocaleTimeString('pt-BR')}
-  </p>
-  <p class="text-sm text-gray-500 mt-1 mb-6">
-    Nenhum dia de vistoria fica aberto por padrão: a página pública de vistoria só mostra os dias e horários que você abrir aqui. A agenda de entrega de chaves não é afetada.
-  </p>
+  <div class="flex items-baseline gap-3 flex-wrap">
+    <h1 class="text-2xl font-extrabold text-calper-dark">Agenda de vistoria</h1>
+    <span class="text-[11px] text-gray-400" data-testid="auto-atualizacao">
+      Atualiza sozinha a cada 20 s · última atualização {auto.em.toLocaleTimeString('pt-BR')}
+    </span>
+  </div>
+  <p class="text-sm text-gray-500 mt-1 mb-4">Só os dias abertos aqui aparecem para o cliente.</p>
 
   {#if !data.funcionario.podeEditar}
     <div class="mb-4 rounded-xl bg-gray-100 text-gray-600 text-sm px-4 py-3">Seu perfil é somente leitura: você vê a agenda, mas não altera dias, horários e limites.</div>
@@ -49,9 +49,9 @@
     <div class="mb-4"><AvisoSutil>{form.erro}</AvisoSutil></div>
   {/if}
 
-  <p class="text-xs text-gray-500 mb-6" data-testid="padrao-vistoria">
-    Horários ({data.config.horarios.join(', ')}) e limite padrão ({data.config.limitePorHora} por hora) vêm do padrão geral da <a href="/admin/agenda" class="font-bold text-calper-red">Agenda de entrega de chaves</a>. Aqui você abre os dias de vistoria e ajusta os limites só da vistoria.
-  </p>
+  <div class="rounded-lg bg-gray-50 text-gray-500 text-xs px-4 py-3 mb-6" data-testid="padrao-vistoria">
+    Horários ({data.config.horarios.join(', ')}) e limite padrão ({data.config.limitePorHora} por hora) vêm do padrão geral da <a href="/admin/agenda" class="font-bold text-calper-red">Agenda de entrega de chaves</a>. Aqui você abre os dias de vistoria e ajusta os limites só da vistoria. A agenda de entrega não é afetada.
+  </div>
 
   <!-- dias -->
   <div class="flex items-end justify-between gap-3 flex-wrap mb-3">

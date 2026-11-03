@@ -24,6 +24,9 @@
   // cada perfil só vê as abas a que tem acesso (as mesmas regras do servidor, em src/lib/perfis.js)
   let menu = $derived(nav.filter((i) => permissaoNoCaminho(data.funcionario.perfil, 'GET', i.href) === 'ok'));
 
+  // "Agenda" não fica ativa em /admin/agenda-vistoria: o caminho precisa ser igual ou subrota (com "/")
+  const ativoNoCaminho = (caminho, href) => caminho === href || caminho.startsWith(href + '/');
+
   const rotuloPerfil = ROTULO_PERFIL;
 </script>
 
@@ -45,9 +48,9 @@
         <a
           href={item.href}
           class="flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-semibold whitespace-nowrap"
-          class:bg-white={$page.url.pathname.startsWith(item.href)}
-          class:text-calper-dark={$page.url.pathname.startsWith(item.href)}
-          class:text-gray-400={!$page.url.pathname.startsWith(item.href)}
+          class:bg-white={ativoNoCaminho($page.url.pathname, item.href)}
+          class:text-calper-dark={ativoNoCaminho($page.url.pathname, item.href)}
+          class:text-gray-400={!ativoNoCaminho($page.url.pathname, item.href)}
         >
           {item.label}
         </a>
@@ -91,7 +94,7 @@
   <!-- navegação mobile: fora do header escuro, bem visível logo acima do conteúdo -->
   <nav class="md:hidden grid grid-cols-4 gap-2 px-4 py-3 bg-white border-b border-gray-100">
     {#each menu as item}
-      {@const ativo = $page.url.pathname.startsWith(item.href)}
+      {@const ativo = ativoNoCaminho($page.url.pathname, item.href)}
       <a
         href={item.href}
         class="flex items-center justify-center px-1.5 py-2.5 rounded-xl text-[12px] font-bold text-center transition-colors active:scale-95"
