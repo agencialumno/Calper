@@ -57,6 +57,17 @@ export async function load({ url }) {
   const agendadosNaoRealizados = atendimentosPeriodo.filter((a) => a.status === 'confirmado' && a.dataHora < agoraRelogio).length;
   const agendadosAFazer = await db.agendamento.count({ where: { status: 'confirmado', dataHora: { gte: agoraRelogio }, tipoEvento: { slug: 'entrega-chaves' }, ...filtroUnidade } });
 
+  // Vistorias do período (pela data do atendimento): aceitas (termo assinado), não aceitas e em aberto. Não mexe nas contagens da entrega.
+  const vistoriasPeriodo = await db.agendamento.findMany({
+    where: { dataHora: { gte: inicioAt, lte: fimAt }, status: { not: 'cancelado' }, tipoEvento: { slug: 'vistoria' }, ...filtroUnidade },
+    select: { status: true, vistoriaResultado: true }
+  });
+  const vistorias = {
+    aceitas: vistoriasPeriodo.filter((v) => v.vistoriaResultado === 'aceita' && v.status === 'realizado').length,
+    naoAceitas: vistoriasPeriodo.filter((v) => v.vistoriaResultado === 'nao_aceita').length,
+    emAberto: vistoriasPeriodo.filter((v) => v.status === 'confirmado').length
+  };
+
   const diasAt = Math.max(1, Math.ceil((fimAt.getTime() - inicioAt.getTime()) / 86400000));
   const numBucketsAt = Math.min(12, diasAt);
   const tamBucketAt = (fimAt.getTime() - inicioAt.getTime()) / numBucketsAt;
@@ -144,6 +155,7 @@ export async function load({ url }) {
         pctNaoRealizados: Math.round((b.naoRealizados / maiorAt) * 100)
       }))
     },
+    vistorias,
     empreendimentoId,
     empreendimentos,
     kpis: {

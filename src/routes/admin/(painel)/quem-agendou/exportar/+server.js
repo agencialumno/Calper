@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { formatarCpf } from '$lib/cpf.js';
 import { dataHoraAgendada, dataHoraBr, respostaCsv, sn } from '$lib/server/csv.js';
+import { rotuloDaVistoria } from '$lib/vistoria.js';
 import { filtrosQuemAgendou } from '$lib/server/quemAgendou.js';
 import { rotuloDoServico, servicoDoSlug } from '$lib/servicos.js';
 
@@ -19,6 +20,7 @@ export async function GET({ url, locals }) {
       status: true,
       origem: true,
       vistoriaNumero: true,
+      vistoriaResultado: true,
       tipoEvento: { select: { slug: true } },
       canceladoEm: true,
       motivoCancelamento: true,
@@ -36,12 +38,12 @@ export async function GET({ url, locals }) {
   // colunas de serviço só quando o filtro de serviço foi usado (padrão: CSV da entrega, igual ao de sempre)
   const comServico = filtros.servico !== '';
   const linhas = [
-    ['Agendado em', ...(comServico ? ['Serviço', 'Nº da vistoria'] : []), 'Nome', 'CPF', 'Telefone', 'E-mail', 'Bloco', 'Unidade', 'Data agendada', 'Hora agendada', 'É o proprietário', 'Nome do proprietário', 'Procuração anexada', 'Status', 'Origem', 'Desmarcado em', 'Motivo do cancelamento'],
+    ['Agendado em', ...(comServico ? ['Serviço', 'Nº da vistoria', 'Resultado da vistoria'] : []), 'Nome', 'CPF', 'Telefone', 'E-mail', 'Bloco', 'Unidade', 'Data agendada', 'Hora agendada', 'É o proprietário', 'Nome do proprietário', 'Procuração anexada', 'Status', 'Origem', 'Desmarcado em', 'Motivo do cancelamento'],
     ...agendamentos.map((a) => {
       const { data, hora } = dataHoraAgendada(a.dataHora);
       return [
         dataHoraBr(a.createdAt),
-        ...(comServico ? [rotuloDoServico(servicoDoSlug(a.tipoEvento.slug)), servicoDoSlug(a.tipoEvento.slug) === 'vistoria' ? a.vistoriaNumero : ''] : []),
+        ...(comServico ? [rotuloDoServico(servicoDoSlug(a.tipoEvento.slug)), servicoDoSlug(a.tipoEvento.slug) === 'vistoria' ? a.vistoriaNumero : '', servicoDoSlug(a.tipoEvento.slug) === 'vistoria' ? (a.vistoriaResultado ? rotuloDaVistoria(a) : '') : ''] : []),
         a.nomeCompareceu,
         a.cpfCompareceu ? formatarCpf(a.cpfCompareceu) : '',
         a.telefoneCompareceu,

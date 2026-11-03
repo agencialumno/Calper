@@ -2,6 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { agendaPublica } from '$lib/server/agenda.js';
 import { LISTA_SERVICOS, servicoDoSlug, rotuloDoServico } from '$lib/servicos.js';
+import { rotuloDaVistoria } from '$lib/vistoria.js';
 import { filtrosQuemAgendou } from '$lib/server/quemAgendou.js';
 import { alterarUnidade, bloqueiosDoAgendamento, desmarcar, remarcar, unidadesParaTroca } from '$lib/server/gestaoAgendamento.js';
 import { podeGerirAgendamentos } from '$lib/gestaoAgendamento.js';
@@ -23,6 +24,7 @@ export async function load({ url, locals }) {
         status: true,
         origem: true,
         vistoriaNumero: true,
+        vistoriaResultado: true,
         tipoEvento: { select: { slug: true } },
         nomeCompareceu: true,
         cpfCompareceu: true,
@@ -83,6 +85,9 @@ export async function load({ url, locals }) {
       servico: servicoDoSlug(a.tipoEvento.slug),
       servicoRotulo: rotuloDoServico(servicoDoSlug(a.tipoEvento.slug)),
       vistoriaNumero: servicoDoSlug(a.tipoEvento.slug) === 'vistoria' ? a.vistoriaNumero : null,
+      // resultado do atendimento da vistoria (aceita / não aceita); nulo enquanto não houve resultado
+      vistoriaResultado: servicoDoSlug(a.tipoEvento.slug) === 'vistoria' ? a.vistoriaResultado : null,
+      vistoriaResultadoRotulo: servicoDoSlug(a.tipoEvento.slug) === 'vistoria' && a.vistoriaResultado ? rotuloDaVistoria(a) : null,
       nome: a.nomeCompareceu,
       cpf: a.cpfCompareceu,
       telefone: a.telefoneCompareceu,

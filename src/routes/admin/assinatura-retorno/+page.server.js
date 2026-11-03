@@ -4,6 +4,6 @@
 export function load({ url }) {
   const destino = url.searchParams.get('destino') ?? '';
   // só caminhos internos do fluxo de entrega (evita redirecionar para outro site)
-  const valido = /^\/admin\/entrega-chaves\/[\w-]+\/assinatura-concluida\?[\w=&%-]*$/.test(destino);
+  const valido = /^\/admin\/(entrega-chaves|vistoria)\/[\w-]+\/assinatura-concluida\?[\w=&%-]*$/.test(destino);
   return { destino: valido ? destino : '/admin/entrega-chaves' };
 }

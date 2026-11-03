@@ -20,6 +20,8 @@ import {
 } from './docusign.js';
 import { gerarPdfBase64 } from './documentos.js';
 import { registrarLog, rotuloFuncionario } from './log.js';
+import { sincronizarTermoVistoria } from './vistoria.js';
+import { TIPO_DOCUMENTO_VISTORIA } from '../vistoria.js';
 
 export const NOME_DOCUMENTO = {
   termo: 'Termo de Entrega de Chaves',
@@ -209,6 +211,8 @@ export async function enviarDocumentoParaAssinatura(event, { agendamentoId, tipo
  * Devolve { status, clientesPendentes }: o status resultante do `documento` e quem ainda não assinou.
  */
 export async function sincronizarDocumento(documento, event = null) {
+  // o termo da vistoria tem envelope e regras próprios (não é termo/checklist da entrega)
+  if (documento.tipo === TIPO_DOCUMENTO_VISTORIA) return sincronizarTermoVistoria(documento, event);
   if (documento.status === 'assinado') return { status: 'assinado', clientesPendentes: [] };
   // agendamento apagado: o documento fica guardado, mas não há mais entrega para atualizar
   if (!documento.agendamentoId) return { status: documento.status, clientesPendentes: [] };

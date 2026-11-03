@@ -87,6 +87,23 @@
         <div class="text-xs text-gray-400 mt-0.5">ainda vão acontecer</div>
       </div>
     </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-4" data-testid="kpis-vistoria">
+      <div class="card p-4 md:p-5 border-l-4 border-l-green-500">
+        <div class="text-xs text-gray-400 font-semibold">Vistorias aceitas</div>
+        <div class="text-3xl font-extrabold text-green-700 mt-1.5" data-testid="kpi-vistorias-aceitas">{data.vistorias.aceitas}</div>
+        <div class="text-xs text-gray-400 mt-0.5">termo assinado, no período</div>
+      </div>
+      <div class="card p-4 md:p-5 border-l-4 border-l-red-400">
+        <div class="text-xs text-gray-400 font-semibold">Vistorias não aceitas</div>
+        <div class="text-3xl font-extrabold text-red-600 mt-1.5" data-testid="kpi-vistorias-nao-aceitas">{data.vistorias.naoAceitas}</div>
+        <div class="text-xs text-gray-400 mt-0.5">com reparos registrados</div>
+      </div>
+      <div class="card p-4 md:p-5 border-l-4 border-l-amber-400">
+        <div class="text-xs text-gray-400 font-semibold">Vistorias em aberto</div>
+        <div class="text-3xl font-extrabold text-amber-700 mt-1.5" data-testid="kpi-vistorias-em-aberto">{data.vistorias.emAberto}</div>
+        <div class="text-xs text-gray-400 mt-0.5">agendadas ou aguardando o termo</div>
+      </div>
+    </div>
     <p class="text-xs text-gray-500 -mt-2 mb-4" data-testid="kpi-cancelados">
       Desmarcados no período: <strong>{data.atendimentos.cancelados}</strong> (não entram nas contagens acima)
     </p>

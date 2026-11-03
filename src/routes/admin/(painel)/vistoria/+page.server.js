@@ -3,8 +3,9 @@ import { buscarMurano } from '$lib/server/entregaChaves.js';
 import { statusDaUnidade } from '$lib/server/unidadeStatus.js';
 import { podeEditar } from '$lib/perfis.js';
 import { SLUG_VISTORIA } from '$lib/servicos.js';
+import { rotuloDaVistoria } from '$lib/vistoria.js';
 
-// Lista dos agendamentos de vistoria (mesma estrutura da aba Chaves). O atendimento da vistoria chega no PR 2.
+// Lista dos agendamentos de vistoria (mesma estrutura da aba Chaves); "Iniciar atendimento" abre /admin/vistoria/[id].
 export async function load({ locals }) {
   const murano = await buscarMurano();
   if (!murano) return { agendamentos: [], semMurano: true };
@@ -25,6 +26,9 @@ export async function load({ locals }) {
       canceladoEm: a.canceladoEm,
       motivoCancelamento: a.motivoCancelamento,
       vistoriaNumero: a.vistoriaNumero,
+      origem: a.origem,
+      resultado: a.vistoriaResultado,
+      resultadoRotulo: rotuloDaVistoria(a),
       nome: a.nomeCompareceu,
       telefone: a.telefoneCompareceu,
       email: a.emailCompareceu,

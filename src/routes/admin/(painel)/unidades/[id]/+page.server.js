@@ -4,6 +4,7 @@ import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 import { quartosDaUnidade } from '$lib/server/documentos.js';
 import { statusDaUnidade } from '$lib/server/unidadeStatus.js';
 import { podeEditar } from '$lib/perfis.js';
+import { presentesDoAgendamento, rotuloDaVistoria } from '$lib/vistoria.js';
 import { buscarMurano } from '$lib/server/entregaChaves.js';
 import { agendamentosAtivosPorUnidade, atendimentoDaUnidade } from '$lib/server/atendimentoDireto.js';
 
@@ -82,6 +83,13 @@ export async function load({ params, locals }) {
         id: a.id,
         tipoNome: a.tipoEvento.nome,
         ehEntregaChaves: a.tipoEvento.slug === 'entrega-chaves',
+        ehVistoria: a.tipoEvento.slug === 'vistoria',
+        vistoriaNumero: a.vistoriaNumero,
+        vistoriaRotulo: rotuloDaVistoria(a),
+        vistoriaResultado: a.vistoriaResultado,
+        vistoriaReparos: a.vistoriaReparos,
+        vistoriaTelefone: a.vistoriaTelefoneRetorno,
+        vistoriaPresentes: presentesDoAgendamento(a).map((p) => ({ nome: p.nome, vinculo: p.vinculo })),
         agendadoPor: a.nomeCompareceu,
         retirante: a.retiranteNome
           ? { nome: a.retiranteNome, vinculo: a.presencas.find((p) => p.vinculo !== 'acompanhante')?.vinculo ?? null }

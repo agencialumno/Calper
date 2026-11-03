@@ -32,7 +32,7 @@ const OCULTAS_AO_COLABORADOR = [
   '/admin/unidades/importar'
 ];
 // o que o colaborador pode ENVIAR (POST etc.): conta própria e o atendimento presencial
-const ESCRITA_DO_COLABORADOR = ['/admin/logout', '/admin/conta', '/admin/checkin', '/admin/entrega-chaves', '/admin/assinatura-retorno'];
+const ESCRITA_DO_COLABORADOR = ['/admin/logout', '/admin/conta', '/admin/checkin', '/admin/entrega-chaves', '/admin/vistoria', '/admin/assinatura-retorno'];
 const ESCRITA_DOCUMENTOS_DA_UNIDADE = /^\/admin\/unidades\/[^/]+\/(termo-entrega|checklist|documento-pdf)(\/|$)/;
 
 /**
