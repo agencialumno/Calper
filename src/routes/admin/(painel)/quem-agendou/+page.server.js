@@ -1,12 +1,12 @@
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db.js';
 import { agendaPublica } from '$lib/server/agenda.js';
-import { SLUG_ENTREGA_CHAVES } from '$lib/server/entregaChaves.js';
+import { LISTA_SERVICOS, servicoDoSlug, rotuloDoServico } from '$lib/servicos.js';
 import { filtrosQuemAgendou } from '$lib/server/quemAgendou.js';
 import { alterarUnidade, bloqueiosDoAgendamento, desmarcar, remarcar, unidadesParaTroca } from '$lib/server/gestaoAgendamento.js';
 import { podeGerirAgendamentos } from '$lib/gestaoAgendamento.js';
 
-// Todas as pessoas que agendaram a entrega de chaves pelo formulário público (/agendar-entrega-chaves),
+// Todas as pessoas que agendaram entrega de chaves ou vistoria pelo formulário público (/agendar-entrega-chaves),
 // inclusive agendamentos cancelados, pra a equipe ter a lista completa de quem agendou.
 export async function load({ url, locals }) {
   const { filtros, where } = filtrosQuemAgendou(url.searchParams);
@@ -22,6 +22,8 @@ export async function load({ url, locals }) {
         dataHora: true,
         status: true,
         origem: true,
+        vistoriaNumero: true,
+        tipoEvento: { select: { slug: true } },
         nomeCompareceu: true,
         cpfCompareceu: true,
         telefoneCompareceu: true,
@@ -39,7 +41,7 @@ export async function load({ url, locals }) {
         unidade: { select: { id: true, bloco: true, numero: true } }
       }
     }),
-    db.agendamento.count({ where: { tipoEvento: { slug: SLUG_ENTREGA_CHAVES } } })
+    db.agendamento.count({ where: { tipoEvento: { slug: filtros.servico === 'todos' ? { in: LISTA_SERVICOS.map((x) => x.slug) } : filtros.servico || 'entrega-chaves' } } })
   ]);
 
   // quais têm arquivo enviado no agendamento (só os ids: sem trazer o base64 pesado)
@@ -53,13 +55,23 @@ export async function load({ url, locals }) {
   const idsProcuracao = new Set(comProcuracaoArquivo.map((a) => a.id));
   const unidadeAntiga = new Map(unidadesAntigas.map((u) => [u.id, `Bloco ${u.bloco} - nº ${u.numero}`]));
   // opções das ações (só para admin/supervisor): unidades livres e horários com vaga
-  const [unidadesLivres, agenda] = podeGerir ? await Promise.all([unidadesParaTroca(), agendaPublica()]) : [[], []];
+  // (vagas e unidades livres de cada serviço: a troca e a remarcação respeitam o serviço do agendamento)
+  const servicos = LISTA_SERVICOS.map((x) => x.valor);
+  const [livres, agendas] = podeGerir
+    ? await Promise.all([
+        Promise.all(servicos.map((sv) => unidadesParaTroca(sv))),
+        Promise.all(servicos.map((sv) => agendaPublica(new Date(), { servico: sv })))
+      ])
+    : [[], []];
+  const unidadesLivres = Object.fromEntries(servicos.map((sv, i) => [sv, livres[i] ?? []]));
+  const agenda = Object.fromEntries(servicos.map((sv, i) => [sv, agendas[i] ?? []]));
 
   return {
     podeGerir,
     unidadesLivres,
     agenda,
     filtros,
+    servicos: LISTA_SERVICOS.map((x) => ({ valor: x.valor, rotulo: x.rotulo })),
     exportarHref: `/admin/quem-agendou/exportar?${url.searchParams}`,
     total,
     agendamentos: agendamentos.map((a) => ({
@@ -68,6 +80,9 @@ export async function load({ url, locals }) {
       dataHora: a.dataHora,
       status: a.status,
       direto: a.origem === 'atendimento_direto',
+      servico: servicoDoSlug(a.tipoEvento.slug),
+      servicoRotulo: rotuloDoServico(servicoDoSlug(a.tipoEvento.slug)),
+      vistoriaNumero: servicoDoSlug(a.tipoEvento.slug) === 'vistoria' ? a.vistoriaNumero : null,
       nome: a.nomeCompareceu,
       cpf: a.cpfCompareceu,
       telefone: a.telefoneCompareceu,

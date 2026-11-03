@@ -9,6 +9,7 @@ import { notificarFuncionarios } from '$lib/server/notificacao.js';
 import { registrarLog } from '$lib/server/log.js';
 import { formatarCpf } from '$lib/cpf.js';
 import { unidadeAgendavel } from '$lib/unidadeAgendavel.js';
+import { MENSAGEM_BLOCO3_ENTREGA, blocoPermitido } from '$lib/servicos.js';
 
 // Rota pública (sem login): agendamento de entrega de chaves do Murano.
 
@@ -33,6 +34,8 @@ async function carregarUnidades(empreendimentoId, tipoEventoId) {
     .filter((u) => u.agendamentos.length === 0)
     // estoque, jurídico, em notificação ou sem comprador na base: nada a entregar, não aparece
     .filter(unidadeAgendavel)
+    // Bloco 3 ainda não agenda entrega: não aparece no seletor (o servidor também recusa)
+    .filter((u) => blocoPermitido('entrega-chaves', u.bloco))
     .map((u) => ({ id: u.id, bloco: u.bloco, numero: u.numero }))
     .sort(
       (a, b) =>
@@ -114,6 +117,7 @@ export const actions = {
       where: { id: valores.unidadeId, empreendimentoId: murano.id }
     });
     if (!unidade || !unidadeAgendavel(unidade)) return erro('Escolha uma unidade da lista.');
+    if (!blocoPermitido('entrega-chaves', unidade.bloco)) return erro(MENSAGEM_BLOCO3_ENTREGA);
 
     // revalida no envio — outra pessoa pode ter agendado a unidade enquanto o formulário estava aberto
     const jaAgendada = await db.agendamento.findFirst({

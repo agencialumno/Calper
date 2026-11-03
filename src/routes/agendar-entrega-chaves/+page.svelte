@@ -2,6 +2,7 @@
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
+  import { MENSAGEM_BLOCO3_ENTREGA, blocoPermitido } from '$lib/servicos.js';
 
   let { data, form } = $props();
 
@@ -19,6 +20,9 @@
   $effect(() => {
     if (!horariosDoDia.some((h) => h.horario === horarioEscolhido && h.restantes > 0)) horarioEscolhido = '';
   });
+  // unidade escolhida: o Bloco 3 ainda não tem entrega de chaves (o servidor também recusa)
+  let unidadeEscolhida = $state(form?.valores?.unidadeId ?? '');
+  const bloco3 = $derived(!blocoPermitido('entrega-chaves', data.unidades.find((u) => u.id === unidadeEscolhida)?.bloco));
   let enviando = $state(false);
   let modalEl = $state(null);
   let modalFechado = $state(false);
@@ -63,7 +67,7 @@
 
   function aoSubmeter({ cancel }) {
     tentouEnviar = true;
-    if (faltaProcuracao || faltaIdentidade) {
+    if (bloco3 || faltaProcuracao || faltaIdentidade) {
       cancel();
       return;
     }
@@ -191,7 +195,7 @@
 
       <div>
         <label for="unidadeId" class="block text-sm font-semibold text-calper-dark mb-1.5">Unidade</label>
-        <select id="unidadeId" name="unidadeId" class="input" required>
+        <select id="unidadeId" name="unidadeId" class="input" bind:value={unidadeEscolhida} required>
           <option value="">selecione</option>
           {#each data.unidades as u (u.id)}
             <option value={u.id} selected={form?.valores?.unidadeId === u.id}>
@@ -199,6 +203,9 @@
             </option>
           {/each}
         </select>
+        {#if bloco3}
+          <div class="mt-2"><AvisoSutil>{MENSAGEM_BLOCO3_ENTREGA}</AvisoSutil></div>
+        {/if}
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

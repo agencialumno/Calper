@@ -35,15 +35,23 @@
   <a href="/admin/entrega-chaves" class="text-sm text-gray-500 hover:text-calper-dark">← Entrega de chaves</a>
   <h1 class="text-2xl font-extrabold text-calper-dark mt-3">Quem agendou</h1>
   <p class="text-sm text-gray-500 mt-1 mb-5">
-    Todas as pessoas que agendaram pelo formulário público — {data.agendamentos.length}
+    Todas as pessoas que agendaram entrega de chaves ou vistoria pelo formulário público — {data.agendamentos.length}
     {data.agendamentos.length === data.total ? '' : `de ${data.total} `}registro(s)
     · <LinkDownload href={data.exportarHref} class="font-bold text-calper-red">Exportar CSV</LinkDownload>
   </p>
 
-  <form method="GET" class="card p-4 grid grid-cols-2 md:grid-cols-[1fr_12rem_auto] gap-3 mb-5 items-end">
+  <form method="GET" class="card p-4 grid grid-cols-2 md:grid-cols-[1fr_11rem_12rem_auto] gap-3 mb-5 items-end">
     <div class="col-span-2 md:col-span-1">
       <label for="q" class="block text-xs font-semibold text-gray-500 mb-1">Buscar (nome, CPF, telefone, e-mail, unidade)</label>
       <input id="q" name="q" value={data.filtros.q} class="input !py-2 text-sm" />
+    </div>
+    <div>
+      <label for="servico" class="block text-xs font-semibold text-gray-500 mb-1">Serviço</label>
+      <select id="servico" name="servico" class="input !py-2 text-sm">
+        <option value="">Entrega de chaves</option>
+        <option value="vistoria" selected={data.filtros.servico === 'vistoria'}>Vistoria</option>
+        <option value="todos" selected={data.filtros.servico === 'todos'}>Todos</option>
+      </select>
     </div>
     <div>
       <label for="status" class="block text-xs font-semibold text-gray-500 mb-1">Status</label>
@@ -56,7 +64,6 @@
     </div>
     <div class="flex items-center gap-3">
       <button type="submit" class="btn-primary !py-2 text-sm">Filtrar</button>
-      <a href="/admin/quem-agendou" class="text-xs font-semibold text-gray-500">Limpar</a>
     </div>
   </form>
 
@@ -71,6 +78,9 @@
             </div>
           </div>
           <div class="flex items-center gap-1.5">
+            {#if data.filtros.servico !== ''}<span class="text-xs font-bold px-2.5 py-1 rounded-full {a.servico === 'vistoria' ? 'bg-amber-50 text-amber-800' : 'bg-gray-100 text-gray-600'}" data-testid="selo-servico">
+              {a.servicoRotulo}{a.vistoriaNumero > 1 ? ` · revistoria ${a.vistoriaNumero}` : ''}
+            </span>{/if}
             {#if a.direto}<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700" data-testid="selo-direto">Atendimento direto</span>{/if}
             <span class="text-xs font-bold px-2.5 py-1 rounded-full {corStatus[a.status] ?? corStatus.cancelado}">{a.status}</span>
           </div>
@@ -79,7 +89,8 @@
         <div class="grid sm:grid-cols-3 gap-x-6 gap-y-2 mt-3 text-sm">
           <div>
             <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Unidade</div>
-            <a href="/admin/entrega-chaves/{a.id}" class="font-bold text-calper-red">{a.unidade}</a>
+            <!-- o atendimento de vistoria chega no PR seguinte: até lá o link da vistoria abre o dossiê da unidade -->
+            <a href={a.servico === 'vistoria' ? `/admin/unidades/${a.unidadeId}` : `/admin/entrega-chaves/${a.id}`} class="font-bold text-calper-red">{a.unidade}</a>
           </div>
           <div>
             <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Agendado para</div>
@@ -103,7 +114,7 @@
           </div>
         {/if}
         {#if data.podeGerir}
-          <AcoesAgendamento class="mt-3" ag={a} unidades={data.unidadesLivres} agenda={data.agenda} />
+          <AcoesAgendamento class="mt-3" ag={a} unidades={data.unidadesLivres[a.servico]} agenda={data.agenda[a.servico]} />
         {/if}
         <div class="text-[11px] text-gray-400 mt-3">Agendou em {quandoAgendou(a.agendadoEm)}</div>
       </div>

@@ -13,7 +13,9 @@
     { href: '/admin/checkin', label: 'Check-in', soMobile: true },
     { href: '/admin/atualizacoes', label: 'Atualizações' },
     { href: '/admin/agenda', label: 'Agenda' },
+    { href: '/admin/agenda-vistoria', label: 'Agenda vistoria' },
     { href: '/admin/entrega-chaves', label: 'Chaves' },
+    { href: '/admin/vistoria', label: 'Vistoria' },
     { href: '/admin/questionarios', label: 'Questionários' },
     { href: '/admin/documentos', label: 'Documentos' },
     { href: '/admin/usuarios', label: 'Usuários' },
@@ -23,30 +25,33 @@
   // cada perfil só vê as abas a que tem acesso (as mesmas regras do servidor, em src/lib/perfis.js)
   let menu = $derived(nav.filter((i) => permissaoNoCaminho(data.funcionario.perfil, 'GET', i.href) === 'ok'));
 
+  // "Agenda" não fica ativa em /admin/agenda-vistoria: o caminho precisa ser igual ou subrota (com "/")
+  const ativoNoCaminho = (caminho, href) => caminho === href || caminho.startsWith(href + '/');
+
   const rotuloPerfil = ROTULO_PERFIL;
 </script>
 
 <div class="min-h-screen flex flex-col md:flex-row bg-[#f6f6f7]">
   <!-- sidebar (desktop) / barra superior enxuta (mobile) -->
   <aside
-    class="md:basis-[240px] md:min-w-[240px] md:h-screen md:sticky md:top-0 md:flex-col md:overflow-y-auto bg-calper-dark flex items-center md:items-stretch justify-between md:justify-start gap-1 px-4 md:px-4 py-3 md:py-6"
+    class="md:basis-[240px] md:min-w-[240px] md:h-screen md:sticky md:top-0 md:flex-col md:overflow-hidden bg-calper-dark flex items-center md:items-stretch justify-between md:justify-start gap-1 px-4 md:px-4 py-3 md:py-4"
   >
-    <div class="px-0 md:px-3 md:pb-7 shrink-0 md:flex md:items-center md:justify-between">
-      <img src="/logo-branca.png" alt="Calper" class="h-10 md:h-14 w-auto" />
+    <div class="px-0 md:px-3 md:pb-3 shrink-0 md:flex md:items-center md:justify-between">
+      <img src="/logo-branca.png" alt="Calper" class="h-10 md:h-10 w-auto" />
       <div class="hidden md:block text-white">
         <NotificationBell notificacoes={data.notificacoes} />
       </div>
     </div>
 
     <!-- navegação: só no desktop fica aqui na sidebar -->
-    <nav class="hidden md:flex md:flex-col gap-1 flex-1">
+    <nav class="hidden md:flex md:flex-col gap-0.5 flex-1 min-h-0 md:overflow-y-auto">
       {#each menu.filter((i) => !i.soMobile) as item}
         <a
           href={item.href}
-          class="flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] font-semibold whitespace-nowrap"
-          class:bg-white={$page.url.pathname.startsWith(item.href)}
-          class:text-calper-dark={$page.url.pathname.startsWith(item.href)}
-          class:text-gray-400={!$page.url.pathname.startsWith(item.href)}
+          class="flex items-center gap-3 px-4 py-1.5 rounded-lg text-[13px] font-semibold whitespace-nowrap"
+          class:bg-white={ativoNoCaminho($page.url.pathname, item.href)}
+          class:text-calper-dark={ativoNoCaminho($page.url.pathname, item.href)}
+          class:text-gray-400={!ativoNoCaminho($page.url.pathname, item.href)}
         >
           {item.label}
         </a>
@@ -56,7 +61,7 @@
     <!-- perfil + sair: completo no desktop -->
     <a
       href="/admin/conta"
-      class="hidden md:flex mt-auto items-center gap-2.5 px-3 pt-4 border-t border-white/10 hover:opacity-90"
+      class="hidden md:flex shrink-0 items-center gap-2.5 px-3 pt-3 border-t border-white/10 hover:opacity-90"
       title="Minha conta: trocar senha e foto"
     >
       <AvatarEquipe id={data.funcionario.id} nome={data.funcionario.nome} fotoVersao={data.funcionario.fotoVersao} />
@@ -67,8 +72,8 @@
         </div>
       </div>
     </a>
-    <form method="POST" action="/admin/logout" class="hidden md:block px-3">
-      <button type="submit" class="text-xs font-semibold text-gray-400 hover:text-white mt-2"
+    <form method="POST" action="/admin/logout" class="hidden md:block shrink-0 px-3">
+      <button type="submit" class="text-xs font-semibold text-gray-400 hover:text-white mt-1"
         >Sair</button
       >
     </form>
@@ -90,7 +95,7 @@
   <!-- navegação mobile: fora do header escuro, bem visível logo acima do conteúdo -->
   <nav class="md:hidden grid grid-cols-4 gap-2 px-4 py-3 bg-white border-b border-gray-100">
     {#each menu as item}
-      {@const ativo = $page.url.pathname.startsWith(item.href)}
+      {@const ativo = ativoNoCaminho($page.url.pathname, item.href)}
       <a
         href={item.href}
         class="flex items-center justify-center px-1.5 py-2.5 rounded-xl text-[12px] font-bold text-center transition-colors active:scale-95"

@@ -3,12 +3,13 @@ import { db } from '$lib/server/db.js';
 import { formatarCpf } from '$lib/cpf.js';
 import { dataHoraAgendada, dataHoraBr, respostaCsv, sn } from '$lib/server/csv.js';
 import { filtrosQuemAgendou } from '$lib/server/quemAgendou.js';
+import { rotuloDoServico, servicoDoSlug } from '$lib/servicos.js';
 
-// CSV de "Quem agendou" com os mesmos filtros da tela (busca e status) — sem os arquivos anexos.
+// CSV de "Quem agendou" com os mesmos filtros da tela (busca, status e serviço) — sem os arquivos anexos.
 export async function GET({ url, locals }) {
   if (!locals.funcionario) throw redirect(303, '/admin/login');
 
-  const { where } = filtrosQuemAgendou(url.searchParams);
+  const { where, filtros } = filtrosQuemAgendou(url.searchParams);
   const agendamentos = await db.agendamento.findMany({
     where,
     orderBy: { createdAt: 'desc' },
@@ -17,6 +18,8 @@ export async function GET({ url, locals }) {
       dataHora: true,
       status: true,
       origem: true,
+      vistoriaNumero: true,
+      tipoEvento: { select: { slug: true } },
       canceladoEm: true,
       motivoCancelamento: true,
       nomeCompareceu: true,
@@ -30,12 +33,15 @@ export async function GET({ url, locals }) {
     }
   });
 
+  // colunas de serviço só quando o filtro de serviço foi usado (padrão: CSV da entrega, igual ao de sempre)
+  const comServico = filtros.servico !== '';
   const linhas = [
-    ['Agendado em', 'Nome', 'CPF', 'Telefone', 'E-mail', 'Bloco', 'Unidade', 'Data agendada', 'Hora agendada', 'É o proprietário', 'Nome do proprietário', 'Procuração anexada', 'Status', 'Origem', 'Desmarcado em', 'Motivo do cancelamento'],
+    ['Agendado em', ...(comServico ? ['Serviço', 'Nº da vistoria'] : []), 'Nome', 'CPF', 'Telefone', 'E-mail', 'Bloco', 'Unidade', 'Data agendada', 'Hora agendada', 'É o proprietário', 'Nome do proprietário', 'Procuração anexada', 'Status', 'Origem', 'Desmarcado em', 'Motivo do cancelamento'],
     ...agendamentos.map((a) => {
       const { data, hora } = dataHoraAgendada(a.dataHora);
       return [
         dataHoraBr(a.createdAt),
+        ...(comServico ? [rotuloDoServico(servicoDoSlug(a.tipoEvento.slug)), servicoDoSlug(a.tipoEvento.slug) === 'vistoria' ? a.vistoriaNumero : ''] : []),
         a.nomeCompareceu,
         a.cpfCompareceu ? formatarCpf(a.cpfCompareceu) : '',
         a.telefoneCompareceu,
@@ -54,5 +60,5 @@ export async function GET({ url, locals }) {
       ];
     })
   ];
-  return respostaCsv('quem-agendou-entrega-chaves.csv', linhas);
+  return respostaCsv(comServico ? 'quem-agendou.csv' : 'quem-agendou-entrega-chaves.csv', linhas);
 }

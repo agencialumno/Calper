@@ -39,3 +39,14 @@ O fluxo de assinatura com o DocuSign (Calper assina termo e checklist, envelope 
 - As unidades 106 e 107 do banco de teste já trazem os dados da base consolidada (vistoria, escritura, datas, valores): são as que
   os testes de etiquetas, "ver mais" e edição de status usam. A planilha sintética `tests/fixtures/base-consolidada-teste.xlsx`
   imita o layout da planilha nova **sem dados reais** (planilhas de verdade nunca entram no git).
+
+## Ambiente de teste local / preview (vistoria e entrega de chaves)
+
+Passo a passo, sempre no schema de teste (nunca produção):
+
+1. `.env.test` com `DATABASE_URL_TESTE="<URL do banco>&schema=calper_test"` (para um preview, use `schema=calper_preview` numa URL separada).
+2. `DATABASE_URL="<essa URL>" npx prisma migrate deploy` (cria as tabelas, inclusive `AgendaDiaVistoria` e `Agendamento.vistoriaNumero`).
+3. Unidades de exemplo dos Blocos 2 e 3: `node scripts/popular-unidades-exemplo.js` (simulação) e depois `--aplicar`. Só cria; recusa qualquer schema que não seja `calper_test`/`calper_preview`.
+4. Na equipe, abra dias da vistoria em **Agenda vistoria** (começa vazia); a entrega usa a **Agenda** de sempre.
+5. Páginas públicas: `/agendamento` (escolha), `/agendar-entrega-chaves` (Bloco 2; o Bloco 3 mostra o erro) e `/agendar-vistoria` (só Bloco 3).
+6. Variáveis do preview: as mesmas do `.env.example` (`DATABASE_URL` apontando para o schema de preview e as chaves do DocuSign **demo**). Nunca use a conta de produção do DocuSign em teste.
