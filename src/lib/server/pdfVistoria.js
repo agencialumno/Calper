@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { LOGO_DOCUMENTOS_BASE64 } from './assets/logoDocumentos.js';
 import { ANCORA_VISTORIA } from './ancoras.js';
+import { LARGURA_LINHA_VISTORIA } from './caixaAssinatura.js';
 import { quebrarLinhas, textoSeguro } from './pdfTermo.js';
 
 // PDF do Termo de Recebimento do Imóvel (FORM-020 Rev. 06) a partir do texto final:
@@ -12,7 +13,9 @@ const MARGEM = 56;
 const LARGURA_UTIL = PAGINA.largura - MARGEM * 2;
 const TAMANHO = 11;
 const PASSO = 15;
-const ESPACO_ASSINATURA = 46;
+// espaço livre acima de cada linha: a caixa do DocuSign (escala 1,5) sobe da linha e não pode tocar o texto anterior
+const ESPACO_ASSINATURA = 66;
+const ESPACO_PRIMEIRA_ASSINATURA = 80; // a 1ª fica logo abaixo da data: um pouco mais de folga
 const LOGO = { largura: 110, altura: 62 };
 const COR = rgb(0.08, 0.08, 0.1);
 
@@ -54,6 +57,7 @@ export async function gerarPdfVistoria(texto, titulo) {
   const ultimaAssinatura = linhas.reduce((ult, l, i) => (MARCADOR.test(l.trim()) ? i : ult), -1);
   let indiceVisivel = 0;
   let brancos = 0;
+  let assinaturasDesenhadas = 0;
 
   for (let i = 0; i < linhas.length; i++) {
     const original = linhas[i];
@@ -69,8 +73,9 @@ export async function gerarPdfVistoria(texto, titulo) {
 
     if (marcador) {
       garantir(ESPACO_ASSINATURA + PASSO * 2);
-      y += ESPACO_ASSINATURA;
-      const larguraLinha = 330;
+      y += assinaturasDesenhadas === 0 ? ESPACO_PRIMEIRA_ASSINATURA : ESPACO_ASSINATURA;
+      assinaturasDesenhadas++;
+      const larguraLinha = LARGURA_LINHA_VISTORIA;
       const x = (PAGINA.largura - larguraLinha) / 2;
       pagina.drawLine({ start: { x, y: PAGINA.altura - y }, end: { x: x + larguraLinha, y: PAGINA.altura - y }, thickness: 0.8, color: COR });
       // âncora invisível (branca, 1 pt) sobre o início da linha: o DocuSign posiciona a caixa de assinatura aqui

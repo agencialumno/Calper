@@ -17,6 +17,9 @@ export function rotuloDaVistoria(ag) {
   return ag.vistoriaPresentes?.length || ag.checkinEm ? 'Em andamento' : 'Agendada';
 }
 
+/** Rótulo da tentativa: a 1ª é "1ª vistoria"; as seguintes são revistorias ("Revistoria · 2ª vistoria"). */
+export const rotuloDaTentativa = (numero) => (numero > 1 ? `Revistoria · ${numero}ª vistoria` : `${numero}ª vistoria`);
+
 /** Lista de presentes gravada no agendamento, sempre como array. */
 export const presentesDoAgendamento = (ag) => (Array.isArray(ag?.vistoriaPresentes) ? ag.vistoriaPresentes : []);
 

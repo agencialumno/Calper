@@ -86,6 +86,14 @@ export async function load(event) {
     where: { unidadeId: u.id, tipoEventoId: ag.tipoEventoId, status: { not: 'cancelado' }, vistoriaNumero: { gt: ag.vistoriaNumero } },
     select: { id: true, vistoriaNumero: true }
   });
+  // revistoria: a vistoria anterior da unidade (reparos e observações), só para leitura no atendimento
+  const anteriorAg = ag.vistoriaNumero > 1
+    ? await db.agendamento.findFirst({
+        where: { unidadeId: u.id, tipoEventoId: ag.tipoEventoId, status: { not: 'cancelado' }, vistoriaNumero: { lt: ag.vistoriaNumero }, vistoriaResultado: RESULTADO.naoAceita },
+        orderBy: { vistoriaNumero: 'desc' },
+        select: { id: true, vistoriaNumero: true, vistoriaReparos: true, vistoriaTelefoneRetorno: true, observacoesAtendimento: true, vistoriaConcluidaEm: true }
+      })
+    : null;
   const podeGerir = podeGerirAgendamentos(locals.funcionario.perfil);
   const calperJaAssinou = CALPER_JA_ASSINOU_VISTORIA.includes(doc?.status);
 
@@ -96,6 +104,9 @@ export async function load(event) {
     bloqueio,
     calper: { nome: locals.funcionario.nome, email: locals.funcionario.email },
     documento: doc ? { status: doc.status } : null,
+    anterior: anteriorAg
+      ? { id: anteriorAg.id, numero: anteriorAg.vistoriaNumero, reparos: anteriorAg.vistoriaReparos ?? '', telefone: anteriorAg.vistoriaTelefoneRetorno ?? '', observacoes: anteriorAg.observacoesAtendimento ?? '', concluidaEm: anteriorAg.vistoriaConcluidaEm }
+      : null,
     pendentes: clientes,
     // revistoria: só admin e supervisor, e só depois de "não aceita"
     revistoria: {
@@ -298,7 +309,7 @@ export const actions = {
         }
       }),
       db.historicoUnidade.create({
-        data: { unidadeId: ag.unidadeId, tipo: 'apontamento', descricao: `Vistoria ${ag.vistoriaNumero} não aceita. Reparos: ${reparos.slice(0, 500)}`, criadoPorId: locals.funcionario.id }
+        data: { unidadeId: ag.unidadeId, tipo: 'apontamento', descricao: `${ag.vistoriaNumero > 1 ? `Revistoria (${ag.vistoriaNumero}ª vistoria)` : `Vistoria ${ag.vistoriaNumero}`} não aceita. Reparos: ${reparos.slice(0, 500)}. Telefone para contato: ${telefone}. Atendido por: ${locals.funcionario.nome}`, criadoPorId: locals.funcionario.id }
       })
     ]);
     await registrarLog({

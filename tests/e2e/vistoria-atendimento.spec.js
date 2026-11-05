@@ -44,6 +44,7 @@ test.beforeAll(async () => {
     out['706'] = await nova(db, inv.id, tipo.id, '706', [par('FABIO REVISTORIA', true)]);
     out['707'] = await nova(db, inv.id, tipo.id, '707', [par('GILDA REVISTORIA', true)]);
     out['708'] = await nova(db, inv.id, tipo.id, '708', [par('HUGO PERMISSAO', true)]);
+    out['709'] = await nova(db, inv.id, tipo.id, '709', [par('IVO FLUXO COMPLETO', true)]);
     await db.agendaDiaVistoria.create({ data: { data: DIA_REVISTORIA, aberto: true, limitePorHora: 1 } });
     return out;
   });
@@ -318,6 +319,66 @@ test.describe('revistoria', () => {
     await page.selectOption('select[name=data]', DIA_REVISTORIA);
     expect(await page.locator('select[name=horario] option').allTextContents()).not.toContain('09:00 (0 vaga)');
     expect((await page.locator('select[name=horario] option').allTextContents()).some((t) => t.startsWith('09:00'))).toBe(false);
+  });
+});
+
+test.describe('não aceita → revistoria (fluxo completo pela tela)', () => {
+  test('não aceita grava no histórico; a revistoria aparece como tal e puxa reparos e observações, só para leitura', async ({ page }) => {
+    await entrarComoAdmin(page, SUPERVISOR);
+    const id = ag['709'].id;
+    await registrarPresentes(page, id, { compradores: [{ indice: 0, email: 'ivo@example.com' }] });
+    await expect(page).toHaveURL(/passo=2/, { timeout: 60_000 });
+    await page.fill('#observacoes', 'Piso da sala com risco');
+    await page.getByRole('button', { name: 'Salvar observações' }).click();
+    await expect(page.getByText('Observações salvas.')).toBeVisible();
+    await page.goto(`/admin/vistoria/${id}?passo=3`, { waitUntil: 'networkidle' });
+    await page.locator('input[name=resultado][value=nao_aceita]').check();
+    await page.fill('textarea[name=reparos]', 'Trocar a tomada da cozinha e pintar o teto do quarto');
+    await page.fill('input[name=telefoneRetorno]', '(21) 98888-7777');
+    await page.getByRole('button', { name: 'Registrar resultado' }).click();
+    await expect(page).toHaveURL(/passo=5/, { timeout: 60_000 });
+
+    // a) fecha o atendimento e grava no histórico: resultado, reparos, telefone e quem atendeu
+    const fechado = await comBanco((db) => db.agendamento.findUnique({ where: { id } }));
+    expect(fechado.status).toBe('realizado');
+    expect(fechado.vistoriaResultado).toBe('nao_aceita');
+    const h1 = await comBanco((db) => db.historicoUnidade.findMany({ where: { unidadeId: u['709'].id, tipo: 'apontamento' } }));
+    expect(h1).toHaveLength(1);
+    expect(h1[0].descricao).toContain('Vistoria 1 não aceita');
+    expect(h1[0].descricao).toContain('Trocar a tomada da cozinha');
+    expect(h1[0].descricao).toContain('(21) 98888-7777');
+    expect(h1[0].descricao).toContain('Atendido por: Supervisor Teste');
+    expect(h1[0].criadoPorId).not.toBeNull();
+
+    // abre a revistoria (2ª vistoria)
+    await page.locator('input[name=quando][value=agora]').check();
+    await page.getByRole('button', { name: /Abrir revistoria \(2ª vistoria\)/ }).click();
+    await expect(page).toHaveURL(/passo=1/, { timeout: 60_000 });
+    const nova2 = await comBanco((db) => db.agendamento.findFirst({ where: { unidadeId: u['709'].id, vistoriaNumero: 2 } }));
+    expect(nova2).not.toBeNull();
+
+    // c) passo 2 da revistoria: reparos e observações anteriores em destaque, só leitura
+    await registrarPresentes(page, nova2.id, { compradores: [{ indice: 0, email: 'ivo@example.com' }] });
+    await expect(page).toHaveURL(/passo=2/, { timeout: 60_000 });
+    const destaque = page.getByTestId('vistoria-anterior');
+    await expect(destaque).toBeVisible();
+    await expect(page.getByTestId('reparos-anteriores')).toHaveText('Trocar a tomada da cozinha e pintar o teto do quarto');
+    await expect(page.getByTestId('observacoes-anteriores')).toHaveText('Piso da sala com risco');
+    await expect(destaque.locator('textarea, input')).toHaveCount(0);
+    await expect(page.locator('#observacoes')).toHaveValue(''); // o campo editável é só o da revistoria
+    // a 1ª vistoria não mostra o destaque
+    await page.goto(`/admin/vistoria/${id}?passo=2`, { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('vistoria-anterior')).toHaveCount(0);
+
+    // b) aparece como "Revistoria" no histórico/dossiê da unidade, em Quem agendou e na aba Vistoria
+    await page.goto(`/admin/unidades/${u['709'].id}`, { waitUntil: 'networkidle' });
+    await expect(page.getByText('Revistoria (2ª vistoria) aberta')).toBeVisible();
+    await expect(page.getByText(/Vistoria 1 não aceita\. Reparos: Trocar a tomada/)).toBeVisible();
+    await expect(page.getByTestId('secao-vistorias')).toContainText('Revistoria · 2ª vistoria');
+    await page.goto('/admin/quem-agendou', { waitUntil: 'networkidle' });
+    await expect(page.getByText('revistoria 2').first()).toBeVisible();
+    await page.goto('/admin/vistoria', { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('card-vistoria').filter({ hasText: 'Bloco 3 - nº 709' }).filter({ hasText: 'Revistoria · 2ª vistoria' })).toHaveCount(1);
   });
 });
 

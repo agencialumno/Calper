@@ -4,6 +4,7 @@
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
+  import { rotuloDaTentativa } from '$lib/vistoria.js';
 
   let { data } = $props();
   let u = $derived(data.unidade);
@@ -234,7 +235,7 @@
             {@const termo = a.documentos.find((d) => d.tipo === 'termo_vistoria')}
             <div class="border border-gray-100 rounded-xl p-3" data-testid="vistoria-item">
               <div class="flex items-center justify-between gap-3">
-                <div class="text-sm font-bold text-calper-dark">{a.vistoriaNumero}ª vistoria · <span class="font-normal text-gray-500">{formatarData(a.dataHora)}</span></div>
+                <div class="text-sm font-bold text-calper-dark">{rotuloDaTentativa(a.vistoriaNumero)} · <span class="font-normal text-gray-500">{formatarData(a.dataHora)}</span></div>
                 <span class="text-xs font-bold px-2 py-0.5 rounded-full {a.vistoriaResultado === 'nao_aceita' ? 'bg-red-50 text-red-700' : a.vistoriaResultado === 'aceita' && a.status === 'realizado' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}">{a.vistoriaRotulo}</span>
               </div>
               {#if a.vistoriaPresentes.length}

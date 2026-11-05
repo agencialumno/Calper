@@ -100,3 +100,11 @@ describe('vistoria: termo e assinaturas', () => {
     expect(Buffer.from(base64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
   });
 });
+
+describe('rotuloDaTentativa', () => {
+  it('1ª é "1ª vistoria"; as seguintes são revistorias', async () => {
+    const { rotuloDaTentativa } = await import('../../src/lib/vistoria.js');
+    expect(rotuloDaTentativa(1)).toBe('1ª vistoria');
+    expect(rotuloDaTentativa(2)).toBe('Revistoria · 2ª vistoria');
+  });
+});

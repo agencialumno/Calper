@@ -5,6 +5,7 @@
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
   import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
   import { formatarCpf } from '$lib/cpf.js';
+  import { rotuloDaTentativa } from '$lib/vistoria.js';
   import { fotosParaPdf } from '$lib/fotoParaPdf.js';
 
   let { data, form } = $props();
@@ -154,7 +155,7 @@
   <a href="/admin/vistoria" class="text-sm text-gray-500 hover:text-calper-dark">← Vistoria</a>
   <h1 class="text-xl font-bold text-calper-dark mt-3 mb-1">Bloco {u.bloco} - nº {u.numero}</h1>
   <p class="text-sm text-gray-500 flex flex-wrap items-center gap-1.5">
-    <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{a.vistoriaNumero}ª vistoria</span>
+    <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{rotuloDaTentativa(a.vistoriaNumero)}</span>
     {#if a.origem === 'atendimento_direto'}
       <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700" data-testid="selo-direto">Atendimento direto</span>
       iniciado em {formatarDataHora(a.dataHora)}
@@ -299,6 +300,15 @@
   {:else if data.passo === 2}
     <div class="card p-6 flex flex-col gap-4" data-testid="etapa-vistoria">
       <div class="text-sm font-bold text-calper-dark">Vistoria no apartamento</div>
+      {#if data.anterior}
+        <div class="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 flex flex-col gap-1.5" data-testid="vistoria-anterior">
+          <div class="text-sm font-bold text-amber-900">Reparos da {data.anterior.numero}ª vistoria (não aceita): confira se foram feitos</div>
+          <div class="text-sm text-gray-800 whitespace-pre-line" data-testid="reparos-anteriores">{data.anterior.reparos}</div>
+          {#if data.anterior.observacoes}<div class="text-xs text-gray-700 whitespace-pre-line"><span class="font-bold">Observações do atendimento anterior:</span> <span data-testid="observacoes-anteriores">{data.anterior.observacoes}</span></div>{/if}
+          {#if data.anterior.telefone}<div class="text-xs text-gray-600">Telefone para contato: {data.anterior.telefone}</div>{/if}
+          <a href="/admin/vistoria/{data.anterior.id}?passo=5" class="text-xs font-bold text-calper-red">Ver o atendimento anterior →</a>
+        </div>
+      {/if}
       <p class="text-sm text-gray-600">Faça a vistoria com {data.presentes.map((p) => p.nome).join(', ')} no apartamento. Anote abaixo o que for útil; o resultado é registrado na próxima etapa.</p>
       <form method="POST" action="?/salvarObservacoes" use:enhance={() => async ({ update }) => update({ reset: false })} class="flex flex-col gap-2">
         <label for="observacoes" class="text-xs font-semibold text-gray-500">Observações do atendimento</label>

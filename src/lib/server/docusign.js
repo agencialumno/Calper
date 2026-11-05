@@ -2,7 +2,7 @@ import docusign from 'docusign-esign';
 import { env } from '$env/dynamic/private';
 import { normalizarChavePrivada } from './chavePrivada.js';
 import { ANCORA, ANCORA_VISTORIA } from './ancoras.js';
-import { xOffsetCentralizado } from './caixaAssinatura.js';
+import { LARGURA_LINHA_VISTORIA, xOffsetCentralizado } from './caixaAssinatura.js';
 
 // Integração DocuSign (JWT Grant + assinatura embutida da Calper + assinatura remota do cliente).
 // Env: DOCUSIGN_INTEGRATION_KEY, DOCUSIGN_USER_ID, DOCUSIGN_ACCOUNT_ID,
@@ -108,14 +108,14 @@ const ehEmailDeExemplo = (email) => /@example\.(com|org|net)$/i.test(String(emai
 // Caixa de assinatura: ampliada (escala máxima do DocuSign é 1,5), centralizada sobre a linha de assinatura
 // e encostada nela. O ponto de ancoragem é o canto superior esquerdo da caixa, na esquerda da linha.
 const CAIXA = { escala: '1.5', yOffset: '-30' };
-function tabAssinar(ancora, documentId, nomeDoAssinante) {
+function tabAssinar(ancora, documentId, nomeDoAssinante, larguraLinha) {
   return docusign.Tabs.constructFromObject({
     signHereTabs: [
       docusign.SignHere.constructFromObject({
         documentId,
         anchorString: ancora,
         anchorUnits: 'pixels',
-        anchorXOffset: xOffsetCentralizado(nomeDoAssinante),
+        anchorXOffset: xOffsetCentralizado(nomeDoAssinante, larguraLinha),
         anchorYOffset: CAIXA.yOffset,
         scaleValue: CAIXA.escala,
         anchorIgnoreIfNotPresent: 'false'
@@ -380,7 +380,7 @@ export async function criarEnvelopeVistoria({ pdfBase64, nomeDocumento, calper, 
       recipientId: DESTINATARIO_VISTORIA.calper,
       routingOrder: '1',
       clientUserId: calper.clientUserId,
-      tabs: tabAssinar(ANCORA_VISTORIA.calper, DOCUMENTO_ID.termo, calper.nome)
+      tabs: tabAssinar(ANCORA_VISTORIA.calper, DOCUMENTO_ID.termo, calper.nome, LARGURA_LINHA_VISTORIA)
     }),
     ...assinantes.map((a, i) =>
       docusign.Signer.constructFromObject({
@@ -388,7 +388,7 @@ export async function criarEnvelopeVistoria({ pdfBase64, nomeDocumento, calper, 
         name: a.nome,
         recipientId: DESTINATARIO_VISTORIA.assinante(i + 1),
         routingOrder: '2',
-        tabs: tabAssinar(ANCORA_VISTORIA.assinante(i + 1), DOCUMENTO_ID.termo, a.nome)
+        tabs: tabAssinar(ANCORA_VISTORIA.assinante(i + 1), DOCUMENTO_ID.termo, a.nome, LARGURA_LINHA_VISTORIA)
       })
     )
   ];
