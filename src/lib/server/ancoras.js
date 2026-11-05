@@ -16,3 +16,10 @@ export function ancoraDoBloco(documento, grupo1) {
   if (g.includes('INVESTIDOR')) return ANCORA[documento].cliente;
   return ANCORA[documento].calper;
 }
+
+// Termo de Recebimento do Imóvel (vistoria): um envelope só com o termo; a Calper (funcionário do atendimento) assina
+// primeiro e cada proprietário/procurador tem a própria âncora (numerada). O "]" no fim impede que uma âncora seja prefixo de outra.
+export const ANCORA_VISTORIA = {
+  calper: '[VISTORIA M1]',
+  assinante: (n) => `[VISTORIA ASSINANTE ${n}]`
+};

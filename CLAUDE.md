@@ -11,3 +11,6 @@
 - Durante o desenvolvimento rode só os testes do que mudou; a suíte completa uma vez no fim de cada PR.
 - Respostas curtas: resultado, decisões e pendências, sem colar logs.
 - Comece conversas com a Skill caveman ativada.
+- Falha na suíte: rode de novo só com --last-failed antes de rodar tudo.
+- Compare falhas com tests/FALHAS-CONHECIDAS.md em vez de rodar a main. Atualize o arquivo quando mudar.
+- Suíte completa com --workers=1, uma única vez, no fim do PR.

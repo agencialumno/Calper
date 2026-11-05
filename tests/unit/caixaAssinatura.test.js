@@ -21,3 +21,15 @@ describe('xOffsetCentralizado (caixa de assinatura centralizada pela largura do 
     expect(typeof xOffsetCentralizado('')).toBe('string');
   });
 });
+
+describe('xOffsetCentralizado com a linha do termo de vistoria (330 pt)', () => {
+  it('a caixa fica centralizada na linha mais curta', async () => {
+    const { LARGURA_LINHA_VISTORIA } = await import('../../src/lib/server/caixaAssinatura.js');
+    for (const nome of ['Pedro Procurador', 'ANA MARIA DOS SANTOS', 'Supervisor Teste']) {
+      const off = Number(xOffsetCentralizado(nome, LARGURA_LINHA_VISTORIA));
+      const largura = Math.min(LARGURA_LINHA_VISTORIA - 10, nome.length * (nome === nome.toUpperCase() ? 11.3 : 8.6));
+      expect(Math.abs(off + largura / 2 - LARGURA_LINHA_VISTORIA / 2)).toBeLessThanOrEqual(5);
+    }
+    expect(Number(xOffsetCentralizado('JOSE AUGUSTO SILVA DA FONSECA', LARGURA_LINHA_VISTORIA))).toBeLessThan(Number(xOffsetCentralizado('JOSE AUGUSTO SILVA DA FONSECA')) + 1);
+  });
+});

@@ -4,6 +4,7 @@
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
+  import { rotuloDaTentativa } from '$lib/vistoria.js';
 
   let { data } = $props();
   let u = $derived(data.unidade);
@@ -219,6 +220,35 @@
                 target="_blank"
                 class="text-xs font-bold text-calper-red shrink-0">abrir</a
               >
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    <!-- vistorias (resultado de cada tentativa: aceita / não aceita, reparos e termo) -->
+    {#if u.agendamentos.some((a) => a.ehVistoria)}
+      <div class="card p-6" data-testid="secao-vistorias">
+        <div class="text-sm font-bold text-calper-dark mb-4">Vistorias</div>
+        <div class="flex flex-col gap-2.5">
+          {#each u.agendamentos.filter((a) => a.ehVistoria) as a (a.id)}
+            {@const termo = a.documentos.find((d) => d.tipo === 'termo_vistoria')}
+            <div class="border border-gray-100 rounded-xl p-3" data-testid="vistoria-item">
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-sm font-bold text-calper-dark">{rotuloDaTentativa(a.vistoriaNumero)} · <span class="font-normal text-gray-500">{formatarData(a.dataHora)}</span></div>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full {a.vistoriaResultado === 'nao_aceita' ? 'bg-red-50 text-red-700' : a.vistoriaResultado === 'aceita' && a.status === 'realizado' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}">{a.vistoriaRotulo}</span>
+              </div>
+              {#if a.vistoriaPresentes.length}
+                <div class="text-xs text-gray-600 mt-1.5"><span class="font-bold text-gray-500">Compareceram:</span> {a.vistoriaPresentes.map((p) => `${p.nome} (${vinculoRotulo[p.vinculo] ?? p.vinculo})`).join('; ')}</div>
+              {/if}
+              {#if a.vistoriaResultado === 'nao_aceita'}
+                <div class="text-xs text-gray-700 mt-1.5 whitespace-pre-line"><span class="font-bold text-gray-500">Reparos:</span> {a.vistoriaReparos}</div>
+                <div class="text-xs text-gray-500 mt-0.5">Telefone para contato: {a.vistoriaTelefone ?? '—'}</div>
+              {/if}
+              <div class="flex items-center gap-3 mt-2 text-xs font-bold">
+                {#if termo?.status === 'assinado'}<LinkDownload href="/admin/vistoria/{a.id}/documento" class="text-calper-red">Baixar termo assinado</LinkDownload>{/if}
+                <a href="/admin/vistoria/{a.id}{a.status === 'realizado' ? '?passo=5' : ''}" class="text-calper-red">Abrir atendimento →</a>
+              </div>
             </div>
           {/each}
         </div>

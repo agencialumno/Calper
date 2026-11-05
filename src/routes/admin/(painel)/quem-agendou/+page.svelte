@@ -80,7 +80,7 @@
           <div class="flex items-center gap-1.5">
             {#if data.filtros.servico !== ''}<span class="text-xs font-bold px-2.5 py-1 rounded-full {a.servico === 'vistoria' ? 'bg-amber-50 text-amber-800' : 'bg-gray-100 text-gray-600'}" data-testid="selo-servico">
               {a.servicoRotulo}{a.vistoriaNumero > 1 ? ` · revistoria ${a.vistoriaNumero}` : ''}
-            </span>{/if}
+            </span>{#if a.vistoriaResultado}<span class="text-xs font-bold px-2.5 py-1 rounded-full {a.vistoriaResultado === 'aceita' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}" data-testid="resultado-vistoria">{a.vistoriaResultadoRotulo}</span>{/if}{/if}
             {#if a.direto}<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700" data-testid="selo-direto">Atendimento direto</span>{/if}
             <span class="text-xs font-bold px-2.5 py-1 rounded-full {corStatus[a.status] ?? corStatus.cancelado}">{a.status}</span>
           </div>
@@ -89,8 +89,7 @@
         <div class="grid sm:grid-cols-3 gap-x-6 gap-y-2 mt-3 text-sm">
           <div>
             <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Unidade</div>
-            <!-- o atendimento de vistoria chega no PR seguinte: até lá o link da vistoria abre o dossiê da unidade -->
-            <a href={a.servico === 'vistoria' ? `/admin/unidades/${a.unidadeId}` : `/admin/entrega-chaves/${a.id}`} class="font-bold text-calper-red">{a.unidade}</a>
+            <a href={a.servico === 'vistoria' ? `/admin/vistoria/${a.id}` : `/admin/entrega-chaves/${a.id}`} class="font-bold text-calper-red">{a.unidade}</a>
           </div>
           <div>
             <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Agendado para</div>

@@ -1,8 +1,8 @@
 import docusign from 'docusign-esign';
 import { env } from '$env/dynamic/private';
 import { normalizarChavePrivada } from './chavePrivada.js';
-import { ANCORA } from './ancoras.js';
-import { xOffsetCentralizado } from './caixaAssinatura.js';
+import { ANCORA, ANCORA_VISTORIA } from './ancoras.js';
+import { LARGURA_LINHA_VISTORIA, xOffsetCentralizado } from './caixaAssinatura.js';
 
 // Integração DocuSign (JWT Grant + assinatura embutida da Calper + assinatura remota do cliente).
 // Env: DOCUSIGN_INTEGRATION_KEY, DOCUSIGN_USER_ID, DOCUSIGN_ACCOUNT_ID,
@@ -108,14 +108,14 @@ const ehEmailDeExemplo = (email) => /@example\.(com|org|net)$/i.test(String(emai
 // Caixa de assinatura: ampliada (escala máxima do DocuSign é 1,5), centralizada sobre a linha de assinatura
 // e encostada nela. O ponto de ancoragem é o canto superior esquerdo da caixa, na esquerda da linha.
 const CAIXA = { escala: '1.5', yOffset: '-30' };
-function tabAssinar(ancora, documentId, nomeDoAssinante) {
+function tabAssinar(ancora, documentId, nomeDoAssinante, larguraLinha) {
   return docusign.Tabs.constructFromObject({
     signHereTabs: [
       docusign.SignHere.constructFromObject({
         documentId,
         anchorString: ancora,
         anchorUnits: 'pixels',
-        anchorXOffset: xOffsetCentralizado(nomeDoAssinante),
+        anchorXOffset: xOffsetCentralizado(nomeDoAssinante, larguraLinha),
         anchorYOffset: CAIXA.yOffset,
         scaleValue: CAIXA.escala,
         anchorIgnoreIfNotPresent: 'false'
@@ -351,4 +351,79 @@ export async function baixarPdfAssinado(envelopeId, documentId = 'combined') {
   const binario = await envelopesApi.getDocument(env.DOCUSIGN_ACCOUNT_ID, envelopeId, documentId);
   const buffer = Buffer.isBuffer(binario) ? binario : Buffer.from(binario, 'binary');
   return `data:application/pdf;base64,${buffer.toString('base64')}`;
+}
+
+// --- Vistoria: Termo de Recebimento do Imóvel (um documento, um envelope) ---
+
+/** Ids dos destinatários do envelope da vistoria: 1 = Calper (funcionário do atendimento), 2.. = proprietários/procurador, 20 = cópia. */
+export const DESTINATARIO_VISTORIA = { calper: '1', assinante: (n) => String(n + 1), copia: '20' };
+
+/**
+ * Cria o envelope da vistoria com o termo: 1) a Calper assina embutida no admin (o funcionário que atende, clientUserId
+ * preenchido); 2) cada proprietário/procurador recebe o link por e-mail, em paralelo, só depois da Calper; 3) cópia carbono.
+ * `assinantes`: [{ nome, email }] na ordem das âncoras (1, 2, ...).
+ */
+export async function criarEnvelopeVistoria({ pdfBase64, nomeDocumento, calper, assinantes, copia = null }) {
+  const apiClient = await clienteAutenticado();
+  const envelopesApi = new docusign.EnvelopesApi(apiClient);
+
+  const documento = docusign.Document.constructFromObject({
+    documentBase64: pdfBase64,
+    name: nomeDocumento,
+    fileExtension: 'pdf',
+    documentId: DOCUMENTO_ID.termo
+  });
+  const signers = [
+    docusign.Signer.constructFromObject({
+      email: calper.email,
+      name: calper.nome,
+      recipientId: DESTINATARIO_VISTORIA.calper,
+      routingOrder: '1',
+      clientUserId: calper.clientUserId,
+      tabs: tabAssinar(ANCORA_VISTORIA.calper, DOCUMENTO_ID.termo, calper.nome, LARGURA_LINHA_VISTORIA)
+    }),
+    ...assinantes.map((a, i) =>
+      docusign.Signer.constructFromObject({
+        email: a.email,
+        name: a.nome,
+        recipientId: DESTINATARIO_VISTORIA.assinante(i + 1),
+        routingOrder: '2',
+        tabs: tabAssinar(ANCORA_VISTORIA.assinante(i + 1), DOCUMENTO_ID.termo, a.nome, LARGURA_LINHA_VISTORIA)
+      })
+    )
+  ];
+  // e-mails reservados para exemplos (example.com etc.) são de teste: não mandam cópia a uma pessoa real
+  const todosDeTeste = assinantes.every((p) => ehEmailDeExemplo(p.email));
+  const carbonCopies =
+    copia && (!todosDeTeste || ehEmailDeExemplo(copia.email))
+      ? [docusign.CarbonCopy.constructFromObject({ email: copia.email, name: copia.nome, recipientId: DESTINATARIO_VISTORIA.copia, routingOrder: '3' })]
+      : [];
+
+  const envelope = docusign.EnvelopeDefinition.constructFromObject({
+    emailSubject: 'Calper — assine o Termo de Recebimento do Imóvel da sua unidade',
+    emailBlurb: 'A Calper já assinou. Falta a sua assinatura no Termo de Recebimento do Imóvel: abra pelo botão abaixo, confira e assine. Dúvidas, procure a equipe Calper.',
+    documents: [documento],
+    recipients: docusign.Recipients.constructFromObject({ signers, carbonCopies }),
+    status: 'sent'
+  });
+  const criado = await envelopesApi.createEnvelope(env.DOCUSIGN_ACCOUNT_ID, { envelopeDefinition: envelope });
+  return { envelopeId: criado.envelopeId, comCopia: carbonCopies.length > 0 };
+}
+
+/** Situação do envelope da vistoria: status, se a Calper assinou e quem (entre proprietários/procurador) ainda falta. */
+export async function situacaoDoEnvelopeVistoria(envelopeId) {
+  const apiClient = await clienteAutenticado();
+  const envelopesApi = new docusign.EnvelopesApi(apiClient);
+  const [envelope, recipientes] = await Promise.all([
+    envelopesApi.getEnvelope(env.DOCUSIGN_ACCOUNT_ID, envelopeId),
+    envelopesApi.listRecipients(env.DOCUSIGN_ACCOUNT_ID, envelopeId)
+  ]);
+  const signers = recipientes.signers ?? [];
+  const clientes = signers.filter((s) => s.recipientId !== DESTINATARIO_VISTORIA.calper);
+  return {
+    status: envelope.status,
+    calperAssinou: signers.find((s) => s.recipientId === DESTINATARIO_VISTORIA.calper)?.status === 'completed',
+    clientes: clientes.map((s) => ({ nome: s.name, email: s.email, recipientId: s.recipientId, assinou: s.status === 'completed' })),
+    clientesPendentes: clientes.filter((s) => s.status !== 'completed').map((s) => ({ nome: s.name, email: s.email, status: s.status }))
+  };
 }

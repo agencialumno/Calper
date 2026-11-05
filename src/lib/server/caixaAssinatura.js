@@ -5,10 +5,13 @@ export const LARGURA_LINHA = 440; // largura da linha de assinatura nos PDFs, em
 // mostra o nome do signatário): nomes longos e em maiúsculas ficam bem mais largos. Estimamos a largura pelo nome
 // (calibrado com assinaturas reais: ~11,3 pt por letra em MAIÚSCULAS e ~8,6 pt em minúsculas, na escala 1,5)
 // e deslocamos a âncora pra a caixa ficar centralizada sobre a linha.
-export function xOffsetCentralizado(nome) {
+// Termo de vistoria: linha mais curta (330 pt) e centralizada na página.
+export const LARGURA_LINHA_VISTORIA = 330;
+
+export function xOffsetCentralizado(nome, larguraLinha = LARGURA_LINHA) {
   const texto = String(nome ?? '').trim();
   const porLetra = texto === texto.toUpperCase() ? 11.3 : 8.6;
-  const largura = Math.min(LARGURA_LINHA - 10, texto.length * porLetra);
-  return String(Math.max(5, Math.round((LARGURA_LINHA - largura) / 2)));
+  const largura = Math.min(larguraLinha - 10, texto.length * porLetra);
+  return String(Math.max(5, Math.round((larguraLinha - largura) / 2)));
 }
 

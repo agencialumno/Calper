@@ -66,7 +66,32 @@ Rio de Janeiro, {{dataAssinatura}}.
 
 [ASSINATURA DO INVESTIDOR: {{assinante}}]`;
 
-export const PADROES = { [TIPO_TERMO]: TERMO_PADRAO, [TIPO_CHECKLIST]: CHECKLIST_PADRAO };
+// Termo de Recebimento do Imóvel (vistoria aceita) — FORM-020 Rev. 06. As linhas de assinatura (proprietários e
+// representante da Calper) são acrescentadas na hora, conforme quem comparece e quem atende (ver server/vistoria.js).
+export const TIPO_TERMO_VISTORIA = 'termo_vistoria';
+export const TERMO_VISTORIA_PADRAO = `TERMO DE RECEBIMENTO DO IMÓVEL
+FICHA DE VISTORIA E ENTREGA DE UNIDADE - FORM-020 - Rev. 06
+Obra: Murano Residencial
+Bloco: {{bloco}} | Unidade: {{unidade}}
+Nome do Cliente: {{proprietarios}}
+
+Declaro, para todos os fins e efeitos legais, que realizei uma vistoria completa e minuciosa da unidade e atesto a inexistência de defeitos visíveis.
+
+Não foram identificados quaisquer defeitos ou vícios construtivos aparentes (visíveis) na unidade. O estado da unidade está em total e plena conformidade com os projetos arquitetônicos, complementares e o memorial descritivo do empreendimento.
+
+Rio de Janeiro, {{dataAssinatura}}.
+
+{{assinaturas}}
+
+Assinatura Eletrônica via DocuSign
+
+As Partes reconhecem e aceitam a validade jurídica da assinatura eletrônica realizada por meio da plataforma DocuSign para o presente instrumento, nos termos do artigo 10, § 2º, da Medida Provisória nº 2.200-2/2001, combinado com o artigo 4º, incisos I "a" e II, da Lei nº 14.063/2020, dispensando-se certificação digital ICP-Brasil. O link de assinatura será enviado ao e-mail e/ou telefone constantes do cadastro do investidor junto ao contrato de compra e venda da unidade.`;
+
+export const PADROES = {
+  [TIPO_TERMO]: TERMO_PADRAO,
+  [TIPO_CHECKLIST]: CHECKLIST_PADRAO,
+  [TIPO_TERMO_VISTORIA]: TERMO_VISTORIA_PADRAO
+};
 
 const SEPARADOR_QTDE = ' — Qtde. ';
 

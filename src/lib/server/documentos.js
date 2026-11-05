@@ -3,6 +3,7 @@ import { db } from './db.js';
 import { PADROES } from '../documentosPadrao.js';
 import { gerarPdfTermo } from './pdfTermo.js';
 import { gerarPdfChecklist } from './pdfChecklist.js';
+import { gerarPdfVistoria } from './pdfVistoria.js';
 
 /** Template do empreendimento; cria com o texto padrão na primeira vez. */
 export async function obterTemplate(empreendimentoId, tipo) {
@@ -189,6 +190,7 @@ function quebrarLinhas(fonte, texto, tamanho, larguraMax) {
 export async function gerarPdfBase64(texto, titulo, tipo = null) {
   if (tipo === 'termo') return gerarPdfTermo(texto, titulo);
   if (tipo === 'checklist') return gerarPdfChecklist(texto, titulo);
+  if (tipo === 'vistoria') return gerarPdfVistoria(texto, titulo);
   const pdf = await PDFDocument.create();
   pdf.setTitle(titulo);
   const normal = await pdf.embedFont(StandardFonts.Helvetica);
