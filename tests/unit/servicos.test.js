@@ -55,3 +55,17 @@ describe('Bloco 3', () => {
     expect(AVISO_BLOCO_VISTORIA).toContain('apenas para o Bloco 3');
   });
 });
+
+import { dataMinimaVistoria, respeitaAntecedenciaVistoria, ANTECEDENCIA_MINIMA_VISTORIA_DIAS } from '../../src/lib/servicos.js';
+describe('antecedência mínima da vistoria', () => {
+  const agora = new Date('2026-11-17T15:00:00Z'); // dia 17 em São Paulo
+  it('constante única vale 3', () => expect(ANTECEDENCIA_MINIMA_VISTORIA_DIAS).toBe(3));
+  it('hoje+2 recusa, hoje+3 aceita', () => {
+    expect(dataMinimaVistoria(agora)).toBe('2026-11-20');
+    expect(respeitaAntecedenciaVistoria('2026-11-19', agora)).toBe(false);
+    expect(respeitaAntecedenciaVistoria('2026-11-20', agora)).toBe(true);
+  });
+  it('usa o dia de São Paulo (01h UTC ainda é o dia anterior)', () => {
+    expect(dataMinimaVistoria(new Date('2026-11-18T01:00:00Z'))).toBe('2026-11-20');
+  });
+});
