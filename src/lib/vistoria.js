@@ -3,6 +3,7 @@
 
 export const TIPO_DOCUMENTO_VISTORIA = 'termo_vistoria';
 export const NOME_DOCUMENTO_VISTORIA = 'Termo de Recebimento do Imóvel';
+export const NOME_DOCUMENTO_FICHA = 'Ficha de Vistoria e Entrega de Unidade (FORM-020)';
 export const MAX_ASSINANTES = 6;
 
 export const RESULTADO = { aceita: 'aceita', naoAceita: 'nao_aceita' };
@@ -12,6 +13,8 @@ export const ROTULO_RESULTADO = { aceita: 'Vistoria aceita', nao_aceita: 'Vistor
 export function rotuloDaVistoria(ag) {
   // aceita só vale depois do termo assinado por todos (o agendamento vira "realizado"); antes disso ainda falta assinar
   if (ag.vistoriaResultado === RESULTADO.aceita && ag.status !== 'realizado') return 'Aceita — aguardando assinatura do termo';
+  // não aceita só vale depois da ficha de reparos assinada por todos (o agendamento vira "realizado")
+  if (ag.vistoriaResultado === RESULTADO.naoAceita && ag.status !== 'realizado') return 'Não aceita — aguardando assinatura da ficha';
   if (ag.vistoriaResultado && ROTULO_RESULTADO[ag.vistoriaResultado]) return ROTULO_RESULTADO[ag.vistoriaResultado];
   if (ag.status === 'cancelado') return 'Desmarcada';
   return ag.vistoriaPresentes?.length || ag.checkinEm ? 'Em andamento' : 'Agendada';

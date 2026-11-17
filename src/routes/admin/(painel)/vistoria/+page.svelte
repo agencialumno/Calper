@@ -78,7 +78,7 @@
             <div class="mt-3 text-xs text-gray-500">Desmarcado{a.motivoCancelamento ? ` — motivo: ${a.motivoCancelamento}` : ''}. <a href="/admin/vistoria/{a.id}" class="font-bold text-calper-red">Ver registro</a></div>
           {:else}
             <div class="flex items-center gap-3 mt-3 text-xs font-bold">
-              <a href="/admin/vistoria/{a.id}{a.status === 'realizado' ? '?passo=5' : ''}" class="text-white bg-calper-red px-3 py-1.5 rounded-lg" data-testid="iniciar-atendimento-vistoria">
+              <a href="/admin/vistoria/{a.id}{a.status === 'realizado' ? '?passo=4' : ''}" class="text-white bg-calper-red px-3 py-1.5 rounded-lg" data-testid="iniciar-atendimento-vistoria">
                 {a.status === 'realizado' ? 'Ver atendimento' : 'Iniciar atendimento'}
               </a>
             </div>

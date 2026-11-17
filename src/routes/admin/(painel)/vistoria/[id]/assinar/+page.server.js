@@ -1,14 +1,14 @@
 import { redirect } from '@sveltejs/kit';
 import { gerarUrlAssinatura } from '$lib/server/docusign.js';
 import { buscarVistoria, documentoDaVistoria } from '$lib/server/vistoria.js';
-import { NOME_DOCUMENTO_VISTORIA } from '$lib/vistoria.js';
+import { NOME_DOCUMENTO_FICHA, NOME_DOCUMENTO_VISTORIA, RESULTADO } from '$lib/vistoria.js';
 
 // Tela que embute a cerimônia de assinatura da Calper (o funcionário que atende) num iframe, sem sair do admin.
 // A URL do DocuSign é de uso único e expira em minutos: é gerada a cada abertura.
 export async function load({ params, url, locals }) {
   const ag = await buscarVistoria(params.id);
   const doc = documentoDaVistoria(ag);
-  const voltarPara = `/admin/vistoria/${ag.id}?passo=4`;
+  const voltarPara = `/admin/vistoria/${ag.id}?passo=3`;
   if (!doc) throw redirect(303, voltarPara);
   if (doc.status !== 'pendente') throw redirect(303, `${voltarPara}&aviso=${doc.status === 'assinado' ? 'ja-assinado' : 'calper-assinou'}`);
 
@@ -30,7 +30,7 @@ export async function load({ params, url, locals }) {
   return {
     urlAssinatura,
     erro,
-    tituloDocumento: NOME_DOCUMENTO_VISTORIA,
+    tituloDocumento: ag.vistoriaResultado === RESULTADO.naoAceita ? NOME_DOCUMENTO_FICHA : NOME_DOCUMENTO_VISTORIA,
     unidade: `Bloco ${ag.unidade.bloco} - nº ${ag.unidade.numero}`,
     signatario: locals.funcionario.nome,
     voltarPara

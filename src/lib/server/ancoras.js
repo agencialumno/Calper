@@ -23,3 +23,18 @@ export const ANCORA_VISTORIA = {
   calper: '[VISTORIA M1]',
   assinante: (n) => `[VISTORIA ASSINANTE ${n}]`
 };
+
+// Ficha de reparos (parte superior do FORM-020, vistoria não aceita): âncoras próprias, diferentes das do Termo de
+// Recebimento (parte inferior). Assim, na revistoria, o novo envelope usa o PDF já assinado como base e só as âncoras
+// do termo recebem caixas: as da ficha (já assinada) não são tocadas.
+export const ANCORA_FICHA = {
+  calper: '[FICHA M1]',
+  assinante: (n) => `[FICHA ASSINANTE ${n}]`
+};
+
+// Campos que quem acompanha pela Calper preenche na hora de assinar (obrigatórios): nome, sobrenome e rubrica.
+// Âncora invisível sobre cada linha, uma série por parte do documento.
+export const CAMPOS_CALPER = {
+  termo: { nome: '[VISTORIA M1 NOME]', sobrenome: '[VISTORIA M1 SOBRENOME]', rubrica: '[VISTORIA M1 RUBRICA]' },
+  ficha: { nome: '[FICHA M1 NOME]', sobrenome: '[FICHA M1 SOBRENOME]', rubrica: '[FICHA M1 RUBRICA]' }
+};

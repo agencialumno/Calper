@@ -232,6 +232,7 @@
         <div class="text-sm font-bold text-calper-dark mb-4">Vistorias</div>
         <div class="flex flex-col gap-2.5">
           {#each u.agendamentos.filter((a) => a.ehVistoria) as a (a.id)}
+            {@const ultimaVistoria = u.agendamentos.filter((x) => x.ehVistoria && x.status !== 'cancelado').sort((x, y) => y.vistoriaNumero - x.vistoriaNumero)[0]}
             {@const termo = a.documentos.find((d) => d.tipo === 'termo_vistoria')}
             <div class="border border-gray-100 rounded-xl p-3" data-testid="vistoria-item">
               <div class="flex items-center justify-between gap-3">
@@ -246,8 +247,13 @@
                 <div class="text-xs text-gray-500 mt-0.5">Telefone para contato: {a.vistoriaTelefone ?? '—'}</div>
               {/if}
               <div class="flex items-center gap-3 mt-2 text-xs font-bold">
+                {#if ultimaVistoria?.id === a.id && a.vistoriaResultado === 'nao_aceita' && a.status === 'realizado'}
+                  <form method="POST" action="/admin/vistoria/{a.id}/iniciar-revistoria" data-testid="iniciar-revistoria-unidade">
+                    <button type="submit" class="btn-primary !py-1.5 !px-3 text-xs">Iniciar revistoria</button>
+                  </form>
+                {/if}
                 {#if termo?.status === 'assinado'}<LinkDownload href="/admin/vistoria/{a.id}/documento" class="text-calper-red">Baixar termo assinado</LinkDownload>{/if}
-                <a href="/admin/vistoria/{a.id}{a.status === 'realizado' ? '?passo=5' : ''}" class="text-calper-red">Abrir atendimento →</a>
+                <a href="/admin/vistoria/{a.id}{a.status === 'realizado' ? '?passo=4' : ''}" class="text-calper-red">Abrir atendimento →</a>
               </div>
             </div>
           {/each}

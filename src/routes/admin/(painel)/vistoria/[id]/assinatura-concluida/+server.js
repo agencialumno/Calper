@@ -7,8 +7,8 @@ export async function GET(event) {
   if (!locals.funcionario) throw redirect(303, '/admin/login');
   const ag = await buscarVistoria(params.id);
   const doc = documentoDaVistoria(ag);
-  if (!doc) throw redirect(303, `/admin/vistoria/${ag.id}?passo=4`);
+  if (!doc) throw redirect(303, `/admin/vistoria/${ag.id}?passo=3`);
   const { status } = await sincronizarTermoVistoria({ ...doc, agendamentoId: ag.id }, event);
-  if (status === 'pendente') throw redirect(303, `/admin/vistoria/${ag.id}?passo=4&aviso=nao-assinado`);
-  throw redirect(303, `/admin/vistoria/${ag.id}?passo=${status === 'assinado' ? 5 : 4}${status === 'aguardando_cliente' ? '&aviso=aguardando-cliente' : ''}`);
+  if (status === 'pendente') throw redirect(303, `/admin/vistoria/${ag.id}?passo=3&aviso=nao-assinado`);
+  throw redirect(303, `/admin/vistoria/${ag.id}?passo=${status === 'assinado' ? 4 : 3}${status === 'aguardando_cliente' ? '&aviso=aguardando-cliente' : ''}`);
 }

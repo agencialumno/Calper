@@ -14,13 +14,16 @@ import {
   abrirRevistoria,
   buscarVistoria,
   documentoDaVistoria,
+  baseDaRevistoria,
   enviarTermoVistoria,
+  montarFichaVistoria,
   montarTermoVistoria,
   procuracaoValidaParaProcurador,
   signatariosDoAgendamento,
   sincronizarTermoVistoria
 } from '$lib/server/vistoria.js';
 import {
+  NOME_DOCUMENTO_FICHA,
   NOME_DOCUMENTO_VISTORIA,
   RESULTADO,
   motivoSemRevistoria,
@@ -41,8 +44,8 @@ export async function load(event) {
   const ag = await buscarVistoria(params.id);
   const u = ag.unidade;
   // vistoria já concluída: abre direto o resumo
-  if (ag.status === 'realizado' && !url.searchParams.get('passo')) throw redirect(303, irPara(ag.id, 5));
-  const passo = Math.min(5, Math.max(1, Number(url.searchParams.get('passo')) || 1));
+  if (ag.status === 'realizado' && !url.searchParams.get('passo')) throw redirect(303, irPara(ag.id, 4));
+  const passo = Math.min(4, Math.max(1, Number(url.searchParams.get('passo')) || 1));
 
   // documento aberto no DocuSign: confere lá se a Calper e os proprietários já assinaram
   let clientes = [];
@@ -65,7 +68,7 @@ export async function load(event) {
 
   // navegação livre; o que ainda não pode ser feito explica o motivo e leva à etapa que resolve
   let bloqueio = null;
-  if (passo >= 2 && passo <= 4 && !temPresencaValida) {
+  if (passo >= 2 && passo <= 3 && !temPresencaValida) {
     bloqueio = {
       texto: procuradorPresente
         ? 'Quem comparece é procurador: anexe a procuração antes de seguir.'
@@ -73,11 +76,9 @@ export async function load(event) {
       passo: 1,
       rotulo: 'Ir para "Quem comparece"'
     };
-  } else if (passo === 4 && ag.vistoriaResultado !== RESULTADO.aceita && ag.vistoriaResultado !== RESULTADO.naoAceita) {
-    bloqueio = { texto: 'Registre o resultado da vistoria antes de seguir para o documento.', passo: 3, rotulo: 'Ir para "Resultado"' };
-  } else if (passo === 4 && ag.vistoriaResultado === RESULTADO.naoAceita) {
-    bloqueio = { texto: 'Vistoria não aceita: não há documento nem assinatura. Os reparos ficam registrados no resultado.', passo: 5, rotulo: 'Ver o resumo' };
-  } else if (passo === 4 && !quem.ok) {
+  } else if (passo === 3 && ag.vistoriaResultado !== RESULTADO.aceita && ag.vistoriaResultado !== RESULTADO.naoAceita) {
+    bloqueio = { texto: 'Registre o resultado da vistoria antes de seguir para o documento.', passo: 2, rotulo: 'Ir para "Resultado"' };
+  } else if (passo === 3 && !quem.ok) {
     bloqueio = { texto: quem.erro, passo: 1, rotulo: 'Ir para "Quem comparece"' };
   }
 
@@ -104,6 +105,9 @@ export async function load(event) {
     bloqueio,
     calper: { nome: locals.funcionario.nome, email: locals.funcionario.email },
     documento: doc ? { status: doc.status } : null,
+    ehFicha: ag.vistoriaResultado === RESULTADO.naoAceita,
+    nomeDocumento: ag.vistoriaResultado === RESULTADO.naoAceita ? NOME_DOCUMENTO_FICHA : NOME_DOCUMENTO_VISTORIA,
+    baseRevistoria: null,
     anterior: anteriorAg
       ? { id: anteriorAg.id, numero: anteriorAg.vistoriaNumero, reparos: anteriorAg.vistoriaReparos ?? '', telefone: anteriorAg.vistoriaTelefoneRetorno ?? '', observacoes: anteriorAg.observacoesAtendimento ?? '', concluidaEm: anteriorAg.vistoriaConcluidaEm }
       : null,
@@ -147,7 +151,11 @@ export async function load(event) {
     documentoLiberado: !travado(ag) && !calperJaAssinou
   };
 
-  if (!bloqueio && passo === 4 && !calperJaAssinou) {
+  if (!bloqueio && passo === 3 && !calperJaAssinou) {
+    if (ag.vistoriaResultado === RESULTADO.naoAceita) return { ...base, texto: await montarFichaVistoria(ag, locals.funcionario.nome) };
+    // revistoria aceita: o termo vai sobre o PDF assinado da vistoria anterior (sem texto para editar)
+    const baseRev = await baseDaRevistoria(ag);
+    if (baseRev) return { ...base, texto: null, baseRevistoria: { numero: baseRev.numero, pdfBase64: baseRev.pdfBase64 } };
     return { ...base, texto: await montarTermoVistoria(ag, locals.funcionario.nome) };
   }
   return base;
@@ -259,7 +267,7 @@ export const actions = {
     return { sucesso: 'observacoes' };
   },
 
-  // Etapa 3: resultado. Aceita → segue para o termo. Não aceita → reparos e telefone, sem documento; a vistoria fecha aqui.
+  // Etapa 2: resultado. Aceita → Termo de Recebimento. Não aceita → reparos e telefone, e a Ficha de reparos (FORM-020, parte superior) vai para assinatura; a vistoria só fecha com ela assinada.
   registrarResultado: async (event) => {
     const { request, params, locals } = event;
     const ag = await buscarVistoria(params.id);
@@ -288,7 +296,7 @@ export const actions = {
         entidadeTipo: 'Agendamento',
         entidadeId: ag.id
       });
-      throw redirect(303, irPara(ag.id, 4));
+      throw redirect(303, irPara(ag.id, 3));
     }
 
     if (resultado !== RESULTADO.naoAceita) return fail(400, { erro: 'Escolha o resultado da vistoria: aceita ou não aceita.' });
@@ -297,30 +305,20 @@ export const actions = {
     if (reparos.length < 3) return fail(400, { erro: 'Descreva os reparos necessários: o campo é obrigatório na vistoria não aceita.' });
     if (somenteDigitos(telefone).length < 10) return fail(400, { erro: 'Informe um telefone para contato (com DDD): o campo é obrigatório na vistoria não aceita.' });
 
-    await db.$transaction([
-      db.agendamento.update({
-        where: { id: ag.id },
-        data: {
-          vistoriaResultado: RESULTADO.naoAceita,
-          vistoriaReparos: reparos,
-          vistoriaTelefoneRetorno: telefone,
-          status: 'realizado',
-          vistoriaConcluidaEm: new Date()
-        }
-      }),
-      db.historicoUnidade.create({
-        data: { unidadeId: ag.unidadeId, tipo: 'apontamento', descricao: `${ag.vistoriaNumero > 1 ? `Revistoria (${ag.vistoriaNumero}ª vistoria)` : `Vistoria ${ag.vistoriaNumero}`} não aceita. Reparos: ${reparos.slice(0, 500)}. Telefone para contato: ${telefone}. Atendido por: ${locals.funcionario.nome}`, criadoPorId: locals.funcionario.id }
-      })
-    ]);
+    // a vistoria continua em andamento até a ficha ser assinada por todos (sincronizarTermoVistoria fecha e registra no histórico)
+    await db.agendamento.update({
+      where: { id: ag.id },
+      data: { vistoriaResultado: RESULTADO.naoAceita, vistoriaReparos: reparos, vistoriaTelefoneRetorno: telefone }
+    });
     await registrarLog({
       event,
       atorTipo: 'funcionario',
-      acao: 'vistoria_nao_aceita',
-      descricao: `${rotuloFuncionario(locals.funcionario)} registrou a vistoria ${ag.vistoriaNumero} como não aceita — ${local}. Reparos: "${reparos.slice(0, 200)}". Telefone: ${telefone}`,
+      acao: 'vistoria_resultado_nao_aceita',
+      descricao: `${rotuloFuncionario(locals.funcionario)} registrou a vistoria ${ag.vistoriaNumero} como não aceita — ${local}; falta a ficha de reparos assinada. Reparos: "${reparos.slice(0, 200)}". Telefone: ${telefone}`,
       entidadeTipo: 'Agendamento',
       entidadeId: ag.id
     });
-    throw redirect(303, irPara(ag.id, 5));
+    throw redirect(303, irPara(ag.id, 3));
   },
 
   // Leitura do termo (PDF) na tela do atendimento, antes de criar o envelope.
@@ -332,7 +330,7 @@ export const actions = {
     const quem = signatariosDoAgendamento(ag);
     if (!quem.ok) return fail(400, { erro: quem.erro });
     try {
-      return { previa: { pdfBase64: await gerarPdfBase64(texto, NOME_DOCUMENTO_VISTORIA, 'vistoria') } };
+      return { previa: { pdfBase64: await gerarPdfBase64(texto, ag.vistoriaResultado === RESULTADO.naoAceita ? NOME_DOCUMENTO_FICHA : NOME_DOCUMENTO_VISTORIA, 'vistoria') } };
     } catch (err) {
       console.error('Prévia do termo da vistoria:', err);
       return fail(400, { erro: 'Não foi possível gerar a leitura do documento.' });

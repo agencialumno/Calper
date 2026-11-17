@@ -16,7 +16,7 @@
   let abrirCorrecao = $state(false);
   const travada = $derived(a.status === 'cancelado' || a.status === 'realizado');
 
-  const passos = ['Quem comparece', 'Vistoria', 'Resultado', 'Termo', 'Concluído'];
+  const passos = ['Quem comparece', 'Resultado', 'Documento', 'Concluído'];
   const href = (passo) => `?passo=${passo}`;
 
   // etapa 1: quem comparece
@@ -185,7 +185,7 @@
     {/each}
   </ol>
 
-  {#if data.bloqueio && data.passo >= 2 && data.passo <= 4}
+  {#if data.bloqueio && data.passo >= 2 && data.passo <= 3}
     <div class="card p-6 flex flex-col gap-3" data-testid="etapa-bloqueada">
       <div class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">{data.bloqueio.texto}</div>
       <a href={href(data.bloqueio.passo)} class="btn-primary text-center">{data.bloqueio.rotulo}</a>
@@ -202,7 +202,7 @@
     </div>
   {/if}
 
-  {#if data.bloqueio && data.passo >= 2 && data.passo <= 4}
+  {#if data.bloqueio && data.passo >= 2 && data.passo <= 3}
     <!-- (etapa bloqueada: o aviso está acima) -->
 
   <!-- ETAPA 1 — quem comparece -->
@@ -296,39 +296,20 @@
       {#if data.presentes.length}<a href={href(2)} class="text-center text-sm text-gray-500">Avançar sem alterar →</a>{/if}
     </form>
 
-  <!-- ETAPA 2 — vistoria no apartamento -->
+  <!-- ETAPA 2 — resultado -->
   {:else if data.passo === 2}
-    <div class="card p-6 flex flex-col gap-4" data-testid="etapa-vistoria">
-      <div class="text-sm font-bold text-calper-dark">Vistoria no apartamento</div>
-      {#if data.anterior}
-        <div class="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 flex flex-col gap-1.5" data-testid="vistoria-anterior">
-          <div class="text-sm font-bold text-amber-900">Reparos da {data.anterior.numero}ª vistoria (não aceita): confira se foram feitos</div>
-          <div class="text-sm text-gray-800 whitespace-pre-line" data-testid="reparos-anteriores">{data.anterior.reparos}</div>
-          {#if data.anterior.observacoes}<div class="text-xs text-gray-700 whitespace-pre-line"><span class="font-bold">Observações do atendimento anterior:</span> <span data-testid="observacoes-anteriores">{data.anterior.observacoes}</span></div>{/if}
-          {#if data.anterior.telefone}<div class="text-xs text-gray-600">Telefone para contato: {data.anterior.telefone}</div>{/if}
-          <a href="/admin/vistoria/{data.anterior.id}?passo=5" class="text-xs font-bold text-calper-red">Ver o atendimento anterior →</a>
-        </div>
-      {/if}
-      <p class="text-sm text-gray-600">Faça a vistoria com {data.presentes.map((p) => p.nome).join(', ')} no apartamento. Anote abaixo o que for útil; o resultado é registrado na próxima etapa.</p>
-      <form method="POST" action="?/salvarObservacoes" use:enhance={() => async ({ update }) => update({ reset: false })} class="flex flex-col gap-2">
-        <label for="observacoes" class="text-xs font-semibold text-gray-500">Observações do atendimento</label>
-        <textarea id="observacoes" name="observacoes" rows="4" maxlength="2000" class="input text-sm">{a.observacoes}</textarea>
-        <div class="flex items-center gap-3 text-xs">
-          <button type="submit" class="btn-outline !py-2 !px-4 text-sm">Salvar observações</button>
-          {#if form?.sucesso === 'observacoes'}<span class="text-green-700 font-semibold">Observações salvas.</span>{/if}
-        </div>
-      </form>
-      <div class="flex gap-2 text-sm text-gray-500">
-        <a href={href(1)} class="flex-1 text-center">← Voltar</a>
-        <a href={href(3)} class="btn-primary flex-1 text-center">Vistoria feita: registrar o resultado</a>
-      </div>
-    </div>
-
-  <!-- ETAPA 3 — resultado -->
-  {:else if data.passo === 3}
     <form method="POST" action="?/registrarResultado" use:enhance={aoEnviar} class="card p-6 flex flex-col gap-4" data-testid="form-resultado">
       <div class="text-sm font-bold text-calper-dark">Resultado da vistoria</div>
-      {#if travada}
+        {#if data.anterior}
+            <div class="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 flex flex-col gap-1.5" data-testid="vistoria-anterior">
+              <div class="text-sm font-bold text-amber-900">Reparos da {data.anterior.numero}ª vistoria (não aceita): confira se foram feitos</div>
+              <div class="text-sm text-gray-800 whitespace-pre-line" data-testid="reparos-anteriores">{data.anterior.reparos}</div>
+              {#if data.anterior.observacoes}<div class="text-xs text-gray-700 whitespace-pre-line"><span class="font-bold">Observações do atendimento anterior:</span> <span data-testid="observacoes-anteriores">{data.anterior.observacoes}</span></div>{/if}
+              {#if data.anterior.telefone}<div class="text-xs text-gray-600">Telefone para contato: {data.anterior.telefone}</div>{/if}
+              <a href="/admin/vistoria/{data.anterior.id}?passo=4" class="text-xs font-bold text-calper-red">Ver o atendimento anterior →</a>
+            </div>
+          {/if}
+      {#if travada || data.documento}
         <div class="rounded-xl border border-gray-200 px-4 py-3 text-sm text-calper-dark" data-testid="resultado-registrado">
           <strong>{a.resultadoRotulo}</strong>
           {#if a.resultado === 'nao_aceita'}
@@ -341,7 +322,7 @@
           <input type="radio" name="resultado" value="aceita" bind:group={resultado} required /> <span><strong>Aceita</strong> — segue para o Termo de Recebimento do Imóvel</span>
         </label>
         <label class="flex items-center gap-2.5 text-sm text-calper-dark border border-gray-100 rounded-xl p-3">
-          <input type="radio" name="resultado" value="nao_aceita" bind:group={resultado} required /> <span><strong>Não aceita</strong> — reparos necessários, sem documento e sem assinatura</span>
+          <input type="radio" name="resultado" value="nao_aceita" bind:group={resultado} required /> <span><strong>Não aceita</strong> — reparos necessários; a Ficha de reparos (FORM-020) vai para assinatura</span>
         </label>
         {#if resultado === 'nao_aceita'}
           <div class="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
@@ -353,23 +334,36 @@
               <label for="telefoneRetorno" class="block text-xs font-semibold text-gray-500 mb-1">Telefone para contato (obrigatório)</label>
               <input id="telefoneRetorno" name="telefoneRetorno" class="input !py-2 text-sm" value={a.telefoneRetorno} required />
             </div>
-            <p class="text-xs text-gray-500">Ao registrar, a vistoria é encerrada como "Vistoria não aceita". Admin e supervisor abrem a revistoria depois.</p>
+            <p class="text-xs text-gray-500">Ao registrar, a Ficha de reparos (parte superior do FORM-020) é gerada: a Calper assina primeiro, depois o cliente. A vistoria só é concluída como "Vistoria não aceita" com a ficha assinada.</p>
           </div>
         {/if}
         <div class="flex gap-2">
-          <a href={href(2)} class="btn-outline text-center flex-1">Voltar</a>
+          <a href={href(1)} class="btn-outline text-center flex-1">Voltar</a>
           <div class="flex-1"><SubmitButton loading={enviando}>Registrar resultado</SubmitButton></div>
         </div>
       {/if}
-      {#if a.resultado === 'aceita'}<a href={href(4)} class="text-center text-sm text-gray-500">Ir para o termo →</a>{/if}
+      {#if a.resultado}<a href={href(3)} class="text-center text-sm text-gray-500">Ir para o documento →</a>{/if}
     </form>
 
-  <!-- ETAPA 4 — termo (a Calper assina primeiro, depois os proprietários) -->
-  {:else if data.passo === 4}
+  <!-- ETAPA 3 — documento (a Calper assina primeiro, depois os proprietários): Termo de Recebimento ou Ficha de reparos -->
+  {:else if data.passo === 3}
     {#if data.documento && data.documento.status !== 'pendente'}
       {@render andamento()}
       {#if data.documento.status !== 'assinado'}{@render corrigirEmail()}{/if}
     {:else}
+      {#if data.baseRevistoria}
+      <form method="POST" action="?/enviar" use:enhance={aoEnviar} class="card p-6 flex flex-col gap-3" data-testid="form-revistoria-documento">
+        {@render quemAssina()}
+        <div class="text-sm text-gray-700 border border-gray-100 rounded-xl p-4" data-testid="base-revistoria">
+          A revistoria usa o <strong>mesmo documento já assinado da {data.baseRevistoria.numero}ª vistoria</strong> (FORM-020). A Calper assina o
+          <strong>Termo de Recebimento</strong>, na parte de baixo, e depois o cliente, aprovando a unidade. As assinaturas da ficha de reparos continuam no documento, sem alteração.
+        </div>
+        <SubmitButton loading={enviando}>Assinar pela Calper</SubmitButton>
+        <div class="flex gap-2 text-sm text-gray-500">
+          <a href={href(2)} class="flex-1 text-center">← Voltar</a>
+        </div>
+      </form>
+      {:else}
       <form method="POST" action="?/enviar" use:enhance={aoPedirDocumento} class="card p-6 flex flex-col gap-3">
         {@render quemAssina()}
         <textarea name="texto" rows="24" class="input text-sm font-mono" required>{data.texto}</textarea>
@@ -382,13 +376,13 @@
             <a href="/admin/vistoria/{a.id}/assinar" class="btn-outline text-center">Continuar a assinatura da Calper</a>
           {/if}
           <div class="flex gap-2 text-sm text-gray-500">
-            <a href={href(3)} class="flex-1 text-center">← Voltar</a>
-            <a href={href(5)} class="flex-1 text-center">Avançar →</a>
+            <a href={href(2)} class="flex-1 text-center">← Voltar</a>
+            <a href={href(4)} class="flex-1 text-center">Avançar →</a>
           </div>
         </div>
         {#if previa}
           <div class="fixed inset-0 z-50 bg-white flex flex-col">
-            <div class="px-4 py-3 border-b border-gray-100 text-sm font-bold text-calper-dark">Leitura — Termo de Recebimento do Imóvel (somente leitura)</div>
+            <div class="px-4 py-3 border-b border-gray-100 text-sm font-bold text-calper-dark">Leitura — {data.nomeDocumento} (somente leitura)</div>
             <iframe src={previa.url} title="Leitura do documento" class="flex-1 w-full border-0"></iframe>
             <div class="p-3 border-t border-gray-100 flex flex-col sm:flex-row gap-2">
               <button type="button" class="btn-outline flex-1" onclick={fecharPrevia}>Voltar e corrigir</button>
@@ -397,10 +391,11 @@
           </div>
         {/if}
       </form>
+      {/if}
       {@render corrigirEmail()}
     {/if}
 
-  <!-- ETAPA 5 — resumo -->
+  <!-- ETAPA 4 — resumo -->
   {:else}
     <div class="card p-6 flex flex-col gap-3" data-testid="resumo-vistoria">
       <div class="rounded-xl px-4 py-3 text-sm {a.resultado === 'nao_aceita' ? 'bg-red-50 border border-red-100 text-red-800' : a.status === 'realizado' ? 'bg-green-50 border border-green-100 text-green-800' : 'bg-gray-50 border border-gray-100 text-gray-700'}">
@@ -456,6 +451,11 @@
       {#if a.resultado === 'nao_aceita'}
         <div class="border border-gray-200 rounded-xl p-4 flex flex-col gap-3 mt-2" data-testid="revistoria">
           <div class="text-sm font-bold text-calper-dark">Revistoria</div>
+          {#if !data.revistoria.proxima && a.status === 'realizado'}
+            <form method="POST" action="/admin/vistoria/{a.id}/iniciar-revistoria" data-testid="form-iniciar-revistoria">
+              <button type="submit" class="btn-primary w-full text-center">Iniciar revistoria ({a.vistoriaNumero + 1}ª vistoria) agora</button>
+            </form>
+          {/if}
           {#if data.revistoria.proxima}
             <div class="text-sm text-gray-700">Já existe a {data.revistoria.proxima.vistoriaNumero}ª vistoria desta unidade. <a href="/admin/vistoria/{data.revistoria.proxima.id}" class="font-bold text-calper-red" data-testid="ir-revistoria">Abrir →</a></div>
           {:else if !data.revistoria.podeGerir}
@@ -489,7 +489,7 @@
         </div>
       {/if}
       <div class="flex gap-2 text-sm text-gray-500 mt-2">
-        <a href={href(a.resultado === 'aceita' ? 4 : 3)} class="flex-1 text-center">← Voltar</a>
+        <a href={href(a.resultado ? 3 : 2)} class="flex-1 text-center">← Voltar</a>
       </div>
     </div>
   {/if}
@@ -516,14 +516,14 @@
 {#snippet andamento()}
   <div class="card p-6 flex flex-col gap-4">
     {#if data.documento.status === 'assinado'}
-      <div class="text-sm font-bold text-green-700">Termo de Recebimento do Imóvel: assinado por todos.</div>
-      <a href={href(5)} class="btn-primary text-center">Ver o resumo</a>
+      <div class="text-sm font-bold text-green-700">{data.nomeDocumento}: assinado por todos.</div>
+      <a href={href(4)} class="btn-primary text-center">Ver o resumo</a>
     {:else}
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-xs font-bold px-2.5 py-1 rounded-full {alerta}">Calper assinou — aguardando os proprietários</span>
       </div>
       <div class="text-sm text-gray-600 flex flex-col gap-2">
-        <div>✔ A Calper assinou. O DocuSign enviou o e-mail com o termo para:</div>
+        <div>✔ A Calper assinou. O DocuSign enviou o e-mail com o documento para:</div>
         <ul class="flex flex-col gap-1.5">
           {#each data.signatarios as p (p.email)}
             {@const falta = data.pendentes.some((c) => c.email?.toLowerCase() === p.email?.toLowerCase())}
@@ -539,7 +539,7 @@
       <form method="POST" action="?/verificar" use:enhance={aoEnviar} class="flex flex-col gap-2">
         <SubmitButton loading={enviando}>Verificar agora no DocuSign</SubmitButton>
       </form>
-      <a href={href(5)} class="btn-outline text-center">Ver o resumo</a>
+      <a href={href(4)} class="btn-outline text-center">Ver o resumo</a>
     {/if}
   </div>
 {/snippet}

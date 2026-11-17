@@ -15,7 +15,7 @@ import {
   situacaoDoEnvelopeVistoria
 } from './docusign.js';
 import { registrarLog, rotuloFuncionario } from './log.js';
-import { NOME_DOCUMENTO_VISTORIA, TIPO_DOCUMENTO_VISTORIA, motivoSemRevistoria, presentesDoAgendamento, signatariosDaVistoria } from '../vistoria.js';
+import { NOME_DOCUMENTO_FICHA, NOME_DOCUMENTO_VISTORIA, RESULTADO, TIPO_DOCUMENTO_VISTORIA, motivoSemRevistoria, presentesDoAgendamento, signatariosDaVistoria } from '../vistoria.js';
 import { TIPO_TERMO_VISTORIA } from '../documentosPadrao.js';
 import { ORIGEM_DIRETO } from '../atendimentoDireto.js';
 
@@ -57,21 +57,45 @@ export function signatariosDoAgendamento(ag) {
   return signatariosDaVistoria(presentes, { procuracaoValida: procurador ? procuracaoValidaParaProcurador(ag, procurador.cpf) : false });
 }
 
-/** Linhas de assinatura do termo: um proprietário/procurador por signatário e o representante da Calper (quem atende). */
-export function linhasDeAssinatura(signatarios, calperNome) {
-  const linhas = signatarios.map((s, i) => `[ASSINATURA ${s.vinculo === 'procurador' ? 'PROCURADOR' : 'PROPRIETÁRIO'} ${i + 1}: ${s.nome}]`);
-  linhas.push(`[ASSINATURA REPRESENTANTE DA CALPER: ${calperNome}]`);
+/**
+ * Linhas de assinatura: a Calper (quem atende) primeiro e depois um proprietário/procurador por signatário, na mesma ordem
+ * do DocuSign. `ficha` = parte superior (Ficha de reparos); sem `ficha` = Termo de Recebimento. `semNomeCalper`: linha da
+ * Calper sem nome (parte do documento que ainda será assinada numa revistoria, por outra pessoa).
+ */
+export function linhasDeAssinatura(signatarios, calperNome, { ficha = false, semNomeCalper = false } = {}) {
+  const prefixo = ficha ? 'ASSINATURA FICHA' : 'ASSINATURA';
+  const linhas = [semNomeCalper || !calperNome ? `[${prefixo} REPRESENTANTE DA CALPER]` : `[${prefixo} REPRESENTANTE DA CALPER: ${calperNome}]`];
+  signatarios.forEach((s, i) => linhas.push(`[${prefixo} ${s.vinculo === 'procurador' ? 'PROCURADOR' : 'PROPRIETÁRIO'} ${i + 1}: ${s.nome}]`));
   return linhas.join('\n\n');
 }
 
 /** Garante que todas as linhas de assinatura esperadas existam no texto (se a equipe apagou alguma na prévia, volta). */
-export function ajustarAssinaturasVistoria(texto, signatarios, calperNome) {
-  const esperadas = linhasDeAssinatura(signatarios, calperNome).split('\n\n');
-  const prefixo = (l) => l.slice(0, l.indexOf(':'));
+export function ajustarAssinaturasVistoria(texto, signatarios, calperNome, { ficha = false } = {}) {
+  const esperadas = [
+    ...(ficha ? linhasDeAssinatura(signatarios, calperNome, { ficha: true }).split('\n\n') : []),
+    ...linhasDeAssinatura(signatarios, calperNome, { semNomeCalper: ficha }).split('\n\n')
+  ];
+  const prefixo = (l) => (l.includes(':') ? l.slice(0, l.indexOf(':')) : l.replace(/\]$/, ''));
   const existentes = new Set(texto.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('[ASSINATURA')).map(prefixo));
   const faltam = esperadas.filter((l) => !existentes.has(prefixo(l)));
   if (faltam.length === 0) return texto;
   return `${texto.trimEnd()}\n\n${faltam.join('\n\n')}`;
+}
+
+/** Variáveis do documento da vistoria (unidade, proprietários, datas) e o template do Termo de Recebimento. */
+async function baseDoDocumento(ag) {
+  const unidade = await db.unidade.findUnique({ where: { id: ag.unidadeId }, include: { investidores: { include: { investidor: true } } } });
+  const template = await obterTemplate(unidade.empreendimentoId, TIPO_TERMO_VISTORIA);
+  const resultado = signatariosDoAgendamento(ag);
+  const signatarios = resultado.ok ? resultado.signatarios : [];
+  const procurador = presentesDoAgendamento(ag).find((p) => p.vinculo === 'procurador');
+  const titulares = titularesDaUnidade(unidade);
+  const variaveis = montarVariaveis({
+    unidade,
+    partes: textosDePartes(titulares.map((t) => t.nome), procurador ? { vinculo: 'procurador', nome: procurador.nome } : null),
+    variaveisTemplate: null
+  });
+  return { template, signatarios, variaveis };
 }
 
 /**
@@ -79,23 +103,54 @@ export function ajustarAssinaturasVistoria(texto, signatarios, calperNome) {
  * Variáveis sem valor ficam como {{variável}} para a equipe completar na prévia.
  */
 export async function montarTermoVistoria(ag, calperNome) {
-  const unidade = await db.unidade.findUnique({ where: { id: ag.unidadeId }, include: { investidores: { include: { investidor: true } } } });
-  const template = await obterTemplate(unidade.empreendimentoId, TIPO_TERMO_VISTORIA);
-  const resultado = signatariosDoAgendamento(ag);
-  const signatarios = resultado.ok ? resultado.signatarios : [];
-  const procurador = presentesDoAgendamento(ag).find((p) => p.vinculo === 'procurador');
-  const titulares = titularesDaUnidade(unidade);
-  const variaveis = {
-    ...montarVariaveis({
-      unidade,
-      partes: textosDePartes(titulares.map((t) => t.nome), procurador ? { vinculo: 'procurador', nome: procurador.nome } : null),
-      variaveisTemplate: null
-    }),
-    assinaturas: linhasDeAssinatura(signatarios, calperNome)
-  };
+  const { template, signatarios, variaveis } = await baseDoDocumento(ag);
   // com o template antigo sem {{assinaturas}}, as linhas entram no fim
-  const texto = preencher(template.conteudo, variaveis);
+  const texto = preencher(template.conteudo, { ...variaveis, assinaturas: linhasDeAssinatura(signatarios, calperNome) });
   return ajustarAssinaturasVistoria(texto, signatarios, calperNome);
+}
+
+/**
+ * FORM-020 da vistoria NÃO aceita: a parte superior (Ficha de reparos) já preenchida, assinada agora (Calper, depois o
+ * cliente), e o Termo de Recebimento embaixo, ainda sem assinatura (se houver revistoria aceita, ela assina ali, sobre este mesmo PDF).
+ */
+export async function montarFichaVistoria(ag, calperNome) {
+  const { template, signatarios, variaveis } = await baseDoDocumento(ag);
+  const termo = preencher(template.conteudo, { ...variaveis, assinaturas: linhasDeAssinatura(signatarios, calperNome, { semNomeCalper: true }) });
+  const ficha = [
+    'FICHA DE REPAROS',
+    'FICHA DE VISTORIA E ENTREGA DE UNIDADE - FORM-020 - Rev. 06',
+    'Obra: Murano Residencial',
+    `Bloco: ${variaveis.bloco} | Unidade: ${variaveis.unidade}`,
+    `Nome do Cliente: ${variaveis.proprietarios}`,
+    `Vistoria: ${ag.vistoriaNumero}ª — resultado: VISTORIA NÃO ACEITA`,
+    '',
+    'Reparos necessários:',
+    String(ag.vistoriaReparos ?? '').trim(),
+    '',
+    `Telefone para contato: ${ag.vistoriaTelefoneRetorno ?? ''}`,
+    '',
+    `Rio de Janeiro, ${variaveis.dataAssinatura}.`,
+    '',
+    linhasDeAssinatura(signatarios, calperNome, { ficha: true }),
+    '',
+    '[PAGINA]',
+    ajustarAssinaturasVistoria(termo, signatarios, calperNome, {})
+  ].join('\n');
+  return ficha;
+}
+
+/** PDF assinado da vistoria anterior (não aceita) da unidade, base do envelope da revistoria; null se não houver. */
+export async function baseDaRevistoria(ag) {
+  if (ag.vistoriaNumero <= 1) return null;
+  const anterior = await db.agendamento.findFirst({
+    where: { unidadeId: ag.unidadeId, tipoEventoId: ag.tipoEventoId, status: { not: 'cancelado' }, vistoriaNumero: { lt: ag.vistoriaNumero }, vistoriaResultado: RESULTADO.naoAceita },
+    orderBy: { vistoriaNumero: 'desc' },
+    include: { documentosAssinados: { where: { tipo: TIPO_DOCUMENTO_VISTORIA, status: 'assinado' }, select: { id: true, pdfBase64: true } } }
+  });
+  const doc = anterior?.documentosAssinados[0];
+  if (!doc?.pdfBase64) return null;
+  const quem = signatariosDoAgendamento(anterior);
+  return { pdfBase64: doc.pdfBase64.replace(/^data:application\/pdf;base64,/, ''), linhas: quem.ok ? quem.signatarios.length : 0, anteriorId: anterior.id, numero: anterior.vistoriaNumero };
 }
 
 /**
@@ -106,7 +161,9 @@ export async function enviarTermoVistoria(event, { agendamentoId, texto }) {
   const { locals } = event;
   const ag = await buscarVistoria(agendamentoId);
   if (ag.status === 'cancelado') return { erro: 'Este agendamento foi cancelado: não dá para enviar documentos.' };
-  if (ag.vistoriaResultado !== 'aceita') return { erro: 'O termo só existe para vistoria aceita: registre o resultado primeiro.' };
+  const ehFicha = ag.vistoriaResultado === RESULTADO.naoAceita;
+  if (!ehFicha && ag.vistoriaResultado !== RESULTADO.aceita) return { erro: 'Registre o resultado da vistoria antes de gerar o documento.' };
+  const nomeDocumento = ehFicha ? NOME_DOCUMENTO_FICHA : NOME_DOCUMENTO_VISTORIA;
   const existente = documentoDaVistoria(ag);
   if (CALPER_JA_ASSINOU_VISTORIA.includes(existente?.status)) return { erro: 'A Calper já assinou este documento.' };
   const irParaAssinatura = () => redirect(303, `/admin/vistoria/${ag.id}/assinar`);
@@ -114,19 +171,29 @@ export async function enviarTermoVistoria(event, { agendamentoId, texto }) {
   const quem = signatariosDoAgendamento(ag);
   if (!quem.ok) return { erro: quem.erro };
 
-  const textoFinal = ajustarAssinaturasVistoria(String(texto ?? '').trim(), quem.signatarios, locals.funcionario.nome);
-  if (!String(texto ?? '').trim()) return { erro: 'O documento está vazio.' };
-  const pendente = textoFinal.match(/\{\{\s*\w+\s*\}\}/g);
-  if (pendente) return { erro: `Preencha antes de enviar: ${[...new Set(pendente)].join(', ')}` };
+  // revistoria aceita: o envelope usa o PDF assinado da vistoria anterior (não aceita) como base; só o Termo (parte de baixo) recebe assinaturas
+  const base = ehFicha ? null : await baseDaRevistoria(ag);
+  let textoFinal = '';
+  if (base) {
+    if (quem.signatarios.length > base.linhas) {
+      return { erro: `A revistoria tem mais assinantes (${quem.signatarios.length}) do que o documento da ${base.numero}ª vistoria tem de linhas (${base.linhas}). Ajuste quem comparece.` };
+    }
+  } else {
+    textoFinal = ajustarAssinaturasVistoria(String(texto ?? '').trim(), quem.signatarios, locals.funcionario.nome, { ficha: ehFicha });
+    if (!String(texto ?? '').trim()) return { erro: 'O documento está vazio.' };
+    const pendente = textoFinal.match(/\{\{\s*\w+\s*\}\}/g);
+    if (pendente) return { erro: `Preencha antes de enviar: ${[...new Set(pendente)].join(', ')}` };
+  }
 
   let envelopeId;
   let comCopia = false;
   try {
-    const pdfBase64 = await gerarPdfBase64(textoFinal, NOME_DOCUMENTO_VISTORIA, 'vistoria');
+    const pdfBase64 = base ? base.pdfBase64 : await gerarPdfBase64(textoFinal, nomeDocumento, 'vistoria');
     const copia = await destinatarioDaCopia();
     ({ envelopeId, comCopia } = await criarEnvelopeVistoria({
       pdfBase64,
-      nomeDocumento: NOME_DOCUMENTO_VISTORIA,
+      nomeDocumento,
+      parte: ehFicha ? 'ficha' : 'termo',
       // a Calper assina pelo funcionário que faz o atendimento (nome e e-mail do perfil dele)
       calper: { nome: locals.funcionario.nome, email: locals.funcionario.email, clientUserId: ag.id },
       assinantes: quem.signatarios,
@@ -148,7 +215,7 @@ export async function enviarTermoVistoria(event, { agendamentoId, texto }) {
     event,
     atorTipo: 'funcionario',
     acao: 'termo_vistoria_enviado_assinatura',
-    descricao: `${rotuloFuncionario(locals.funcionario)} abriu o envelope do ${NOME_DOCUMENTO_VISTORIA} — Unidade ${ag.unidade.numero}, Bloco ${ag.unidade.bloco}: a Calper assina primeiro (${locals.funcionario.nome}); depois ${quem.signatarios.map((s) => `${s.nome} (${s.email})`).join(', ')}${comCopia ? '; a cópia do documento final vai para o e-mail da Calper' : ''}`,
+    descricao: `${rotuloFuncionario(locals.funcionario)} abriu o envelope do ${nomeDocumento}${base ? ` (revistoria: base é o PDF assinado da ${base.numero}ª vistoria)` : ''} — Unidade ${ag.unidade.numero}, Bloco ${ag.unidade.bloco}: a Calper assina primeiro (${locals.funcionario.nome}); depois ${quem.signatarios.map((s) => `${s.nome} (${s.email})`).join(', ')}${comCopia ? '; a cópia do documento final vai para o e-mail da Calper' : ''}`,
     entidadeTipo: 'DocumentoAssinado',
     entidadeId: envelopeId
   });
@@ -180,22 +247,41 @@ export async function sincronizarTermoVistoria(documento, event = null) {
     if (ag.status !== 'realizado') {
       await db.agendamento.update({ where: { id: ag.id }, data: { status: 'realizado', vistoriaConcluidaEm: new Date() } });
     }
-    await db.historicoUnidade.create({
-      data: { unidadeId: ag.unidadeId, tipo: 'evento_realizado', descricao: `Vistoria ${ag.vistoriaNumero} aceita (${NOME_DOCUMENTO_VISTORIA} assinado via DocuSign)`, criadoPorId: atendente?.id ?? null }
-    });
-    await log({
-      funcionarioId: atendente?.id,
-      acao: 'vistoria_aceita',
-      descricao: `${NOME_DOCUMENTO_VISTORIA} da ${local} assinado por todos via DocuSign — vistoria ${ag.vistoriaNumero} aceita`,
-      entidadeTipo: 'Agendamento',
-      entidadeId: ag.id
-    });
+    if (ag.vistoriaResultado === RESULTADO.naoAceita) {
+      // vistoria não aceita: só termina com a Ficha de reparos assinada; o documento assinado fica guardado nesta tentativa
+      await db.historicoUnidade.create({
+        data: {
+          unidadeId: ag.unidadeId,
+          tipo: 'apontamento',
+          descricao: `${ag.vistoriaNumero > 1 ? `Revistoria (${ag.vistoriaNumero}ª vistoria)` : `Vistoria ${ag.vistoriaNumero}`} não aceita. Reparos: ${String(ag.vistoriaReparos ?? '').slice(0, 500)}. Telefone para contato: ${ag.vistoriaTelefoneRetorno ?? '—'}. Ficha assinada via DocuSign`,
+          criadoPorId: atendente?.id ?? null
+        }
+      });
+      await log({
+        funcionarioId: atendente?.id,
+        acao: 'vistoria_nao_aceita',
+        descricao: `${NOME_DOCUMENTO_FICHA} da ${local} assinada por todos via DocuSign — vistoria ${ag.vistoriaNumero} não aceita`,
+        entidadeTipo: 'Agendamento',
+        entidadeId: ag.id
+      });
+    } else {
+      await db.historicoUnidade.create({
+        data: { unidadeId: ag.unidadeId, tipo: 'evento_realizado', descricao: `Vistoria ${ag.vistoriaNumero} aceita (${NOME_DOCUMENTO_VISTORIA} assinado via DocuSign)`, criadoPorId: atendente?.id ?? null }
+      });
+      await log({
+        funcionarioId: atendente?.id,
+        acao: 'vistoria_aceita',
+        descricao: `${NOME_DOCUMENTO_VISTORIA} da ${local} assinado por todos via DocuSign — vistoria ${ag.vistoriaNumero} aceita`,
+        entidadeTipo: 'Agendamento',
+        entidadeId: ag.id
+      });
+    }
   } else {
     await db.documentoAssinado.update({ where: { id: documento.id }, data: { status: novo } });
     await log({
       funcionarioId: atendente?.id,
       acao: 'documento_assinado_calper',
-      descricao: `${NOME_DOCUMENTO_VISTORIA} da ${local} assinado pela Calper; o DocuSign enviou o e-mail para ${situacao.clientesPendentes.map((c) => c.nome).join(' e ')}`,
+      descricao: `${ag.vistoriaResultado === RESULTADO.naoAceita ? NOME_DOCUMENTO_FICHA : NOME_DOCUMENTO_VISTORIA} da ${local} assinado pela Calper; o DocuSign enviou o e-mail para ${situacao.clientesPendentes.map((c) => c.nome).join(' e ')}`,
       entidadeTipo: 'DocumentoAssinado',
       entidadeId: documento.id
     });
