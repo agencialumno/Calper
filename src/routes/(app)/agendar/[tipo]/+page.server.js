@@ -8,6 +8,12 @@ import {
   temAgendamentoAtivo
 } from '$lib/server/agendamento.js';
 import { tipoLiberadoNaEtapa } from '$lib/etapas.js';
+import {
+  SLUG_VISTORIA,
+  MENSAGEM_ANTECEDENCIA_VISTORIA,
+  dataMinimaVistoria,
+  respeitaAntecedenciaVistoria
+} from '$lib/servicos.js';
 import { horarioOcupado, criarEvento } from '$lib/server/googleCalendar.js';
 import { notificarInvestidor, notificarFuncionarios, emailDoInvestidorNaUnidade } from '$lib/server/notificacao.js';
 import { templateAgendamentoConfirmado } from '$lib/server/email.js';
@@ -42,7 +48,8 @@ export async function load({ params, locals }) {
       limitePessoas: tipoEvento.limitePessoas
     },
     horarios: HORARIOS_DISPONIVEIS,
-    dataMinima: minimo.toISOString().slice(0, 10),
+    dataMinima: tipoEvento.slug === SLUG_VISTORIA ? dataMinimaVistoria() : minimo.toISOString().slice(0, 10),
+    mensagemAntecedencia: tipoEvento.slug === SLUG_VISTORIA ? MENSAGEM_ANTECEDENCIA_VISTORIA : null,
     dataMaxima: maximo.toISOString().slice(0, 10)
   };
 }
@@ -78,6 +85,9 @@ export const actions = {
 
     if (!data || Number.isNaN(dataEscolhida.getTime()) || dataEscolhida < minimo || dataEscolhida > maximo) {
       return fail(400, { erro: 'Escolha uma data válida dentro da janela disponível.' });
+    }
+    if (tipoEvento.slug === SLUG_VISTORIA && !respeitaAntecedenciaVistoria(data)) {
+      return fail(400, { erro: MENSAGEM_ANTECEDENCIA_VISTORIA });
     }
     if (!HORARIOS_DISPONIVEIS.includes(horario)) {
       return fail(400, { erro: 'Escolha um horário válido.' });

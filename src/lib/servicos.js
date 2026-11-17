@@ -46,3 +46,17 @@ export function blocoPermitido(servico, bloco) {
   const blocos = BLOCOS_POR_SERVICO[sv];
   return (!blocos || blocos.includes(b)) && !BLOCOS_BLOQUEADOS_POR_SERVICO[sv].includes(b);
 }
+
+/** Antecedência mínima (dias de calendário) para o cliente agendar vistoria na página pública. Entrega de chaves não usa. */
+export const ANTECEDENCIA_MINIMA_VISTORIA_DIAS = 3;
+export const MENSAGEM_ANTECEDENCIA_VISTORIA = `A vistoria deve ser agendada com no mínimo ${ANTECEDENCIA_MINIMA_VISTORIA_DIAS} dias de antecedência.`;
+
+/** Primeiro dia permitido (AAAA-MM-DD) = hoje em America/Sao_Paulo + antecedência. */
+export function dataMinimaVistoria(agora = new Date()) {
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(agora);
+  const [a, m, d] = hoje.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1, d + ANTECEDENCIA_MINIMA_VISTORIA_DIAS)).toISOString().slice(0, 10);
+}
+
+/** A data (AAAA-MM-DD) respeita a antecedência mínima da vistoria? */
+export const respeitaAntecedenciaVistoria = (data, agora = new Date()) => String(data) >= dataMinimaVistoria(agora);

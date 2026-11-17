@@ -9,6 +9,7 @@
   let acompanhantes = $state([]);
   let enviando = $state(false);
   let tentouEnviar = $state(false);
+  let erroAntecedencia = $state('');
 
   let inputPrincipal;
   let arquivoPrincipal = $state(null);
@@ -72,6 +73,13 @@
 
   function aoSubmeter({ cancel }) {
     tentouEnviar = true;
+    const dataEscolhida = document.getElementById('data')?.value;
+    if (data.mensagemAntecedencia && dataEscolhida && dataEscolhida < data.dataMinima) {
+      erroAntecedencia = data.mensagemAntecedencia;
+      cancel();
+      return;
+    }
+    erroAntecedencia = '';
 
     if (data.tipoEvento.exigeDocumento && !arquivoPrincipal) {
       cancel();
@@ -111,7 +119,9 @@
     use:enhance={aoSubmeter}
     class="card p-6 md:p-8 flex flex-col gap-5"
   >
-    {#if form?.erro}
+    {#if erroAntecedencia}
+      <AvisoSutil>{erroAntecedencia}</AvisoSutil>
+    {:else if form?.erro}
       <AvisoSutil>{form.erro}</AvisoSutil>
     {/if}
 
@@ -123,8 +133,9 @@
           name="data"
           type="date"
           class="input"
-          min={data.dataMinima}
+          min={data.mensagemAntecedencia ? undefined : data.dataMinima}
           max={data.dataMaxima}
+          oninput={() => (erroAntecedencia = '')}
           required
         />
       </div>
