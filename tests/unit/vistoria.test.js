@@ -108,3 +108,10 @@ describe('rotuloDaTentativa', () => {
     expect(rotuloDaTentativa(2)).toBe('Revistoria · 2ª vistoria');
   });
 });
+
+describe('vistoria não aceita: só conclui com a ficha assinada', () => {
+  it('não aceita ainda não concluída aguarda a assinatura da ficha; depois vira "Vistoria não aceita"', () => {
+    expect(rotuloDaVistoria({ vistoriaResultado: 'nao_aceita', status: 'confirmado' })).toBe('Não aceita — aguardando assinatura da ficha');
+    expect(rotuloDaVistoria({ vistoriaResultado: 'nao_aceita', status: 'realizado' })).toBe('Vistoria não aceita');
+  });
+});

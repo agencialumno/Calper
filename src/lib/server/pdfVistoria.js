@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { LOGO_DOCUMENTOS_BASE64 } from './assets/logoDocumentos.js';
-import { ANCORA_VISTORIA } from './ancoras.js';
+import { ANCORA_FICHA, ANCORA_VISTORIA, CAMPOS_CALPER } from './ancoras.js';
 import { LARGURA_LINHA_VISTORIA } from './caixaAssinatura.js';
 import { quebrarLinhas, textoSeguro } from './pdfTermo.js';
 
@@ -19,12 +19,15 @@ const ESPACO_PRIMEIRA_ASSINATURA = 80; // a 1ª fica logo abaixo da data: um pou
 const LOGO = { largura: 110, altura: 62 };
 const COR = rgb(0.08, 0.08, 0.1);
 
-const MARCADOR = /^\[ASSINATURA (REPRESENTANTE DA CALPER|PROPRIETÁRIO (\d+)|PROCURADOR (\d+))(?::\s*(.*?))?\]\s*$/;
+const MARCADOR = /^\[ASSINATURA (FICHA )?(REPRESENTANTE DA CALPER|PROPRIETÁRIO (\d+)|PROCURADOR (\d+))(?::\s*(.*?))?\]\s*$/;
+// linha só com isto = quebra de página (o Termo de Recebimento começa em página própria, abaixo da ficha de reparos)
+const QUEBRA_PAGINA = '[PAGINA]';
 
 /** Âncora do DocuSign de um marcador de assinatura. */
 function ancoraDoMarcador(m) {
-  const n = m[2] ?? m[3];
-  return n ? ANCORA_VISTORIA.assinante(Number(n)) : ANCORA_VISTORIA.calper;
+  const n = m[3] ?? m[4];
+  const a = m[1] ? ANCORA_FICHA : ANCORA_VISTORIA;
+  return n ? a.assinante(Number(n)) : a.calper;
 }
 
 export async function gerarPdfVistoria(texto, titulo) {
@@ -49,6 +52,28 @@ export async function gerarPdfVistoria(texto, titulo) {
     pagina.drawText(str, { x, y: PAGINA.altura - y, size: tamanho, font: f, color: cor });
   const centralizado = (str, f, tamanho) => desenhar(str, (PAGINA.largura - f.widthOfTextAtSize(str, tamanho)) / 2, f, tamanho);
 
+  // Nome, sobrenome e rubrica: quem acompanha pela Calper preenche na hora de assinar (campos obrigatórios do DocuSign,
+  // posicionados pelas âncoras invisíveis sobre cada linha).
+  const CAMPOS_LINHAS = [
+    { chave: 'nome', rotulo: 'Nome', largura: 150 },
+    { chave: 'sobrenome', rotulo: 'Sobrenome', largura: 150 },
+    { chave: 'rubrica', rotulo: 'Rubrica', largura: 80 }
+  ];
+  const desenharCamposCalper = (ancoras) => {
+    garantir(70);
+    y += 46; // espaço para os campos preenchidos (acima da linha)
+    const folga = 18;
+    const total = CAMPOS_LINHAS.reduce((t, c) => t + c.largura, 0) + folga * (CAMPOS_LINHAS.length - 1);
+    let x = (PAGINA.largura - total) / 2;
+    for (const c of CAMPOS_LINHAS) {
+      pagina.drawLine({ start: { x, y: PAGINA.altura - y }, end: { x: x + c.largura, y: PAGINA.altura - y }, thickness: 0.6, color: COR });
+      pagina.drawText(ancoras[c.chave], { x, y: PAGINA.altura - y, size: 1, font: fonte, color: rgb(1, 1, 1) });
+      pagina.drawText(c.rotulo, { x, y: PAGINA.altura - y - 10, size: 8, font: fonte, color: COR });
+      x += c.largura + folga;
+    }
+    y += 14;
+  };
+
   novaPagina();
   pagina.drawImage(logo, { x: PAGINA.largura - MARGEM - LOGO.largura, y: PAGINA.altura - MARGEM - LOGO.altura + 14, width: LOGO.largura, height: LOGO.altura });
   y = MARGEM + LOGO.altura + 16;
@@ -65,6 +90,14 @@ export async function gerarPdfVistoria(texto, titulo) {
       brancos++;
       continue;
     }
+    if (original.trim() === QUEBRA_PAGINA) {
+      novaPagina();
+      y = MARGEM + 6;
+      indiceVisivel = 0;
+      brancos = 0;
+      assinaturasDesenhadas = 0;
+      continue;
+    }
     const marcador = MARCADOR.exec(original.trim());
     const rodape = ultimaAssinatura >= 0 && i > ultimaAssinatura;
     const comoTitulo = indiceVisivel === 0;
@@ -72,7 +105,7 @@ export async function gerarPdfVistoria(texto, titulo) {
     indiceVisivel++;
 
     if (marcador) {
-      garantir(ESPACO_ASSINATURA + PASSO * 2);
+      garantir(ESPACO_ASSINATURA + PASSO * 2 + (marcador[2].startsWith('REPRESENTANTE') ? 70 : 0));
       y += assinaturasDesenhadas === 0 ? ESPACO_PRIMEIRA_ASSINATURA : ESPACO_ASSINATURA;
       assinaturasDesenhadas++;
       const larguraLinha = LARGURA_LINHA_VISTORIA;
@@ -80,13 +113,14 @@ export async function gerarPdfVistoria(texto, titulo) {
       pagina.drawLine({ start: { x, y: PAGINA.altura - y }, end: { x: x + larguraLinha, y: PAGINA.altura - y }, thickness: 0.8, color: COR });
       // âncora invisível (branca, 1 pt) sobre o início da linha: o DocuSign posiciona a caixa de assinatura aqui
       pagina.drawText(ancoraDoMarcador(marcador), { x, y: PAGINA.altura - y, size: 1, font: fonte, color: rgb(1, 1, 1) });
-      const papel = marcador[1].startsWith('REPRESENTANTE') ? 'Representante da Calper' : marcador[1].startsWith('PROCURADOR') ? 'Procurador' : 'Proprietário';
-      const nome = textoSeguro(negrito, marcador[4] ?? '');
+      const papel = marcador[2].startsWith('REPRESENTANTE') ? 'Representante da Calper' : marcador[2].startsWith('PROCURADOR') ? 'Procurador' : 'Proprietário';
+      const nome = textoSeguro(negrito, marcador[5] ?? '');
       y += PASSO;
       centralizado(nome ? `${nome}` : papel, negrito, TAMANHO);
       y += PASSO - 2;
       if (nome) centralizado(papel, fonte, 9);
       y += PASSO;
+      if (marcador[2].startsWith('REPRESENTANTE')) desenharCamposCalper(marcador[1] ? CAMPOS_CALPER.ficha : CAMPOS_CALPER.termo);
       brancos = 0;
       continue;
     }

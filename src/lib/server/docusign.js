@@ -1,7 +1,7 @@
 import docusign from 'docusign-esign';
 import { env } from '$env/dynamic/private';
 import { normalizarChavePrivada } from './chavePrivada.js';
-import { ANCORA, ANCORA_VISTORIA } from './ancoras.js';
+import { ANCORA, ANCORA_FICHA, ANCORA_VISTORIA, CAMPOS_CALPER } from './ancoras.js';
 import { LARGURA_LINHA_VISTORIA, xOffsetCentralizado } from './caixaAssinatura.js';
 
 // Integração DocuSign (JWT Grant + assinatura embutida da Calper + assinatura remota do cliente).
@@ -358,14 +358,54 @@ export async function baixarPdfAssinado(envelopeId, documentId = 'combined') {
 /** Ids dos destinatários do envelope da vistoria: 1 = Calper (funcionário do atendimento), 2.. = proprietários/procurador, 20 = cópia. */
 export const DESTINATARIO_VISTORIA = { calper: '1', assinante: (n) => String(n + 1), copia: '20' };
 
+/** Caixas do signatário da Calper na vistoria: assinatura + nome, sobrenome e rubrica obrigatórios (preenchidos na hora, nunca com o nome da conta). */
+function tabsCalperVistoria(parte, nomeDoAssinante) {
+  const ancoras = parte === 'ficha' ? ANCORA_FICHA : ANCORA_VISTORIA;
+  const campos = CAMPOS_CALPER[parte === 'ficha' ? 'ficha' : 'termo'];
+  const texto = (ancora, rotulo, largura) =>
+    docusign.Text.constructFromObject({
+      documentId: DOCUMENTO_ID.termo,
+      anchorString: ancora,
+      anchorUnits: 'pixels',
+      anchorXOffset: '0',
+      anchorYOffset: '-17',
+      anchorIgnoreIfNotPresent: 'false',
+      tabLabel: `${parte}_${rotulo}`,
+      required: 'true',
+      locked: 'false',
+      width: String(largura),
+      height: '16',
+      font: 'helvetica',
+      fontSize: 'size10'
+    });
+  const base = tabAssinar(ancoras.calper, DOCUMENTO_ID.termo, nomeDoAssinante, LARGURA_LINHA_VISTORIA);
+  base.textTabs = [texto(campos.nome, 'nome', 150), texto(campos.sobrenome, 'sobrenome', 150)];
+  base.initialHereTabs = [
+    docusign.InitialHere.constructFromObject({
+      documentId: DOCUMENTO_ID.termo,
+      anchorString: campos.rubrica,
+      anchorUnits: 'pixels',
+      anchorXOffset: '10',
+      anchorYOffset: '-26',
+      anchorIgnoreIfNotPresent: 'false',
+      scaleValue: '1',
+      tabLabel: `${parte}_rubrica`
+    })
+  ];
+  return base;
+}
+
 /**
- * Cria o envelope da vistoria com o termo: 1) a Calper assina embutida no admin (o funcionário que atende, clientUserId
- * preenchido); 2) cada proprietário/procurador recebe o link por e-mail, em paralelo, só depois da Calper; 3) cópia carbono.
- * `assinantes`: [{ nome, email }] na ordem das âncoras (1, 2, ...).
+ * Cria o envelope da vistoria: 1) a Calper assina embutida no admin (o funcionário que atende, clientUserId preenchido),
+ * com nome, sobrenome e rubrica obrigatórios; 2) cada proprietário/procurador recebe o link por e-mail, em paralelo, só
+ * depois da Calper; 3) cópia carbono. `assinantes`: [{ nome, email }] na ordem das âncoras (1, 2, ...).
+ * `parte`: 'termo' = Termo de Recebimento (parte inferior do FORM-020; também usado na revistoria, sobre o PDF da vistoria
+ * anterior); 'ficha' = Ficha de reparos (parte superior, vistoria não aceita).
  */
-export async function criarEnvelopeVistoria({ pdfBase64, nomeDocumento, calper, assinantes, copia = null }) {
+export async function criarEnvelopeVistoria({ pdfBase64, nomeDocumento, calper, assinantes, copia = null, parte = 'termo' }) {
   const apiClient = await clienteAutenticado();
   const envelopesApi = new docusign.EnvelopesApi(apiClient);
+  const ancoras = parte === 'ficha' ? ANCORA_FICHA : ANCORA_VISTORIA;
 
   const documento = docusign.Document.constructFromObject({
     documentBase64: pdfBase64,
@@ -380,7 +420,7 @@ export async function criarEnvelopeVistoria({ pdfBase64, nomeDocumento, calper, 
       recipientId: DESTINATARIO_VISTORIA.calper,
       routingOrder: '1',
       clientUserId: calper.clientUserId,
-      tabs: tabAssinar(ANCORA_VISTORIA.calper, DOCUMENTO_ID.termo, calper.nome, LARGURA_LINHA_VISTORIA)
+      tabs: tabsCalperVistoria(parte, calper.nome)
     }),
     ...assinantes.map((a, i) =>
       docusign.Signer.constructFromObject({
@@ -388,7 +428,7 @@ export async function criarEnvelopeVistoria({ pdfBase64, nomeDocumento, calper, 
         name: a.nome,
         recipientId: DESTINATARIO_VISTORIA.assinante(i + 1),
         routingOrder: '2',
-        tabs: tabAssinar(ANCORA_VISTORIA.assinante(i + 1), DOCUMENTO_ID.termo, a.nome, LARGURA_LINHA_VISTORIA)
+        tabs: tabAssinar(ancoras.assinante(i + 1), DOCUMENTO_ID.termo, a.nome, LARGURA_LINHA_VISTORIA)
       })
     )
   ];
@@ -400,8 +440,11 @@ export async function criarEnvelopeVistoria({ pdfBase64, nomeDocumento, calper, 
       : [];
 
   const envelope = docusign.EnvelopeDefinition.constructFromObject({
-    emailSubject: 'Calper — assine o Termo de Recebimento do Imóvel da sua unidade',
-    emailBlurb: 'A Calper já assinou. Falta a sua assinatura no Termo de Recebimento do Imóvel: abra pelo botão abaixo, confira e assine. Dúvidas, procure a equipe Calper.',
+    emailSubject: parte === 'ficha' ? 'Calper — assine a Ficha de Vistoria da sua unidade' : 'Calper — assine o Termo de Recebimento do Imóvel da sua unidade',
+    emailBlurb:
+      parte === 'ficha'
+        ? 'A Calper já assinou. Falta a sua assinatura na Ficha de Vistoria (reparos necessários): abra pelo botão abaixo, confira e assine. Dúvidas, procure a equipe Calper.'
+        : 'A Calper já assinou. Falta a sua assinatura no Termo de Recebimento do Imóvel: abra pelo botão abaixo, confira e assine. Dúvidas, procure a equipe Calper.',
     documents: [documento],
     recipients: docusign.Recipients.constructFromObject({ signers, carbonCopies }),
     status: 'sent'

@@ -64,7 +64,7 @@ export async function load({ url }) {
   });
   const vistorias = {
     aceitas: vistoriasPeriodo.filter((v) => v.vistoriaResultado === 'aceita' && v.status === 'realizado').length,
-    naoAceitas: vistoriasPeriodo.filter((v) => v.vistoriaResultado === 'nao_aceita').length,
+    naoAceitas: vistoriasPeriodo.filter((v) => v.vistoriaResultado === 'nao_aceita' && v.status === 'realizado').length,
     emAberto: vistoriasPeriodo.filter((v) => v.status === 'confirmado').length
   };
 

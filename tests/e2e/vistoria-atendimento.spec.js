@@ -45,6 +45,10 @@ test.beforeAll(async () => {
     out['707'] = await nova(db, inv.id, tipo.id, '707', [par('GILDA REVISTORIA', true)]);
     out['708'] = await nova(db, inv.id, tipo.id, '708', [par('HUGO PERMISSAO', true)]);
     out['709'] = await nova(db, inv.id, tipo.id, '709', [par('IVO FLUXO COMPLETO', true)]);
+    out['710'] = await nova(db, inv.id, tipo.id, '710', [par('JOANA INICIAR REVISTORIA', true)], {}, {
+      vistoriaResultado: 'nao_aceita', vistoriaReparos: 'Trinco da janela', vistoriaTelefoneRetorno: '21977776666', status: 'realizado', vistoriaConcluidaEm: new Date(),
+      vistoriaPresentes: [{ nome: 'JOANA INICIAR REVISTORIA', email: 'j@example.com', vinculo: 'comprador_principal' }]
+    });
     await db.agendaDiaVistoria.create({ data: { data: DIA_REVISTORIA, aberto: true, limitePorHora: 1 } });
     return out;
   });
@@ -69,11 +73,21 @@ async function registrarPresentes(page, id, { compradores = [], procurador = nul
   await page.getByRole('button', { name: 'Confirmar e continuar' }).click();
 }
 
+/** Simula a Ficha de reparos assinada por todos (o que o DocuSign + sincronizarTermoVistoria fazem): fecha a vistoria não aceita. */
+async function assinarFicha(id, unidadeId) {
+  await comBanco(async (db) => {
+    await db.documentoAssinado.create({
+      data: { agendamentoId: id, unidadeId, tipo: 'termo_vistoria', status: 'assinado', pdfBase64: `data:application/pdf;base64,${PDF.toString('base64')}`, docusignEnvelopeId: `env-ficha-${id}`, assinadoEm: new Date() }
+    });
+    await db.agendamento.update({ where: { id }, data: { status: 'realizado', vistoriaConcluidaEm: new Date() } });
+  });
+}
+
 async function resultadoAceita(page, id) {
-  await page.goto(`/admin/vistoria/${id}?passo=3`, { waitUntil: 'networkidle' });
+  await page.goto(`/admin/vistoria/${id}?passo=2`, { waitUntil: 'networkidle' });
   await page.locator('input[name=resultado][value=aceita]').check();
   await page.getByRole('button', { name: 'Registrar resultado' }).click();
-  await expect(page).toHaveURL(/passo=4/);
+  await expect(page).toHaveURL(/passo=3/);
 }
 
 test.describe('aba Vistoria: Iniciar atendimento', () => {
@@ -87,7 +101,7 @@ test.describe('aba Vistoria: Iniciar atendimento', () => {
     await card.getByTestId('iniciar-atendimento-vistoria').click();
     await expect(page).toHaveURL(new RegExp(`/admin/vistoria/${ag['701'].id}$`));
     await expect(page.getByRole('heading', { name: 'Bloco 3 - nº 701' })).toBeVisible();
-    for (const etapa of ['1. Quem comparece', '2. Vistoria', '3. Resultado', '4. Termo', '5. Concluído']) await expect(page.getByRole('link', { name: etapa })).toBeVisible();
+    for (const etapa of ['1. Quem comparece', '2. Resultado', '3. Documento', '4. Concluído']) await expect(page.getByRole('link', { name: etapa })).toBeVisible();
   });
 
   test('o atendimento da entrega de chaves não abre agendamento de vistoria (e vice-versa)', async ({ page }) => {
@@ -102,7 +116,7 @@ test.describe('quem comparece e quem assina o termo', () => {
     await page.goto(`/admin/vistoria/${ag['701'].id}?passo=1`, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Confirmar e continuar' }).click();
     await expect(page.getByText('Marque quem comparece')).toBeVisible();
-    for (const passo of [2, 3, 4]) {
+    for (const passo of [2, 3]) {
       await page.goto(`/admin/vistoria/${ag['701'].id}?passo=${passo}`, { waitUntil: 'networkidle' });
       await expect(page.getByTestId('etapa-bloqueada')).toBeVisible();
     }
@@ -176,14 +190,14 @@ test.describe('quem comparece e quem assina o termo', () => {
   test('sem comprador e sem procurador com procuração: o avanço é bloqueado (servidor também recusa o resultado)', async ({ page }) => {
     await entrarComoAdmin(page);
     // 704 não tem ninguém registrado: nem a etapa 4 abre, nem o servidor aceita o resultado
-    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=4`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=3`, { waitUntil: 'networkidle' });
     await expect(page.getByTestId('etapa-bloqueada')).toContainText('Marque quem comparece');
     const r = await acao(page, ag['704'].id, 'registrarResultado', { resultado: 'aceita' });
     expect(await r.text()).toContain('Registre quem comparece');
     expect((await comBanco((db) => db.agendamento.findUnique({ where: { id: ag['704'].id } }))).vistoriaResultado).toBeNull();
     // procurador gravado sem procuração válida (dado inconsistente) também bloqueia
     await comBanco((db) => db.agendamento.update({ where: { id: ag['704'].id }, data: { vistoriaPresentes: [{ nome: 'Sem Procuracao', cpf: '52998224725', email: 's@example.com', vinculo: 'procurador' }] } }));
-    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=4`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=3`, { waitUntil: 'networkidle' });
     await expect(page.getByTestId('etapa-bloqueada')).toContainText('anexe a procuração');
     await comBanco((db) => db.agendamento.update({ where: { id: ag['704'].id }, data: { vistoriaPresentes: [] } }));
   });
@@ -198,7 +212,7 @@ test.describe('quem comparece e quem assina o termo', () => {
 
   test('enviar sem DocuSign configurado devolve o erro e não cria documento nem conclui a vistoria', async ({ page }) => {
     await entrarComoAdmin(page);
-    await page.goto(`/admin/vistoria/${ag['701'].id}?passo=4`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/vistoria/${ag['701'].id}?passo=3`, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Cliente: ler o documento' }).waitFor();
     const texto = await page.locator('textarea[name=texto]').inputValue();
     const r = await acao(page, ag['701'].id, 'enviar', { texto });
@@ -224,26 +238,40 @@ test.describe('vistoria não aceita', () => {
     expect(await semTelefone.text()).toContain('telefone');
     expect((await comBanco((db) => db.agendamento.findUnique({ where: { id: ag['704'].id } }))).vistoriaResultado).toBeNull();
 
-    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=3`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=2`, { waitUntil: 'networkidle' });
     await page.locator('input[name=resultado][value=nao_aceita]').check();
     await page.fill('#reparos', 'Rejunte do banheiro solto\nPorta da varanda arranhada');
     await page.fill('#telefoneRetorno', '(21) 98888-7777');
     await page.getByRole('button', { name: 'Registrar resultado' }).click();
-    await expect(page).toHaveURL(/passo=5/);
-    await expect(page.getByTestId('resultado-vistoria')).toHaveText('Vistoria não aceita');
-    await expect(page.getByTestId('reparos-registrados')).toContainText('Rejunte do banheiro solto');
+    // não aceita não termina sozinha: segue para a Ficha de reparos (parte superior do FORM-020), a assinar
+    await expect(page).toHaveURL(/passo=3/);
+    const texto = await page.locator('textarea[name=texto]').inputValue();
+    expect(texto).toContain('FICHA DE REPAROS');
+    expect(texto).toContain('Rejunte do banheiro solto');
+    expect(texto).toContain('(21) 98888-7777');
+    expect(texto).toContain('[ASSINATURA FICHA REPRESENTANTE DA CALPER: Admin Teste]');
+    expect(texto).toContain('[ASSINATURA FICHA PROPRIETÁRIO 1: DIOGO NAO ACEITA]');
+    expect(texto).toContain('TERMO DE RECEBIMENTO DO IMÓVEL'); // o termo vem embaixo, ainda sem assinatura
+    // Calper primeiro, cliente depois, em todas as partes
+    expect(texto.indexOf('[ASSINATURA FICHA REPRESENTANTE')).toBeLessThan(texto.indexOf('[ASSINATURA FICHA PROPRIETÁRIO 1'));
 
     const a = await comBanco((db) => db.agendamento.findUnique({ where: { id: ag['704'].id } }));
     expect(a.vistoriaResultado).toBe('nao_aceita');
-    expect(a.status).toBe('realizado');
     expect(a.vistoriaTelefoneRetorno).toBe('(21) 98888-7777');
-    expect(a.vistoriaConcluidaEm).not.toBeNull();
-    // sem documento e sem assinatura
+    // ainda não concluída: falta a ficha assinada (e nada de apontamento no histórico antes disso)
+    expect(a.status).toBe('confirmado');
+    expect(a.vistoriaConcluidaEm).toBeNull();
+    expect(await comBanco((db) => db.historicoUnidade.count({ where: { unidadeId: u['704'].id, tipo: 'apontamento' } }))).toBe(0);
     expect(await comBanco((db) => db.documentoAssinado.count({ where: { agendamentoId: ag['704'].id } }))).toBe(0);
+    // sem DocuSign nos testes, o envio devolve o erro de integração e nada é criado
+    const enviar = await acao(page, ag['704'].id, 'enviar', { texto });
+    expect(await enviar.text()).toContain('Não foi possível enviar para assinatura');
+    expect(await comBanco((db) => db.documentoAssinado.count({ where: { agendamentoId: ag['704'].id } }))).toBe(0);
+    // com o documento aberto, o resultado não muda mais; ficha assinada por todos → vistoria concluída
+    await assinarFicha(ag['704'].id, u['704'].id);
     await page.goto(`/admin/vistoria/${ag['704'].id}?passo=4`, { waitUntil: 'networkidle' });
-    await expect(page.getByTestId('etapa-bloqueada')).toContainText('não há documento nem assinatura');
-    const enviar = await acao(page, ag['704'].id, 'enviar', { texto: 'x' });
-    expect(await enviar.text()).toContain('O termo só existe para vistoria aceita');
+    await expect(page.getByTestId('resultado-vistoria')).toHaveText('Vistoria não aceita');
+    await expect(page.getByTestId('reparos-registrados')).toContainText('Rejunte do banheiro solto');
     // a vistoria concluída não é mais alterada
     const outra = await acao(page, ag['704'].id, 'registrarResultado', { resultado: 'aceita' });
     expect(await outra.text()).toContain('já foi concluída');
@@ -265,7 +293,7 @@ test.describe('revistoria', () => {
   test('colaborador não abre a revistoria (nem vê o botão); supervisor abre "agora" com vistoriaNumero + 1', async ({ page }) => {
     // 704 já está "não aceita"
     await entrarComoAdmin(page, COLABORADOR);
-    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=5`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=4`, { waitUntil: 'networkidle' });
     await expect(page.getByTestId('revistoria-sem-permissao')).toBeVisible();
     await expect(page.getByTestId('form-revistoria')).toHaveCount(0);
     const negada = await acao(page, ag['704'].id, 'abrirRevistoria', { quando: 'agora' });
@@ -274,7 +302,7 @@ test.describe('revistoria', () => {
 
     await page.context().clearCookies();
     await entrarComoAdmin(page, SUPERVISOR);
-    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=5`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/vistoria/${ag['704'].id}?passo=4`, { waitUntil: 'networkidle' });
     await page.locator('input[name=quando][value=agora]').check();
     await page.getByRole('button', { name: /Abrir revistoria \(2ª vistoria\)/ }).click();
     await expect(page).toHaveURL(/\/admin\/vistoria\/[a-z0-9]+\?passo=1/);
@@ -291,6 +319,29 @@ test.describe('revistoria', () => {
     expect(await comBanco((db) => db.agendamento.count({ where: { unidadeId: u['704'].id } }))).toBe(2);
   });
 
+  test('"Iniciar revistoria" na unidade: colaborador pode; só depois da não aceita concluída; cria a próxima já iniciada', async ({ page }) => {
+    await entrarComoAdmin(page, COLABORADOR);
+    // vistoria sem resultado / não aceita ainda sem a ficha assinada: o servidor recusa
+    const antes = await page.request.post(`/admin/vistoria/${ag['708'].id}/iniciar-revistoria`, { form: {}, headers: ACAO });
+    expect(antes.status()).toBe(400);
+    expect(await comBanco((db) => db.agendamento.count({ where: { unidadeId: u['708'].id } }))).toBe(1);
+
+    await page.goto(`/admin/unidades/${u['710'].id}`, { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('secao-vistorias')).toContainText('Vistoria não aceita');
+    await page.getByTestId('iniciar-revistoria-unidade').click();
+    await expect(page).toHaveURL(/\/admin\/vistoria\/[a-z0-9]+\?passo=1/);
+    const todas = await comBanco((db) => db.agendamento.findMany({ where: { unidadeId: u['710'].id }, orderBy: { vistoriaNumero: 'asc' } }));
+    expect(todas.map((a) => a.vistoriaNumero)).toEqual([1, 2]);
+    expect(todas[1].origem).toBe('atendimento_direto');
+    expect(todas[1].checkinEm).not.toBeNull();
+    // com a revistoria aberta, o botão some e o servidor recusa outra
+    await page.goto(`/admin/unidades/${u['710'].id}`, { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('iniciar-revistoria-unidade')).toHaveCount(0);
+    const outra = await page.request.post(`/admin/vistoria/${ag['710'].id}/iniciar-revistoria`, { form: {}, headers: ACAO });
+    expect(outra.status()).toBe(400);
+    expect(await comBanco((db) => db.agendamento.count({ where: { unidadeId: u['710'].id } }))).toBe(2);
+  });
+
   test('admin escolhe data e horário na agenda de vistoria, respeitando as vagas', async ({ page }) => {
     await comBanco((db) =>
       db.agendamento.update({ where: { id: ag['706'].id }, data: { vistoriaResultado: 'nao_aceita', vistoriaReparos: 'Tomada solta', vistoriaTelefoneRetorno: '21977776666', status: 'realizado', vistoriaPresentes: [{ nome: 'FABIO REVISTORIA', email: 'f@example.com', vinculo: 'comprador_principal' }] } })
@@ -299,7 +350,7 @@ test.describe('revistoria', () => {
       db.agendamento.update({ where: { id: ag['707'].id }, data: { vistoriaResultado: 'nao_aceita', vistoriaReparos: 'Janela', vistoriaTelefoneRetorno: '21977776666', status: 'realizado', vistoriaPresentes: [{ nome: 'GILDA REVISTORIA', email: 'g@example.com', vinculo: 'comprador_principal' }] } })
     );
     await entrarComoAdmin(page);
-    await page.goto(`/admin/vistoria/${ag['706'].id}?passo=5`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/vistoria/${ag['706'].id}?passo=4`, { waitUntil: 'networkidle' });
     await page.locator('input[name=quando][value=agenda]').check();
     await page.selectOption('select[name=data]', DIA_REVISTORIA);
     await page.selectOption('select[name=horario]', '09:00');
@@ -314,7 +365,7 @@ test.describe('revistoria', () => {
     expect(await lotado.text()).toContain('acabou de lotar');
     expect(await comBanco((db) => db.agendamento.count({ where: { unidadeId: u['707'].id } }))).toBe(1);
     // e a tela não oferece mais o horário lotado
-    await page.goto(`/admin/vistoria/${ag['707'].id}?passo=5`, { waitUntil: 'networkidle' });
+    await page.goto(`/admin/vistoria/${ag['707'].id}?passo=4`, { waitUntil: 'networkidle' });
     await page.locator('input[name=quando][value=agenda]').check();
     await page.selectOption('select[name=data]', DIA_REVISTORIA);
     expect(await page.locator('select[name=horario] option').allTextContents()).not.toContain('09:00 (0 vaga)');
@@ -328,27 +379,21 @@ test.describe('não aceita → revistoria (fluxo completo pela tela)', () => {
     const id = ag['709'].id;
     await registrarPresentes(page, id, { compradores: [{ indice: 0, email: 'ivo@example.com' }] });
     await expect(page).toHaveURL(/passo=2/, { timeout: 60_000 });
-    await page.fill('#observacoes', 'Piso da sala com risco');
-    await page.getByRole('button', { name: 'Salvar observações' }).click();
-    await expect(page.getByText('Observações salvas.')).toBeVisible();
-    await page.goto(`/admin/vistoria/${id}?passo=3`, { waitUntil: 'networkidle' });
+    await comBanco((db) => db.agendamento.update({ where: { id }, data: { observacoesAtendimento: 'Piso da sala com risco' } }));
+    await page.goto(`/admin/vistoria/${id}?passo=2`, { waitUntil: 'networkidle' });
     await page.locator('input[name=resultado][value=nao_aceita]').check();
     await page.fill('textarea[name=reparos]', 'Trocar a tomada da cozinha e pintar o teto do quarto');
     await page.fill('input[name=telefoneRetorno]', '(21) 98888-7777');
     await page.getByRole('button', { name: 'Registrar resultado' }).click();
-    await expect(page).toHaveURL(/passo=5/, { timeout: 60_000 });
+    await expect(page).toHaveURL(/passo=3/, { timeout: 60_000 });
 
-    // a) fecha o atendimento e grava no histórico: resultado, reparos, telefone e quem atendeu
-    const fechado = await comBanco((db) => db.agendamento.findUnique({ where: { id } }));
-    expect(fechado.status).toBe('realizado');
-    expect(fechado.vistoriaResultado).toBe('nao_aceita');
-    const h1 = await comBanco((db) => db.historicoUnidade.findMany({ where: { unidadeId: u['709'].id, tipo: 'apontamento' } }));
-    expect(h1).toHaveLength(1);
-    expect(h1[0].descricao).toContain('Vistoria 1 não aceita');
-    expect(h1[0].descricao).toContain('Trocar a tomada da cozinha');
-    expect(h1[0].descricao).toContain('(21) 98888-7777');
-    expect(h1[0].descricao).toContain('Atendido por: Supervisor Teste');
-    expect(h1[0].criadoPorId).not.toBeNull();
+    // a) a não aceita só fecha com a ficha assinada; aí o histórico recebe resultado, reparos e telefone
+    expect((await comBanco((db) => db.agendamento.findUnique({ where: { id } }))).status).toBe('confirmado');
+    await assinarFicha(id, u['709'].id);
+    await comBanco((db) =>
+      db.historicoUnidade.create({ data: { unidadeId: u['709'].id, tipo: 'apontamento', descricao: 'Vistoria 1 não aceita. Reparos: Trocar a tomada da cozinha e pintar o teto do quarto. Telefone para contato: (21) 98888-7777. Ficha assinada via DocuSign' } })
+    );
+    await page.goto(`/admin/vistoria/${id}?passo=4`, { waitUntil: 'networkidle' });
 
     // abre a revistoria (2ª vistoria)
     await page.locator('input[name=quando][value=agora]').check();
@@ -365,7 +410,7 @@ test.describe('não aceita → revistoria (fluxo completo pela tela)', () => {
     await expect(page.getByTestId('reparos-anteriores')).toHaveText('Trocar a tomada da cozinha e pintar o teto do quarto');
     await expect(page.getByTestId('observacoes-anteriores')).toHaveText('Piso da sala com risco');
     await expect(destaque.locator('textarea, input')).toHaveCount(0);
-    await expect(page.locator('#observacoes')).toHaveValue(''); // o campo editável é só o da revistoria
+    await expect(page.locator('#observacoes')).toHaveCount(0); // a etapa "Vistoria" com observações foi removida
     // a 1ª vistoria não mostra o destaque
     await page.goto(`/admin/vistoria/${id}?passo=2`, { waitUntil: 'networkidle' });
     await expect(page.getByTestId('vistoria-anterior')).toHaveCount(0);
@@ -375,7 +420,7 @@ test.describe('não aceita → revistoria (fluxo completo pela tela)', () => {
     await expect(page.getByText('Revistoria (2ª vistoria) aberta')).toBeVisible();
     await expect(page.getByText(/Vistoria 1 não aceita\. Reparos: Trocar a tomada/)).toBeVisible();
     await expect(page.getByTestId('secao-vistorias')).toContainText('Revistoria · 2ª vistoria');
-    await page.goto('/admin/quem-agendou', { waitUntil: 'networkidle' });
+    await page.goto('/admin/quem-agendou?servico=vistoria', { waitUntil: 'networkidle' });
     await expect(page.getByText('revistoria 2').first()).toBeVisible();
     await page.goto('/admin/vistoria', { waitUntil: 'networkidle' });
     await expect(page.getByTestId('card-vistoria').filter({ hasText: 'Bloco 3 - nº 709' }).filter({ hasText: 'Revistoria · 2ª vistoria' })).toHaveCount(1);
@@ -405,7 +450,7 @@ test.describe('onde o resultado aparece', () => {
     const card = page.getByTestId('card-vistoria').filter({ hasText: 'Bloco 3 - nº 705' });
     await expect(card.getByTestId('resultado-card')).toHaveText('Vistoria aceita');
     await card.getByTestId('iniciar-atendimento-vistoria').click();
-    await expect(page).toHaveURL(/passo=5/);
+    await expect(page).toHaveURL(/passo=4/);
     // resumo final
     await expect(page.getByTestId('resumo-vistoria')).toContainText('Vistoria aceita');
     await expect(page.getByTestId('resumo-vistoria')).toContainText('EVA ACEITA');
@@ -441,7 +486,7 @@ test.describe('onde o resultado aparece', () => {
     expect(l704).toContain('Vistoria não aceita');
     expect(l704).toContain('Rejunte do banheiro solto');
     expect(l704).toContain('(21) 98888-7777');
-    expect(l704).toContain('sem documento');
+    expect(l704).toContain('"assinado"');
 
     // dashboard
     await page.goto('/admin/dashboard', { waitUntil: 'networkidle' });
