@@ -2,7 +2,7 @@
   import { enhance } from '$app/forms';
   import SubmitButton from '$lib/components/SubmitButton.svelte';
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
-  import { AVISO_BLOCO_VISTORIA } from '$lib/servicos.js';
+  import { AVISO_BLOCO_VISTORIA, MENSAGEM_ANTECEDENCIA_VISTORIA } from '$lib/servicos.js';
 
   let { data, form } = $props();
 
@@ -62,8 +62,14 @@
   const faltaProcuracao = $derived(ehProprietario === 'nao' && !arquivoProcuracao);
   const faltaIdentidade = $derived(ehProprietario === 'nao' && !arquivoIdentidade);
 
+  const dataAntecipada = $derived(Boolean(dataEscolhida) && dataEscolhida < data.dataMinima);
+
   function aoSubmeter({ cancel }) {
     tentouEnviar = true;
+    if (dataAntecipada) {
+      cancel();
+      return;
+    }
     if (faltaProcuracao || faltaIdentidade) {
       cancel();
       return;
@@ -229,6 +235,9 @@
           </select>
         </div>
       </div>
+      {#if dataAntecipada}
+        <div data-testid="erro-antecedencia"><AvisoSutil>{MENSAGEM_ANTECEDENCIA_VISTORIA}</AvisoSutil></div>
+      {/if}
       {#if data.agenda.length === 0}
         <AvisoSutil>No momento não há datas abertas para agendamento. Tente novamente mais tarde.</AvisoSutil>
       {/if}
