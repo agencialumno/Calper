@@ -5,7 +5,13 @@ import { gerarSenhaTemporaria, hashSenha } from '$lib/server/auth.js';
 import { TIPOS_PROCURACAO, arquivoParaBase64, gerarQrToken } from '$lib/server/agendamento.js';
 import { agendaPublica, conferirVaga, dataHoraDoSlot } from '$lib/server/agenda.js';
 import { buscarMurano } from '$lib/server/entregaChaves.js';
-import { SERVICOS, blocoPermitido } from '$lib/servicos.js';
+import {
+  SERVICOS,
+  blocoPermitido,
+  MENSAGEM_ANTECEDENCIA_VISTORIA,
+  dataMinimaVistoria,
+  respeitaAntecedenciaVistoria
+} from '$lib/servicos.js';
 import { notificarFuncionarios } from '$lib/server/notificacao.js';
 import { registrarLog } from '$lib/server/log.js';
 import { formatarCpf } from '$lib/cpf.js';
@@ -46,6 +52,7 @@ async function carregarUnidades(empreendimentoId, tipoEventoId) {
 export async function load() {
   const [murano, tipoEvento] = await Promise.all([buscarMurano(), db.tipoEvento.findUnique({ where: { slug: SLUG } })]);
   return {
+    dataMinima: dataMinimaVistoria(),
     disponivel: Boolean(murano && tipoEvento),
     unidades: murano && tipoEvento ? await carregarUnidades(murano.id, tipoEvento.id) : [],
     // dias e horários abertos para VISTORIA (agenda própria, aberta pela equipe em /admin/agenda-vistoria)
@@ -121,6 +128,9 @@ export const actions = {
       where: { unidadeId: unidade.id, tipoEventoId: tipoEvento.id, status: { not: 'cancelado' } }
     });
     if (jaAgendada) return erro(`Esta unidade já tem ${rotuloMin} agendada. Escolha outra.`);
+
+    // antecedência mínima (só cliente, nesta página pública; a equipe remarca sem essa trava)
+    if (!respeitaAntecedenciaVistoria(valores.data)) return erro(MENSAGEM_ANTECEDENCIA_VISTORIA);
 
     const dataHora = dataHoraDoSlot(valores.data, valores.horario);
     const vaga = await conferirVaga(db, valores.data, valores.horario, { servico });
