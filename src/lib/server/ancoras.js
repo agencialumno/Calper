@@ -31,10 +31,3 @@ export const ANCORA_FICHA = {
   calper: '[FICHA M1]',
   assinante: (n) => `[FICHA ASSINANTE ${n}]`
 };
-
-// Campos que quem acompanha pela Calper preenche na hora de assinar (obrigatórios): nome, sobrenome e rubrica.
-// Âncora invisível sobre cada linha, uma série por parte do documento.
-export const CAMPOS_CALPER = {
-  termo: { nome: '[VISTORIA M1 NOME]', sobrenome: '[VISTORIA M1 SOBRENOME]', rubrica: '[VISTORIA M1 RUBRICA]' },
-  ficha: { nome: '[FICHA M1 NOME]', sobrenome: '[FICHA M1 SOBRENOME]', rubrica: '[FICHA M1 RUBRICA]' }
-};

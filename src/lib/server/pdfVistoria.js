@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { LOGO_DOCUMENTOS_BASE64 } from './assets/logoDocumentos.js';
-import { ANCORA_FICHA, ANCORA_VISTORIA, CAMPOS_CALPER } from './ancoras.js';
+import { ANCORA_FICHA, ANCORA_VISTORIA } from './ancoras.js';
 import { LARGURA_LINHA_VISTORIA } from './caixaAssinatura.js';
 import { quebrarLinhas, textoSeguro } from './pdfTermo.js';
 
@@ -52,28 +52,6 @@ export async function gerarPdfVistoria(texto, titulo) {
     pagina.drawText(str, { x, y: PAGINA.altura - y, size: tamanho, font: f, color: cor });
   const centralizado = (str, f, tamanho) => desenhar(str, (PAGINA.largura - f.widthOfTextAtSize(str, tamanho)) / 2, f, tamanho);
 
-  // Nome, sobrenome e rubrica: quem acompanha pela Calper preenche na hora de assinar (campos obrigatórios do DocuSign,
-  // posicionados pelas âncoras invisíveis sobre cada linha).
-  const CAMPOS_LINHAS = [
-    { chave: 'nome', rotulo: 'Nome', largura: 150 },
-    { chave: 'sobrenome', rotulo: 'Sobrenome', largura: 150 },
-    { chave: 'rubrica', rotulo: 'Rubrica', largura: 80 }
-  ];
-  const desenharCamposCalper = (ancoras) => {
-    garantir(70);
-    y += 46; // espaço para os campos preenchidos (acima da linha)
-    const folga = 18;
-    const total = CAMPOS_LINHAS.reduce((t, c) => t + c.largura, 0) + folga * (CAMPOS_LINHAS.length - 1);
-    let x = (PAGINA.largura - total) / 2;
-    for (const c of CAMPOS_LINHAS) {
-      pagina.drawLine({ start: { x, y: PAGINA.altura - y }, end: { x: x + c.largura, y: PAGINA.altura - y }, thickness: 0.6, color: COR });
-      pagina.drawText(ancoras[c.chave], { x, y: PAGINA.altura - y, size: 1, font: fonte, color: rgb(1, 1, 1) });
-      pagina.drawText(c.rotulo, { x, y: PAGINA.altura - y - 10, size: 8, font: fonte, color: COR });
-      x += c.largura + folga;
-    }
-    y += 14;
-  };
-
   novaPagina();
   pagina.drawImage(logo, { x: PAGINA.largura - MARGEM - LOGO.largura, y: PAGINA.altura - MARGEM - LOGO.altura + 14, width: LOGO.largura, height: LOGO.altura });
   y = MARGEM + LOGO.altura + 16;
@@ -105,7 +83,7 @@ export async function gerarPdfVistoria(texto, titulo) {
     indiceVisivel++;
 
     if (marcador) {
-      garantir(ESPACO_ASSINATURA + PASSO * 2 + (marcador[2].startsWith('REPRESENTANTE') ? 70 : 0));
+      garantir(ESPACO_ASSINATURA + PASSO * 2);
       y += assinaturasDesenhadas === 0 ? ESPACO_PRIMEIRA_ASSINATURA : ESPACO_ASSINATURA;
       assinaturasDesenhadas++;
       const larguraLinha = LARGURA_LINHA_VISTORIA;
@@ -120,7 +98,6 @@ export async function gerarPdfVistoria(texto, titulo) {
       y += PASSO - 2;
       if (nome) centralizado(papel, fonte, 9);
       y += PASSO;
-      if (marcador[2].startsWith('REPRESENTANTE')) desenharCamposCalper(marcador[1] ? CAMPOS_CALPER.ficha : CAMPOS_CALPER.termo);
       brancos = 0;
       continue;
     }

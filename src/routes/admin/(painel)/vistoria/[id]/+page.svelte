@@ -5,7 +5,7 @@
   import AvisoSutil from '$lib/components/AvisoSutil.svelte';
   import UnidadeStatus from '$lib/components/UnidadeStatus.svelte';
   import { formatarCpf } from '$lib/cpf.js';
-  import { rotuloDaTentativa } from '$lib/vistoria.js';
+  import { rotuloDaTentativa, medirReparos, LINHAS_REPAROS_PAGINA_1 } from '$lib/vistoria.js';
   import { fotosParaPdf } from '$lib/fotoParaPdf.js';
 
   let { data, form } = $props();
@@ -13,6 +13,8 @@
   let u = $derived(data.unidade);
   let a = $derived(data.agendamento);
   let enviando = $state(false);
+  let reparosDigitados = $state(null);
+  let medidaReparos = $derived(medirReparos(reparosDigitados ?? a.reparos));
   let abrirCorrecao = $state(false);
   const travada = $derived(a.status === 'cancelado' || a.status === 'realizado');
 
@@ -328,7 +330,11 @@
           <div class="border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
             <div>
               <label for="reparos" class="block text-xs font-semibold text-gray-500 mb-1">Reparos necessários (obrigatório)</label>
-              <textarea id="reparos" name="reparos" rows="6" maxlength="4000" class="input text-sm" required>{a.reparos}</textarea>
+              <textarea id="reparos" name="reparos" rows="6" maxlength="4000" class="input text-sm" required oninput={(e) => (reparosDigitados = e.currentTarget.value)}>{a.reparos}</textarea>
+              <div class="mt-1 text-xs text-gray-500" data-testid="reparos-contador">{medidaReparos.linhas} linha(s) · {medidaReparos.caracteres}/4000 caracteres</div>
+              {#if !medidaReparos.cabeNaPagina1}
+                <div class="mt-1 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2" data-testid="reparos-aviso">Passou do que cabe na página 1 da Ficha (cerca de {LINHAS_REPAROS_PAGINA_1} linhas): o restante vai para uma página extra de continuação. A assinatura continua na página 1.</div>
+              {/if}
             </div>
             <div>
               <label for="telefoneRetorno" class="block text-xs font-semibold text-gray-500 mb-1">Telefone para contato (obrigatório)</label>

@@ -4,7 +4,8 @@ import { buscarMurano } from './murano.js';
 import { SLUG_VISTORIA } from '../servicos.js';
 import { agoraComoRelogioDeBrasilia, conferirVaga, dataHoraDoSlot } from './agenda.js';
 import { gerarQrToken } from './agendamento.js';
-import { dataPorExtenso, gerarPdfBase64, obterTemplate, preencher, textosDePartes, titularesDaUnidade, montarVariaveis } from './documentos.js';
+import { dataPorExtenso, obterTemplate, textosDePartes, titularesDaUnidade, montarVariaveis } from './documentos.js';
+import { gerarPdfModeloVistoria } from './pdfModeloVistoria.js';
 import {
   DOCUMENTO_ID,
   anularEnvelope,
@@ -98,30 +99,42 @@ async function baseDoDocumento(ag) {
   return { template, signatarios, variaveis };
 }
 
+/** Linhas do cabeçalho do FORM-020 (as mesmas da prévia e do PDF): o PDF é o modelo oficial com estes campos escritos por cima. */
+function cabecalhoFormulario(variaveis) {
+  return [
+    'Obra: Murano Residencial',
+    `Bloco: ${variaveis.bloco} | Unidade: ${variaveis.unidade}`,
+    `Data: ${dataCurtaDeHoje()}`,
+    `Nome do Cliente: ${variaveis.proprietarios}`
+  ].join('\n');
+}
+
+const dataCurtaDeHoje = () => new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
 /**
- * Texto do Termo de Recebimento do Imóvel para a unidade, com as variáveis preenchidas. `calperNome` = funcionário que atende.
- * Variáveis sem valor ficam como {{variável}} para a equipe completar na prévia.
+ * Prévia do Termo de Recebimento do Imóvel (FORM-020, vistoria aceita) para a unidade. O PDF é o modelo oficial; aqui só
+ * aparecem os campos preenchidos. Campos sem valor ficam como {{variável}} para a equipe completar na prévia.
  */
-export async function montarTermoVistoria(ag, calperNome) {
-  const { template, signatarios, variaveis } = await baseDoDocumento(ag);
-  // com o template antigo sem {{assinaturas}}, as linhas entram no fim
-  const texto = preencher(template.conteudo, { ...variaveis, assinaturas: linhasDeAssinatura(signatarios, calperNome) });
-  return ajustarAssinaturasVistoria(texto, signatarios, calperNome);
+export async function montarTermoVistoria(ag) {
+  const { variaveis } = await baseDoDocumento(ag);
+  return [
+    'TERMO DE RECEBIMENTO DO IMÓVEL',
+    'FICHA DE VISTORIA E ENTREGA DE UNIDADE - FORM-020 - Rev. 06',
+    cabecalhoFormulario(variaveis),
+    `Rio de Janeiro, ${variaveis.dataAssinatura}.`
+  ].join('\n');
 }
 
 /**
- * FORM-020 da vistoria NÃO aceita: a parte superior (Ficha de reparos) já preenchida, assinada agora (Calper, depois o
- * cliente), e o Termo de Recebimento embaixo, ainda sem assinatura (se houver revistoria aceita, ela assina ali, sobre este mesmo PDF).
+ * Prévia do FORM-020 da vistoria NÃO aceita: Ficha de reparos preenchida (assinada agora, Calper e depois o cliente) e o
+ * Termo de Recebimento embaixo, em branco (se houver revistoria aceita, ela assina ali, sobre este mesmo PDF).
  */
-export async function montarFichaVistoria(ag, calperNome) {
-  const { template, signatarios, variaveis } = await baseDoDocumento(ag);
-  const termo = preencher(template.conteudo, { ...variaveis, assinaturas: linhasDeAssinatura(signatarios, calperNome, { semNomeCalper: true }) });
-  const ficha = [
+export async function montarFichaVistoria(ag) {
+  const { variaveis } = await baseDoDocumento(ag);
+  return [
     'FICHA DE REPAROS',
     'FICHA DE VISTORIA E ENTREGA DE UNIDADE - FORM-020 - Rev. 06',
-    'Obra: Murano Residencial',
-    `Bloco: ${variaveis.bloco} | Unidade: ${variaveis.unidade}`,
-    `Nome do Cliente: ${variaveis.proprietarios}`,
+    cabecalhoFormulario(variaveis),
     `Vistoria: ${ag.vistoriaNumero}ª — resultado: VISTORIA NÃO ACEITA`,
     '',
     'Reparos necessários:',
@@ -129,14 +142,24 @@ export async function montarFichaVistoria(ag, calperNome) {
     '',
     `Telefone para contato: ${ag.vistoriaTelefoneRetorno ?? ''}`,
     '',
-    `Rio de Janeiro, ${variaveis.dataAssinatura}.`,
-    '',
-    linhasDeAssinatura(signatarios, calperNome, { ficha: true }),
-    '',
-    '[PAGINA]',
-    ajustarAssinaturasVistoria(termo, signatarios, calperNome, {})
+    `Rio de Janeiro, ${variaveis.dataAssinatura}.`
   ].join('\n');
-  return ficha;
+}
+
+/** Lê de volta, da prévia (já revisada pela equipe), os campos que o PDF do modelo recebe. */
+export function dadosDaPreviaVistoria(texto) {
+  const linha = (re) => re.exec(texto)?.[1]?.trim() ?? '';
+  const bu = /^Bloco:\s*(.*?)\s*\|\s*Unidade:\s*(.*)$/m.exec(texto);
+  const reparos = /^Reparos necessários:[^\S\n]*\n([\s\S]*?)\n[^\S\n]*Telefone para contato:/m.exec(texto)?.[1]?.trim() ?? '';
+  return {
+    bloco: bu?.[1]?.trim() ?? '',
+    unidade: bu?.[2]?.trim() ?? '',
+    proprietarios: linha(/^Nome do Cliente:\s*(.*)$/m),
+    dataCurta: linha(/^Data:\s*(.*)$/m),
+    data: linha(/^Rio de Janeiro,\s*(.*?)\.?\s*$/m),
+    reparos,
+    telefone: linha(/^Telefone para contato:[^\S\n]*(.*)$/m)
+  };
 }
 
 /** PDF assinado da vistoria anterior (não aceita) da unidade, base do envelope da revistoria; null se não houver. */
@@ -188,12 +211,19 @@ export async function enviarTermoVistoria(event, { agendamentoId, texto }) {
   let envelopeId;
   let comCopia = false;
   try {
-    const pdfBase64 = base ? base.pdfBase64 : await gerarPdfBase64(textoFinal, nomeDocumento, 'vistoria');
+    const pdfBase64 = base
+      ? base.pdfBase64
+      : await gerarPdfModeloVistoria({
+          ...dadosDaPreviaVistoria(textoFinal),
+          parte: ehFicha ? 'ficha' : 'termo',
+          assinantes: quem.signatarios.map((x) => ({ nome: x.nome, procurador: x.vinculo === 'procurador' }))
+        });
     const copia = await destinatarioDaCopia();
     ({ envelopeId, comCopia } = await criarEnvelopeVistoria({
       pdfBase64,
       nomeDocumento,
       parte: ehFicha ? 'ficha' : 'termo',
+      linhas: base ? base.linhas : quem.signatarios.length,
       // a Calper assina pelo funcionário que faz o atendimento (nome e e-mail do perfil dele)
       calper: { nome: locals.funcionario.nome, email: locals.funcionario.email, clientUserId: ag.id },
       assinantes: quem.signatarios,
@@ -202,6 +232,7 @@ export async function enviarTermoVistoria(event, { agendamentoId, texto }) {
     // reenvio com o texto corrigido antes de a Calper assinar: o envelope anterior fica sem uso
     if (existente?.docusignEnvelopeId) await anularEnvelope(existente.docusignEnvelopeId, 'termo reenviado com outro texto');
   } catch (err) {
+    if (err?.amigavel) return { erro: err.message };
     console.error('DocuSign (vistoria):', err?.response?.body ?? err);
     return { erro: 'Não foi possível enviar para assinatura (DocuSign). Veja o log do servidor.' };
   }

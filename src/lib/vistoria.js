@@ -72,3 +72,14 @@ export function motivoSemRevistoria(ag, { existeProxima = false } = {}) {
   if (existeProxima) return 'já existe uma revistoria aberta para esta unidade';
   return null;
 }
+
+// Reparos da Ficha FORM-020: a página 1 do modelo comporta ~9 linhas; acima disso o resto segue em página de continuação.
+export const LINHAS_REPAROS_PAGINA_1 = 9;
+const CARACTERES_POR_LINHA = 140; // estimativa conservadora (o PDF mede a largura real)
+
+/** Quantas linhas os reparos ocupam e se cabem na página 1 da Ficha (estimativa para o aviso na tela). */
+export function medirReparos(texto) {
+  const t = String(texto ?? '');
+  const linhas = t.trim() === '' ? 0 : t.split(/\r?\n/).reduce((n, l) => n + Math.max(1, Math.ceil(l.length / CARACTERES_POR_LINHA)), 0);
+  return { linhas, caracteres: t.length, cabeNaPagina1: linhas <= LINHAS_REPAROS_PAGINA_1 };
+}
