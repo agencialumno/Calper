@@ -1,9 +1,11 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { defineConfig } from 'vite';
+import { pdfBase64 } from './vite-pdf-base64.js';
 
 export default defineConfig({
   plugins: [
+    pdfBase64(),
     sveltekit(),
     SvelteKitPWA({
       strategies: 'injectManifest',

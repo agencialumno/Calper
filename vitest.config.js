@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
+import { pdfBase64 } from './vite-pdf-base64.js';
 
 // Testes de unidade (rápidos, sem banco e sem navegador): funções puras do servidor e das regras de negócio.
 export default defineConfig({
+  plugins: [pdfBase64()],
   resolve: {
     alias: {
       $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),

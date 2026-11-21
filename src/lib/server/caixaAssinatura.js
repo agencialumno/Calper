@@ -8,10 +8,10 @@ export const LARGURA_LINHA = 440; // largura da linha de assinatura nos PDFs, em
 // Termo de vistoria: linha mais curta (330 pt) e centralizada na página.
 export const LARGURA_LINHA_VISTORIA = 330;
 
-export function xOffsetCentralizado(nome, larguraLinha = LARGURA_LINHA) {
+export function xOffsetCentralizado(nome, larguraLinha = LARGURA_LINHA, escala = 1.5) {
   const texto = String(nome ?? '').trim();
   const porLetra = texto === texto.toUpperCase() ? 11.3 : 8.6;
-  const largura = Math.min(larguraLinha - 10, texto.length * porLetra);
+  const largura = Math.min(larguraLinha - 10, (texto.length * porLetra * escala) / 1.5);
   return String(Math.max(5, Math.round((larguraLinha - largura) / 2)));
 }
 
