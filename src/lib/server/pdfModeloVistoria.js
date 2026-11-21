@@ -34,6 +34,11 @@ function faixasDosDonos(L, n) {
 // O PDF do modelo entra no código do servidor como base64 (ver vite-pdf-base64.js), então vai junto no deploy.
 const bytesDoModelo = () => Buffer.from(modeloBase64, 'base64');
 
+// texto que sobrou da página 1: junta as linhas quebradas, preservando o fim de cada parágrafo
+function restante(linhas, fimPar, de) {
+  return linhas.slice(de).map((l, i) => l + (fimPar.has(de + i) ? '\n' : ' ')).join('');
+}
+
 /** Reduz o corpo da fonte até o texto caber em `largura` (mínimo 6 pt); corta com "…" se ainda não couber. */
 function ajustar(fonte, str, tamanho, largura) {
   let t = tamanho;
@@ -89,6 +94,7 @@ export async function gerarPdfModeloVistoria(d) {
   const nome = ajustar(negrito, seguro(negrito, d.proprietarios), 8.5, 420);
   texto(nome.texto, 131, 148.4, negrito, nome.tamanho);
 
+  let continuacao = [];
   if (d.parte === 'ficha') {
     // reparos: área livre entre o enunciado e a caixa do telefone; a fonte encolhe até caber
     const larg = 499;
@@ -100,15 +106,22 @@ export async function gerarPdfModeloVistoria(d) {
       .join('\n')
       .trim();
     let tamanho = 9.5;
-    let linhas = quebrar(fonte, reparos, tamanho, larg);
+    let fimPar = new Set();
+    const quebrarPar = () => { fimPar = new Set(); const todas = []; for (const par of reparos.split('\n')) { todas.push(...quebrar(fonte, par, tamanho, larg)); fimPar.add(todas.length - 1); } return todas; };
+    let linhas = quebrarPar();
     while (tamanho > 6.5 && linhas.length * (tamanho + 1.6) > limite - topo) {
       tamanho -= 0.25;
-      linhas = quebrar(fonte, reparos, tamanho, larg);
+      linhas = quebrarPar();
     }
     if (linhas.length * (tamanho + 1.6) > limite - topo) {
-      const e = new Error('Os reparos não cabem na Ficha de Vistoria (FORM-020). Resuma o texto dos reparos.');
-      e.amigavel = true;
-      throw e;
+      tamanho = 8; // nem no menor corpo cabe: a página 1 fica legível e o resto vai para a continuação
+      linhas = quebrarPar();
+    }
+    const cabem = Math.floor((limite - topo) / (tamanho + 1.6));
+    if (linhas.length > cabem) {
+      // não cabe na página 1: ela mantém o layout do modelo e o resto segue em página(s) de continuação
+      continuacao = quebrar(fonte, restante(linhas, fimPar, cabem - 1), 10, 495);
+      linhas = [...linhas.slice(0, cabem - 1), '(continua na página 2)'];
     }
     linhas.forEach((l, i) => texto(l, 52, topo + i * (tamanho + 1.6), fonte, tamanho));
     texto(seguro(fonte, d.telefone ?? ''), 142, 288.4, fonte, 9);
@@ -144,5 +157,34 @@ export async function gerarPdfModeloVistoria(d) {
   if (d.parte === 'ficha') bloco('ficha', ANCORA_FICHA, 409, () => { retangulo(70, 389, 250, 399); retangulo(60, 404.5, 312, 415); });
   bloco('termo', ANCORA_VISTORIA, 666, () => { retangulo(80, 650.5, 312, 658.5); retangulo(60, 661, 312, 673); });
 
+  if (continuacao.length) await paginasDeContinuacao(pdf, { fonte, negrito, d, linhas: continuacao, pg, retangulo, texto });
+
   return Buffer.from(await pdf.save()).toString('base64');
+}
+
+/** Páginas extras com a continuação dos reparos (a página 1 do modelo e as âncoras de assinatura não mudam). */
+async function paginasDeContinuacao(pdf, { fonte, negrito, d, linhas, retangulo, texto }) {
+  const TAM = 10;
+  const PASSO = 14;
+  const POR_PAGINA = 48;
+  const grupos = [];
+  for (let i = 0; i < linhas.length; i += POR_PAGINA) grupos.push(linhas.slice(i, i + POR_PAGINA));
+  const total = 1 + grupos.length;
+  // "Folha 1 / 1" do modelo passa a "1 / N"
+  retangulo(489, 105.5, 512, 116.5);
+  const f1 = `1 / ${total}`;
+  texto(f1, 499.5 - negrito.widthOfTextAtSize(f1, 8.5) / 2, 114.1, negrito, 8.5);
+  grupos.forEach((grupo, k) => {
+    const pagina = pdf.addPage([595.28, ALTURA]);
+    const t = (str, x, y, f, size) => pagina.drawText(str, { x, y: ALTURA - y, size, font: f, color: PRETO });
+    const centro = (str, y, f, size) => t(str, (595.28 - f.widthOfTextAtSize(str, size)) / 2, y, f, size);
+    centro('FICHA DE VISTORIA E ENTREGA DE UNIDADE - FORM-020 - Rev. 06', 60, negrito, 11);
+    centro('Continuação dos reparos necessários', 76, fonte, 10);
+    const cab = ajustar(negrito, textoSeguro(negrito, `Bloco: ${d.bloco} | Unidade: ${d.unidade} | Nome do Cliente: ${d.proprietarios}`), 9, 495);
+    t(cab.texto, 50, 100, negrito, cab.tamanho);
+    pagina.drawLine({ start: { x: 50, y: ALTURA - 106 }, end: { x: 545, y: ALTURA - 106 }, thickness: 0.6, color: PRETO });
+    grupo.forEach((l, i) => t(l, 50, 126 + i * PASSO, fonte, TAM));
+    const rod = `Folha ${k + 2} / ${total}`;
+    t(rod, 545 - fonte.widthOfTextAtSize(rod, 9), 800, fonte, 9);
+  });
 }
