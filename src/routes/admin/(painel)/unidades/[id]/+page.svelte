@@ -11,6 +11,27 @@
   let adicionando = $state(false);
   let editandoEmailDe = $state(null); // investidorId em edição, ou null
   let salvandoEmail = $state(false);
+  let adicionandoCompradorAberto = $state(false);
+  let salvandoComprador = $state(false);
+  let nomeComprador = $state('');
+  let compradorPrincipal = $state(false);
+  let erroComprador = $state('');
+
+  function aoSubmeterComprador() {
+    salvandoComprador = true;
+    erroComprador = '';
+    return async ({ result, update }) => {
+      salvandoComprador = false;
+      if (result.type === 'failure') {
+        erroComprador = result.data?.erroComprador ?? 'Erro ao adicionar comprador.';
+      } else {
+        await update();
+        adicionandoCompradorAberto = false;
+        nomeComprador = '';
+        compradorPrincipal = false;
+      }
+    };
+  }
 
   function aoSubmeterApontamento() {
     adicionando = true;
@@ -101,28 +122,95 @@
     </div>
 
     <!-- compradores (base Murano) + documentos de entrega -->
-    {#if u.compradores.length > 0 || u.tipologia || u.vistoriaStatus}
-      <div class="card p-6 flex flex-col gap-4">
+    <div class="card p-6 flex flex-col gap-4">
+      <div class="flex items-center justify-between">
         <div class="text-sm font-bold text-calper-dark">Compradores e entrega de chaves</div>
-        {#each u.compradores as c}
-          <div class="text-sm text-calper-dark">
-            {c.nome}
-            {#if c.principal}<span class="text-[11px] font-bold text-calper-red ml-1">principal</span>{/if}
+      </div>
+
+      {#if u.compradores.length > 0}
+        <div class="flex flex-col gap-2">
+          {#each u.compradores as c}
+            <div class="text-sm text-calper-dark flex items-center justify-between">
+              <span class="font-medium">{c.nome}</span>
+              {#if c.principal}
+                <span class="text-[11px] font-bold text-calper-red bg-red-50 px-2 py-0.5 rounded-full ml-1.5">
+                  principal
+                </span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <p class="text-sm text-gray-400">Sem comprador cadastrado.</p>
+      {/if}
+
+      {#if data.podeEditar}
+        {#if !adicionandoCompradorAberto}
+          <div>
+            <button
+              type="button"
+              onclick={() => { adicionandoCompradorAberto = true; erroComprador = ''; }}
+              class="text-xs font-bold text-calper-red hover:underline inline-flex items-center gap-1"
+            >
+              + Adicionar comprador
+            </button>
           </div>
         {:else}
-          <p class="text-sm text-gray-400">Sem comprador cadastrado.</p>
-        {/each}
-        <div class="flex gap-4 text-sm font-bold text-calper-red">
-          <a href="/admin/unidades/{u.id}/termo-entrega">Termo de entrega</a>
-          <a href="/admin/unidades/{u.id}/checklist">Checklist</a>
-        </div>
-      </div>
-    {:else}
-      <div class="card p-6 flex gap-4 text-sm font-bold text-calper-red items-start">
+          <form
+            method="POST"
+            action="?/adicionarComprador"
+            use:enhance={aoSubmeterComprador}
+            class="flex flex-col gap-2.5 p-3.5 bg-gray-50/80 border border-gray-200/80 rounded-xl"
+          >
+            <div class="text-xs font-bold text-calper-dark">Novo comprador</div>
+            <input
+              type="text"
+              name="nome"
+              bind:value={nomeComprador}
+              placeholder="Nome completo do comprador"
+              required
+              class="input text-xs !py-2 bg-white"
+            />
+            {#if u.compradores.length > 0}
+              <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  name="principal"
+                  bind:checked={compradorPrincipal}
+                  class="rounded border-gray-300 text-calper-red focus:ring-calper-red"
+                />
+                Definir como comprador principal
+              </label>
+            {:else}
+              <input type="hidden" name="principal" value="true" />
+              <p class="text-[11px] text-gray-500">Será definido como comprador principal.</p>
+            {/if}
+
+            {#if erroComprador}
+              <p class="text-xs text-red-600 font-medium">{erroComprador}</p>
+            {/if}
+
+            <div class="flex items-center gap-2 mt-1">
+              <SubmitButton loading={salvandoComprador} class="!py-1.5 !px-3 text-xs w-auto">
+                Salvar comprador
+              </SubmitButton>
+              <button
+                type="button"
+                onclick={() => { adicionandoCompradorAberto = false; erroComprador = ''; nomeComprador = ''; }}
+                class="text-xs text-gray-500 hover:text-gray-700 font-semibold px-2 py-1.5"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        {/if}
+      {/if}
+
+      <div class="flex gap-4 text-sm font-bold text-calper-red pt-1 border-t border-gray-100">
         <a href="/admin/unidades/{u.id}/termo-entrega">Termo de entrega</a>
         <a href="/admin/unidades/{u.id}/checklist">Checklist</a>
       </div>
-    {/if}
+    </div>
 
     <!-- investidores -->
     <div class="card p-6">

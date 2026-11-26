@@ -5,7 +5,7 @@
 // se a regra mudar.
 export const VISTORIA_SEM_AGENDAMENTO = ['EM ESTOQUE', 'JURÍDICO', 'UNIDADES EM NOTIFICAÇÃO'];
 
-const semAcento = (s) =>
+export const semAcento = (s) =>
   String(s ?? '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
