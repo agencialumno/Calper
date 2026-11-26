@@ -4,6 +4,7 @@ import { registrarLog, rotuloFuncionario } from '$lib/server/log.js';
 import { quartosDaUnidade } from '$lib/server/documentos.js';
 import { statusDaUnidade } from '$lib/server/unidadeStatus.js';
 import { podeEditar } from '$lib/perfis.js';
+import { semAcento } from '$lib/unidadeAgendavel.js';
 import { presentesDoAgendamento, rotuloDaVistoria } from '$lib/vistoria.js';
 import { buscarMurano } from '$lib/server/entregaChaves.js';
 import { agendamentosAtivosPorUnidade, atendimentoDaUnidade } from '$lib/server/atendimentoDireto.js';
@@ -172,5 +173,68 @@ export const actions = {
 
     await logUnidade(event, 'unidade_editada', `atualizou o e-mail de contato de um investidor para ${email}`);
     return { sucesso: true, emailAtualizado: true };
+  },
+
+  adicionarComprador: async (event) => {
+    const { request, params, locals } = event;
+    if (!podeEditar(locals.funcionario?.perfil)) {
+      return fail(403, { erroComprador: 'Seu perfil não pode alterar dados.' });
+    }
+
+    const form = await request.formData();
+    const nome = String(form.get('nome') ?? '').trim();
+    const marcarPrincipal = form.get('principal') === 'true' || form.get('principal') === 'on';
+
+    if (!nome) {
+      return fail(400, { erroComprador: 'Informe o nome do comprador.' });
+    }
+
+    const unidade = await db.unidade.findUnique({
+      where: { id: params.id },
+      select: { id: true, numero: true, bloco: true, compradores: true }
+    });
+
+    if (!unidade) {
+      return fail(404, { erroComprador: 'Unidade não encontrada.' });
+    }
+
+    const atuais = Array.isArray(unidade.compradores) ? [...unidade.compradores] : [];
+
+    const jaExiste = atuais.some((c) => semAcento(c.nome) === semAcento(nome));
+    if (jaExiste) {
+      return fail(400, { erroComprador: 'Já existe um comprador com este nome nesta unidade.' });
+    }
+
+    const ehPrincipal = atuais.length === 0 || marcarPrincipal;
+
+    let novos;
+    if (ehPrincipal) {
+      novos = atuais.map((c) => ({ ...c, principal: false }));
+      novos.push({ nome, principal: true });
+    } else {
+      novos = [...atuais, { nome, principal: false }];
+    }
+
+    await db.unidade.update({
+      where: { id: params.id },
+      data: { compradores: novos }
+    });
+
+    await db.historicoUnidade.create({
+      data: {
+        unidadeId: params.id,
+        tipo: 'cadastro',
+        descricao: `Comprador "${nome}" cadastrado${ehPrincipal ? ' (principal)' : ''}`,
+        criadoPorId: locals.funcionario.id
+      }
+    });
+
+    await logUnidade(
+      event,
+      'unidade_editada',
+      `adicionou o comprador "${nome}"${ehPrincipal ? ' (principal)' : ''}`
+    );
+
+    return { sucesso: true, compradorAdicionado: true };
   }
 };
